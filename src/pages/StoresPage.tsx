@@ -32,6 +32,8 @@ const StoresPage: React.FC<StoresPageProps> = ({
 
   // Debug: Log the data to see what we're receiving
   console.log('StoresPage - storeSummary:', storeSummary);
+  console.log('StoresPage - isRecalculating:', isRecalculating);
+  console.log('StoresPage - storesByAreaManager:', storesByAreaManager);
   const canAdd = profile?.role === 'admin';
   const canDelete = profile?.role === 'admin';
   const canEdit = profile?.role === 'admin' || profile?.role === 'general_manager';

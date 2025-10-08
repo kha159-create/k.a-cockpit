@@ -41,6 +41,8 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   // Debug: Log the data to see what we're receiving
   console.log('EmployeesPage - employeeSummary:', employeeSummary);
   console.log('EmployeesPage - allEmployees:', allEmployees);
+  console.log('EmployeesPage - isRecalculating:', isRecalculating);
+  console.log('EmployeesPage - filteredEmployeeSummary:', filteredEmployeeSummary);
 
   const canAdd = profile?.role === 'admin';
   const canDelete = profile?.role === 'admin';

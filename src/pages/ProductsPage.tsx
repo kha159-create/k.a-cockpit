@@ -27,6 +27,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
 
   // Debug: Log the data to see what we're receiving
   console.log('ProductsPage - productSummary:', productSummary);
+  console.log('ProductsPage - isRecalculating:', isRecalculating);
+  console.log('ProductsPage - filteredProducts:', filteredProducts);
 
   const filteredProducts = useMemo(() => {
     return productSummary.filter(p => {
