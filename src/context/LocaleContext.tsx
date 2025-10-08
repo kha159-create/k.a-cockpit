@@ -25,8 +25,8 @@ export const LocaleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const fetchTranslations = async () => {
       try {
         const [enResponse, arResponse] = await Promise.all([
-          fetch('./locales/en.json'),
-          fetch('./locales/ar.json')
+          fetch('/k.a-cockpit/locales/en.json'),
+          fetch('/k.a-cockpit/locales/ar.json')
         ]);
         if (!enResponse.ok || !arResponse.ok) {
             throw new Error(`Failed to fetch locale files: ${enResponse.statusText} & ${arResponse.statusText}`);

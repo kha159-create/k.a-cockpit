@@ -10,6 +10,17 @@ export default defineConfig(({ mode }) => {
   return {
     base: '/k.a-cockpit/',
     plugins: [react()],
+    publicDir: 'public',
+    build: {
+      assetsDir: 'assets',
+      rollupOptions: {
+        output: {
+          assetFileNames: 'assets/[name]-[hash][extname]',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          entryFileNames: 'assets/[name]-[hash].js'
+        }
+      }
+    },
     define: {
       'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY),
       // FIX: Define process.env variables for Firebase to fix errors in src/services/firebase.ts
