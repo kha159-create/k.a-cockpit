@@ -10,8 +10,8 @@ interface LoginPageProps {
 
 const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
   const { t } = useLocale();
-  const [identifier, setIdentifier] = useState('admin@alsani.com'); // Can be email or ID
-  const [password, setPassword] = useState('password123');
+  const [identifier, setIdentifier] = useState('kha.als@outlook.com'); // Can be email or ID
+  const [password, setPassword] = useState(''); // Empty password for security
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -38,7 +38,22 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
         // FIX: Use namespaced compat API for authentication.
         await auth.signInWithEmailAndPassword(userEmail, password);
     } catch (err: any) {
-      setError(err.message || t('error_login_failed'));
+      let errorMessage = err.message || t('error_login_failed');
+      
+      // رسائل خطأ مخصصة
+      if (err.code === 'auth/user-not-found') {
+        errorMessage = 'المستخدم غير موجود، تحقق من البريد الإلكتروني';
+      } else if (err.code === 'auth/wrong-password') {
+        errorMessage = 'كلمة المرور غير صحيحة';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'البريد الإلكتروني غير صحيح';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'محاولات تسجيل دخول كثيرة، حاول لاحقاً';
+      } else if (err.code === 'auth/invalid-login-credentials') {
+        errorMessage = 'بيانات تسجيل الدخول غير صحيحة';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -72,7 +87,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
           
           <div>
             <label className="label">{t('password')}</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="input" placeholder="password123"/>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="input" placeholder="أدخل كلمة المرور"/>
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
