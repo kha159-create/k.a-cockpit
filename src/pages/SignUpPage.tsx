@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 // FIX: Use namespaced compat API by importing auth and db services.
 import { auth, db } from '../services/firebase';
 import { useLocale } from '../context/LocaleContext';
+import firebase from 'firebase/app';
 
 interface SignUpPageProps {
   onSwitchToLogin: () => void;
@@ -25,29 +26,73 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
       setError(t('passwords_no_match'));
       return;
     }
+    
+    // التحقق من Employee ID
+    if (!employeeId || employeeId.length !== 4) {
+      setError('رقم الموظف يجب أن يكون 4 خانات');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     setSuccess(null);
+    
     try {
-      // FIX: Use namespaced compat API for authentication.
+      // التحقق من وجود Employee ID في مجموعة employees
+      const employeeDoc = await db.collection('employees').doc(employeeId).get();
+      
+      if (!employeeDoc.exists) {
+        setError('رقم الموظف غير مسجل، تواصل مع الإدارة');
+        setLoading(false);
+        return;
+      }
+      
+      const employeeData = employeeDoc.data();
+      
+      // التحقق من أن الموظف غير مربوط بحساب آخر
+      if (employeeData?.linkedAccount) {
+        setError('رقم الموظف مربوط بحساب آخر بالفعل');
+        setLoading(false);
+        return;
+      }
+      
+      // إنشاء حساب المستخدم
       const userCredential = await auth.createUserWithEmailAndPassword(email, password);
       const user = userCredential.user;
+      
       if (user) {
-        // FIX: Use namespaced compat API for user profile updates.
+        // تحديث معلومات المستخدم
         await user.updateProfile({ displayName: name });
-        // FIX: Use namespaced compat API for Firestore operations.
-        await db.collection('users').doc(user.uid).set({
-          id: user.uid,
-          name,
-          employeeId,
-          email,
-          role: 'employee', // Default role
-          status: 'pending', // Await admin approval
+        
+        // إنشاء سجل في pendingEmployees
+        await db.collection('pendingEmployees').doc(user.uid).set({
+          employeeId: employeeId,
+          email: email,
+          name: name,
+          role: 'employee',
+          status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          userId: user.uid
         });
-        setSuccess(t('sign_up_success'));
+        
+        // تسجيل الخروج فوراً (المستخدم لا يستطيع تسجيل الدخول حتى موافقة الإدارة)
+        await auth.signOut();
+        
+        setSuccess('تم إرسال طلب التسجيل بنجاح، يرجى انتظار موافقة الإدارة');
       }
     } catch (err: any) {
-      setError(err.message);
+      let errorMessage = err.message;
+      
+      // رسائل خطأ مخصصة
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = 'البريد الإلكتروني مستخدم بالفعل';
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage = 'كلمة المرور ضعيفة جداً';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'البريد الإلكتروني غير صحيح';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -70,7 +115,18 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
         ) : (
           <form className="space-y-4" onSubmit={handleSignUp}>
             <div><label className="label">{t('name')}</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="input" /></div>
-            <div><label className="label">{t('employee_id')}</label><input type="text" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required className="input" /></div>
+            <div>
+              <label className="label">رقم الموظف (4 خانات)</label>
+              <input 
+                type="text" 
+                value={employeeId} 
+                onChange={(e) => setEmployeeId(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+                required 
+                className="input" 
+                placeholder="مثال: 2156"
+                maxLength={4}
+              />
+            </div>
             <div><label className="label">{t('email')}</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="input" /></div>
             <div><label className="label">{t('password')}</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="input" /></div>
             <div><label className="label">{t('confirm_password')}</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className="input" /></div>

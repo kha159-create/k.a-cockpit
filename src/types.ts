@@ -19,7 +19,9 @@ export interface UserProfile {
     phone?: string;
     areaManager?: string; // For area_manager role
     store?: string; // For store_manager and employee roles
-    status?: 'pending' | 'active';
+    status?: 'pending' | 'approved' | 'active';
+    approvedAt?: Timestamp;
+    approvedBy?: string;
 }
 
 

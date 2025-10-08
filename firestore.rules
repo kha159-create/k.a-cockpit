@@ -1,0 +1,223 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isApprovedUser() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return isApprovedUser() && getUserRole() == 'admin';
+    }
+    
+    function isGeneralManager() {
+      return isApprovedUser() && getUserRole() == 'general_manager';
+    }
+    
+    function isAreaManager() {
+      return isApprovedUser() && getUserRole() == 'area_manager';
+    }
+    
+    function isStoreManager() {
+      return isApprovedUser() && getUserRole() == 'store_manager';
+    }
+    
+    function isEmployee() {
+      return isApprovedUser() && getUserRole() == 'employee';
+    }
+    
+    function getUserStore() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.store;
+    }
+    
+    function getUserArea() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.areaManager;
+    }
+    
+    // Users collection rules
+    match /users/{userId} {
+      // Users can read their own data
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Only admins can write to users collection
+      allow write: if isAdmin();
+      
+      // Allow users to create their own pending record during signup
+      allow create: if isAuthenticated() && 
+                      request.auth.uid == userId && 
+                      request.resource.data.status == 'pending';
+    }
+    
+    // Pending employees collection - only admins can access
+    match /pendingEmployees/{pendingId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Employees collection rules
+    match /employees/{employeeId} {
+      // Admins can read/write all employees
+      allow read, write: if isAdmin();
+      
+      // General managers can read all employees
+      allow read: if isGeneralManager();
+      
+      // Area managers can read employees in their area
+      allow read: if isAreaManager() && 
+                     resource.data.areaManager == getUserArea();
+      
+      // Store managers can read employees in their store
+      allow read: if isStoreManager() && 
+                     resource.data.store == getUserStore();
+      
+      // Employees can read their own data
+      allow read: if isEmployee() && 
+                     resource.data.employeeId == request.auth.uid;
+      
+      // Area managers can update employee targets in their area
+      allow update: if isAreaManager() && 
+                       resource.data.areaManager == getUserArea() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['target']);
+      
+      // General managers can update employee targets
+      allow update: if isGeneralManager() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['target']);
+    }
+    
+    // Stores collection rules
+    match /stores/{storeId} {
+      // Admins can read/write all stores
+      allow read, write: if isAdmin();
+      
+      // General managers can read all stores
+      allow read: if isGeneralManager();
+      
+      // Area managers can read stores in their area
+      allow read: if isAreaManager() && 
+                     resource.data.areaManager == getUserArea();
+      
+      // Store managers and employees can read their own store
+      allow read: if (isStoreManager() || isEmployee()) && 
+                     resource.data.id == getUserStore();
+      
+      // General managers can update store targets
+      allow update: if isGeneralManager() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['target']);
+    }
+    
+    // Daily metrics collection rules
+    match /dailyMetrics/{metricId} {
+      // Admins can read/write all metrics
+      allow read, write: if isAdmin();
+      
+      // General managers can read all metrics
+      allow read: if isGeneralManager();
+      
+      // Area managers can read metrics for stores in their area
+      allow read: if isAreaManager() && 
+                     resource.data.store in get(/databases/$(database)/documents/stores/$(resource.data.store)).data.areaManager;
+      
+      // Store managers and employees can read metrics for their store
+      allow read: if (isStoreManager() || isEmployee()) && 
+                     resource.data.store == getUserStore();
+      
+      // Store managers can create/update metrics for their store
+      allow create, update: if isStoreManager() && 
+                               resource.data.store == getUserStore();
+    }
+    
+    // Sales transactions collection rules
+    match /salesTransactions/{transactionId} {
+      // Admins can read/write all transactions
+      allow read, write: if isAdmin();
+      
+      // General managers can read all transactions
+      allow read: if isGeneralManager();
+      
+      // Area managers can read transactions for stores in their area
+      allow read: if isAreaManager() && 
+                     resource.data.store in get(/databases/$(database)/documents/stores/$(resource.data.store)).data.areaManager;
+      
+      // Store managers and employees can read transactions for their store
+      allow read: if (isStoreManager() || isEmployee()) && 
+                     resource.data.store == getUserStore();
+      
+      // Store managers can create/update transactions for their store
+      allow create, update: if isStoreManager() && 
+                               resource.data.store == getUserStore();
+    }
+    
+    // King duvet sales collection rules
+    match /kingDuvetSales/{saleId} {
+      // Admins can read/write all king duvet sales
+      allow read, write: if isAdmin();
+      
+      // General managers can read all king duvet sales
+      allow read: if isGeneralManager();
+      
+      // Area managers can read king duvet sales for stores in their area
+      allow read: if isAreaManager() && 
+                     resource.data.store in get(/databases/$(database)/documents/stores/$(resource.data.store)).data.areaManager;
+      
+      // Store managers and employees can read king duvet sales for their store
+      allow read: if (isStoreManager() || isEmployee()) && 
+                     resource.data.store == getUserStore();
+      
+      // Store managers can create/update king duvet sales for their store
+      allow create, update: if isStoreManager() && 
+                               resource.data.store == getUserStore();
+    }
+    
+    // Business rules collection - only admins and general managers
+    match /businessRules/{ruleId} {
+      allow read: if isGeneralManager() || isAdmin();
+      allow write: if isAdmin();
+    }
+    
+    // Tasks collection rules
+    match /tasks/{taskId} {
+      // Admins can read/write all tasks
+      allow read, write: if isAdmin();
+      
+      // General managers can read/write all tasks
+      allow read, write: if isGeneralManager();
+      
+      // Area managers can read/write tasks for their area
+      allow read, write: if isAreaManager() && 
+                           resource.data.assignedTo in get(/databases/$(database)/documents/employees).data.where('areaManager', '==', getUserArea());
+      
+      // Store managers can read/write tasks for their store
+      allow read, write: if isStoreManager() && 
+                           resource.data.assignedTo in get(/databases/$(database)/documents/employees).data.where('store', '==', getUserStore());
+      
+      // Employees can read their own tasks
+      allow read: if isEmployee() && resource.data.assignedTo == request.auth.uid;
+      
+      // Employees can update their own task status
+      allow update: if isEmployee() && 
+                       resource.data.assignedTo == request.auth.uid &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt']);
+    }
+    
+    // Notifications collection - only admins can access
+    match /notifications/{notificationId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

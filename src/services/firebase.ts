@@ -20,3 +20,50 @@ if (!firebase.apps.length) {
 
 export const auth = firebase.auth();
 export const db = firebase.firestore();
+
+// إدارة الصلاحيات والأدوار
+export const getUserRole = async (userId: string): Promise<string | null> => {
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      return userData?.role || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting user role:', error);
+    return null;
+  }
+};
+
+export const getUserStatus = async (userId: string): Promise<string | null> => {
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      return userData?.status || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting user status:', error);
+    return null;
+  }
+};
+
+export const isUserApproved = async (userId: string): Promise<boolean> => {
+  const status = await getUserStatus(userId);
+  return status === 'approved';
+};
+
+export const getUserProfile = async (userId: string) => {
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      return userDoc.data();
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting user profile:', error);
+    return null;
+  }
+};

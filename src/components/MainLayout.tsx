@@ -21,6 +21,8 @@ import StoreDetailPage from '@/pages/StoreDetailPage';
 import NaturalLanguageSearch from '@/components/NaturalLanguageSearch';
 import AiChatAssistant from '@/components/AiChatAssistant';
 import PendingApprovalPage from '@/pages/PendingApprovalPage';
+import PendingApprovalsPage from '@/pages/PendingApprovalsPage';
+import RolesManagementPage from '@/pages/RolesManagementPage';
 
 
 import { 
@@ -646,6 +648,8 @@ const handleNotificationClick = (notificationId: string) => {
           { icon: <DuvetIcon />, label: t('duvets'), name: "duvets", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
           { icon: <UploadIcon />, label: t('smart_upload'), name: "uploads", roles: ['admin', 'general_manager', 'area_manager'] as UserRole[] },
           { icon: <CogIcon />, label: t('settings'), name: "settings", roles: ['admin', 'general_manager'] as UserRole[] },
+          { icon: <span>⏳</span>, label: "الطلبات المعلقة", name: "pendingApprovals", roles: ['admin'] as UserRole[] },
+          { icon: <span>👥</span>, label: "إدارة الأدوار", name: "rolesManagement", roles: ['admin'] as UserRole[] },
       ];
       return allItems.filter(item => item.roles.includes(role));
   }, [profile, t]);
@@ -738,6 +742,10 @@ const handleNotificationClick = (notificationId: string) => {
                   onDeleteUser={handleDeleteUser}
                   setModalState={setModalState}
                />;
+     case 'pendingApprovals':
+        return <PendingApprovalsPage />;
+     case 'rolesManagement':
+        return <RolesManagementPage />;
     default:
       return (
         <div className="text-center p-10 bg-white rounded-lg shadow">

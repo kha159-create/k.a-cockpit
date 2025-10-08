@@ -1,17 +1,18 @@
 
 import { useState, useEffect } from 'react';
 // FIX: No longer need direct imports from 'firebase/auth' or 'firebase/firestore' when using compat API.
-import { auth, db } from '../services/firebase';
+import { auth, db, isUserApproved } from '../services/firebase';
 import type { User, UserProfile } from '../types';
 
 export interface AuthState {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  isApproved: boolean;
 }
 
 export const useAuth = (): AuthState => {
-  const [authState, setAuthState] = useState<AuthState>({ user: null, profile: null, loading: true });
+  const [authState, setAuthState] = useState<AuthState>({ user: null, profile: null, loading: true, isApproved: false });
 
   useEffect(() => {
     // FIX: Use namespaced compat API for onAuthStateChanged
@@ -36,7 +37,15 @@ export const useAuth = (): AuthState => {
           }
 
           if (userProfile) {
-              setAuthState({ user, profile: userProfile, loading: false });
+              // التحقق من حالة الموافقة
+              const approved = await isUserApproved(user.uid);
+              setAuthState({ user, profile: userProfile, loading: false, isApproved: approved });
+              
+              // إذا لم يكن المستخدم معتمد، امسحه من الجلسة
+              if (!approved) {
+                  await auth.signOut();
+                  setAuthState({ user: null, profile: null, loading: false, isApproved: false });
+              }
           } else {
               console.warn(`No profile document found for user with uid ${user.uid}. Falling back to default profile.`);
               const fallbackProfile: UserProfile = {
@@ -45,7 +54,7 @@ export const useAuth = (): AuthState => {
                   email: user.email || '',
                   role: 'employee',
               };
-              setAuthState({ user, profile: fallbackProfile, loading: false });
+              setAuthState({ user, profile: fallbackProfile, loading: false, isApproved: false });
           }
         } catch (error) {
             console.error("Error fetching user profile:", error);
@@ -55,10 +64,10 @@ export const useAuth = (): AuthState => {
                 email: user.email || '',
                 role: 'employee',
             };
-            setAuthState({ user, profile: errorFallbackProfile, loading: false });
+            setAuthState({ user, profile: errorFallbackProfile, loading: false, isApproved: false });
         }
       } else {
-        setAuthState({ user: null, profile: null, loading: false });
+        setAuthState({ user: null, profile: null, loading: false, isApproved: false });
       }
     });
 
