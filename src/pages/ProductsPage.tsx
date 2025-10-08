@@ -25,6 +25,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
 }) => {
   const [filters, setFilters] = useState({ name: '', alias: '', category: 'All', priceRange: 'All' });
 
+  // Debug: Log the data to see what we're receiving
+  console.log('ProductsPage - productSummary:', productSummary);
+
   const filteredProducts = useMemo(() => {
     return productSummary.filter(p => {
         const nameMatch = p.name?.toLowerCase().includes(filters.name.toLowerCase());

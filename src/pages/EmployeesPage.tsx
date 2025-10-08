@@ -38,6 +38,10 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
 
+  // Debug: Log the data to see what we're receiving
+  console.log('EmployeesPage - employeeSummary:', employeeSummary);
+  console.log('EmployeesPage - allEmployees:', allEmployees);
+
   const canAdd = profile?.role === 'admin';
   const canDelete = profile?.role === 'admin';
   const canEdit = profile?.role === 'admin' || profile?.role === 'area_manager';
