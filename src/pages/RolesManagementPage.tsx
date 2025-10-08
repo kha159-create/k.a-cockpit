@@ -33,6 +33,11 @@ const RolesManagementPage: React.FC = () => {
       
       const allUsers = snapshot.docs.map(doc => ({
         id: doc.id,
+        name: doc.data().name || 'غير محدد',
+        email: doc.data().email || '',
+        employeeId: doc.data().employeeId || '',
+        role: doc.data().role || 'employee',
+        status: doc.data().status || 'pending',
         ...doc.data()
       })) as User[];
       
@@ -93,11 +98,11 @@ const RolesManagementPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
             <span className="text-orange-600 font-bold text-lg">
-              {value.charAt(0).toUpperCase()}
+              {value?.charAt(0)?.toUpperCase() || 'U'}
             </span>
           </div>
           <div>
-            <p className="font-medium text-gray-900">{value}</p>
+            <p className="font-medium text-gray-900">{value || 'غير محدد'}</p>
             <p className="text-sm text-gray-500">{record.email}</p>
           </div>
         </div>
@@ -124,11 +129,11 @@ const RolesManagementPage: React.FC = () => {
       label: 'الحالة',
       render: (value: string) => (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          value === 'approved' 
+          value === 'approved' || value === 'active'
             ? 'bg-green-100 text-green-800' 
             : 'bg-yellow-100 text-yellow-800'
         }`}>
-          {value === 'approved' ? 'معتمد' : 'معلق'}
+          {value === 'approved' || value === 'active' ? 'معتمد' : 'معلق'}
         </span>
       )
     },

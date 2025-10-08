@@ -30,13 +30,19 @@ const PendingApprovalsPage: React.FC = () => {
     try {
       const snapshot = await db.collection('pendingEmployees')
         .where('status', '==', 'pending')
-        .orderBy('createdAt', 'desc')
         .get();
       
       const employees = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as PendingEmployee[];
+      
+      // ترتيب محلياً حسب createdAt
+      employees.sort((a, b) => {
+        const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+        const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+        return bTime.getTime() - aTime.getTime();
+      });
       
       setPendingEmployees(employees);
     } catch (error) {

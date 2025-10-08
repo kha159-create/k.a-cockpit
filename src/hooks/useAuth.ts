@@ -41,8 +41,8 @@ export const useAuth = (): AuthState => {
               // التحقق من حالة الموافقة
               const approved = await isUserApproved(user.uid);
               
-              // إذا لم يكن المستخدم معتمد، تحقق من كونه admin بدون status أو status غير صحيح
-              if (!approved && userProfile.role === 'admin' && (!userProfile.status || userProfile.status === 'active')) {
+              // إذا لم يكن المستخدم معتمد، تحقق من كونه admin
+              if (!approved && userProfile.role === 'admin') {
                   console.log('Admin user without status field, auto-approving...');
                   // إضافة status: 'approved' تلقائياً للـ admin
                   try {
