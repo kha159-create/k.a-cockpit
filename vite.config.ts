@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
     base: '/alsanicockpitv3/',
     plugins: [react()],
     define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY),
       // FIX: Define process.env variables for Firebase to fix errors in src/services/firebase.ts
       'process.env.VITE_FIREBASE_API_KEY': JSON.stringify(env.VITE_FIREBASE_API_KEY),
       'process.env.VITE_FIREBASE_AUTH_DOMAIN': JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN),
