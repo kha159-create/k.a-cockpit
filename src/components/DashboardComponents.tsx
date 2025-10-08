@@ -297,7 +297,7 @@ export const PieChart: React.FC<{ data: { name: string, value: number }[], onSli
                     {data.slice(0, 10).map((item, index) => (
                         <li key={item.name} className="flex items-center text-sm group hover:bg-neutral-50 p-2 rounded-lg transition-all duration-200">
                             <div className="w-4 h-4 rounded-full mr-3 shadow-sm" style={{ backgroundColor: colors[index % colors.length] }}></div>
-                            <span className="text-neutral-700 truncate flex-grow font-medium" title={item.name}>{item.name}</span>
+                            <span className="text-neutral-700 flex-grow font-medium whitespace-nowrap" title={item.name}>{item.name}</span>
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-neutral-500">{item.value.toLocaleString()}</span>
                                 <span className="font-bold text-neutral-900 bg-neutral-100 px-2 py-1 rounded-md text-xs">{((item.value/total) * 100).toFixed(1)}%</span>

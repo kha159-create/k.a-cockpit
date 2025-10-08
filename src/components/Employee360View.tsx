@@ -5,7 +5,6 @@ import { SparklesIcon } from './Icons';
 import { calculateEffectiveTarget, getCategory } from '../utils/calculator';
 import type { EmployeeSummary, DailyMetric, SalesTransaction, StoreSummary, DateFilter, ModalState } from '../types';
 import { useLocale } from '../context/LocaleContext';
-import AiEmployeeSummaryCard from './AiEmployeeSummaryCard';
 
 interface Employee360ViewProps {
     employee: EmployeeSummary;
@@ -155,7 +154,6 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
                     </button>
                 </div>
 
-                <AiEmployeeSummaryCard employee={employee} />
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 my-4">
                     <KPICard title={t('total_sales')} value={employeeData.totalSales} format={v => v.toLocaleString('en-US', {style: 'currency', currency: 'SAR'})} />
