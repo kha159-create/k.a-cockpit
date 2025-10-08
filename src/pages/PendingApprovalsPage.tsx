@@ -198,10 +198,10 @@ const PendingApprovalsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6">
+        <div className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">طلبات التسجيل المعلقة</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t('pending_approvals')}</h2>
             <p className="text-gray-600 mt-1">إدارة طلبات التسجيل الجديدة</p>
           </div>
           <div className="flex items-center gap-4">

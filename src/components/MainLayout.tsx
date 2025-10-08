@@ -648,8 +648,8 @@ const handleNotificationClick = (notificationId: string) => {
           { icon: <DuvetIcon />, label: t('duvets'), name: "duvets", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
           { icon: <UploadIcon />, label: t('smart_upload'), name: "uploads", roles: ['admin', 'general_manager', 'area_manager'] as UserRole[] },
           { icon: <CogIcon />, label: t('settings'), name: "settings", roles: ['admin', 'general_manager'] as UserRole[] },
-          { icon: <span>⏳</span>, label: "الطلبات المعلقة", name: "pendingApprovals", roles: ['admin'] as UserRole[] },
-          { icon: <span>👥</span>, label: "إدارة الأدوار", name: "rolesManagement", roles: ['admin'] as UserRole[] },
+          { icon: <span>⏳</span>, label: t('pending_approvals'), name: "pendingApprovals", roles: ['admin'] as UserRole[] },
+          { icon: <span>👥</span>, label: t('roles_management'), name: "rolesManagement", roles: ['admin'] as UserRole[] },
       ];
       return allItems.filter(item => item.roles.includes(role));
   }, [profile, t]);

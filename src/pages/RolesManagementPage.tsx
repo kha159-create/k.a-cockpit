@@ -27,17 +27,22 @@ const RolesManagementPage: React.FC = () => {
 
   const loadUsers = async () => {
     try {
+      // جلب جميع المستخدمين المعتمدين (approved أو admin بدون status)
       const snapshot = await db.collection('users')
-        .where('status', '==', 'approved')
-        .orderBy('name')
         .get();
       
-      const usersData = snapshot.docs.map(doc => ({
+      const allUsers = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as User[];
       
-      setUsers(usersData);
+      // تصفية المستخدمين المعتمدين
+      const approvedUsers = allUsers.filter(user => 
+        user.status === 'approved' || 
+        (user.role === 'admin' && !user.status)
+      );
+      
+      setUsers(approvedUsers);
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {
@@ -187,11 +192,11 @@ const RolesManagementPage: React.FC = () => {
       </div>
 
       {/* جدول المستخدمين */}
-      <div className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6">
+        <div className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">إدارة أدوار المستخدمين</h2>
-            <p className="text-gray-600 mt-1">تعديل أدوار المستخدمين المعتمدين</p>
+            <h2 className="text-2xl font-bold text-gray-900">{t('manage_user_roles')}</h2>
+            <p className="text-gray-600 mt-1">{t('modify_roles_for_approved_users')}</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">

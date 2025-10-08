@@ -61,7 +61,7 @@ const EmployeeUpdateSection: React.FC = () => {
     const [updateResult, setUpdateResult] = useState<{success: boolean, message: string, updatedCount?: number} | null>(null);
 
     const handleUpdateEmployees = async () => {
-        if (!confirm('هل أنت متأكد من تحديث جميع الموظفين؟ سيتم إضافة حقل linkedAccount للموظفين الذين لا يملكونه.')) {
+        if (!confirm(t('confirm_update_employees'))) {
             return;
         }
 
@@ -74,7 +74,7 @@ const EmployeeUpdateSection: React.FC = () => {
         } catch (error) {
             setUpdateResult({
                 success: false,
-                message: `خطأ: ${error}`
+                message: `${t('error_updating_employees')}: ${error}`
             });
         } finally {
             setIsUpdating(false);
@@ -83,8 +83,8 @@ const EmployeeUpdateSection: React.FC = () => {
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="text-xl font-semibold text-zinc-700 mb-2">تحديث بيانات الموظفين</h3>
-            <p className="text-sm text-zinc-500 mb-4">إضافة حقل linkedAccount لجميع الموظفين لتفعيل نظام التسجيل الجديد</p>
+            <h3 className="text-xl font-semibold text-zinc-700 mb-2">{t('update_employees')}</h3>
+            <p className="text-sm text-zinc-500 mb-4">{t('update_employees_desc')}</p>
             
             <div className="p-4 border border-orange-200 bg-orange-50 rounded-lg">
                 <div className="flex items-center gap-3 mb-4">
@@ -92,8 +92,8 @@ const EmployeeUpdateSection: React.FC = () => {
                         <span className="text-orange-600 text-lg">👥</span>
                     </div>
                     <div>
-                        <h4 className="font-semibold text-orange-800">تحديث قاعدة بيانات الموظفين</h4>
-                        <p className="text-orange-700 text-sm">سيتم إضافة حقل linkedAccount: false لجميع الموظفين</p>
+                        <h4 className="font-semibold text-orange-800">{t('update_employees')}</h4>
+                        <p className="text-orange-700 text-sm">{t('update_employees_desc')}</p>
                     </div>
                 </div>
                 
@@ -105,12 +105,12 @@ const EmployeeUpdateSection: React.FC = () => {
                     {isUpdating ? (
                         <>
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            جاري التحديث...
+                            {t('updating')}
                         </>
                     ) : (
                         <>
                             <span>🔄</span>
-                            تحديث جميع الموظفين
+                            {t('update_all_employees')}
                         </>
                     )}
                 </button>
@@ -122,7 +122,7 @@ const EmployeeUpdateSection: React.FC = () => {
                         </p>
                         {updateResult.updatedCount !== undefined && updateResult.updatedCount > 0 && (
                             <p className="text-green-700 text-sm mt-1">
-                                تم تحديث {updateResult.updatedCount} موظف بنجاح
+                                {t('employees_updated_successfully')}: {updateResult.updatedCount}
                             </p>
                         )}
                     </div>
