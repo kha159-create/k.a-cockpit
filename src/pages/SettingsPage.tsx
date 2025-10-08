@@ -4,6 +4,7 @@ import DataExporter from '../components/DataExporter.js';
 import CustomBusinessRules from '../components/CustomBusinessRules.js';
 import UserManagement from '../components/UserManagement.js';
 import { useLocale } from '../context/LocaleContext.js';
+import { updateAllEmployeesWithLinkedAccount } from '../utils/updateEmployees.js';
 
 interface SelectiveDataDeletionProps {
     onSelectiveDelete: (dataType: 'visitors' | 'sales', year: number, month: number) => void;
@@ -55,6 +56,81 @@ const SelectiveDataDeletion: React.FC<SelectiveDataDeletionProps> = ({ onSelecti
     );
 };
 
+const EmployeeUpdateSection: React.FC = () => {
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [updateResult, setUpdateResult] = useState<{success: boolean, message: string, updatedCount?: number} | null>(null);
+
+    const handleUpdateEmployees = async () => {
+        if (!confirm('هل أنت متأكد من تحديث جميع الموظفين؟ سيتم إضافة حقل linkedAccount للموظفين الذين لا يملكونه.')) {
+            return;
+        }
+
+        setIsUpdating(true);
+        setUpdateResult(null);
+
+        try {
+            const result = await updateAllEmployeesWithLinkedAccount();
+            setUpdateResult(result);
+        } catch (error) {
+            setUpdateResult({
+                success: false,
+                message: `خطأ: ${error}`
+            });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border">
+            <h3 className="text-xl font-semibold text-zinc-700 mb-2">تحديث بيانات الموظفين</h3>
+            <p className="text-sm text-zinc-500 mb-4">إضافة حقل linkedAccount لجميع الموظفين لتفعيل نظام التسجيل الجديد</p>
+            
+            <div className="p-4 border border-orange-200 bg-orange-50 rounded-lg">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                        <span className="text-orange-600 text-lg">👥</span>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-orange-800">تحديث قاعدة بيانات الموظفين</h4>
+                        <p className="text-orange-700 text-sm">سيتم إضافة حقل linkedAccount: false لجميع الموظفين</p>
+                    </div>
+                </div>
+                
+                <button 
+                    onClick={handleUpdateEmployees} 
+                    disabled={isUpdating}
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                    {isUpdating ? (
+                        <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            جاري التحديث...
+                        </>
+                    ) : (
+                        <>
+                            <span>🔄</span>
+                            تحديث جميع الموظفين
+                        </>
+                    )}
+                </button>
+                
+                {updateResult && (
+                    <div className={`mt-4 p-3 rounded-lg ${updateResult.success ? 'bg-green-100 border border-green-200' : 'bg-red-100 border border-red-200'}`}>
+                        <p className={`font-medium ${updateResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                            {updateResult.message}
+                        </p>
+                        {updateResult.updatedCount !== undefined && updateResult.updatedCount > 0 && (
+                            <p className="text-green-700 text-sm mt-1">
+                                تم تحديث {updateResult.updatedCount} موظف بنجاح
+                            </p>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 interface SettingsPageProps {
     employeeSummary: EmployeeSummary[];
@@ -65,16 +141,16 @@ interface SettingsPageProps {
     onSelectiveDelete: (dataType: 'visitors' | 'sales', year: number, month: number) => void;
     isProcessing: boolean;
     businessRules: BusinessRule[];
-    onSaveRule: (rule: string) => void;
+    onSaveRule: (rule: Omit<BusinessRule, 'id'>) => void;
     onDeleteRule: (id: string) => void;
     profile: UserProfile | null;
-    allUsers: (UserProfile & { id: string })[];
-    onUpdateUser: (userId: string, data: Partial<UserProfile>) => void;
-    onDeleteUser?: (userId: string, userName: string) => void;
+    allUsers: UserProfile[];
+    onUpdateUser: (id: string, data: Partial<UserProfile>) => void;
+    onDeleteUser: (id: string) => void;
     setModalState: (state: any) => void;
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ 
+const SettingsPage: React.FC<SettingsPageProps> = ({
     employeeSummary, storeSummary, kingDuvetSales, onAddMonthlyData, onDeleteAllData, onSelectiveDelete, isProcessing,
     businessRules, onSaveRule, onDeleteRule, profile, allUsers, onUpdateUser, onDeleteUser, setModalState
 }) => {
@@ -107,6 +183,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     setModalState={setModalState}
                     onDeleteUser={onDeleteUser}
                 />
+            )}
+
+            {isAdmin && (
+                <EmployeeUpdateSection />
             )}
 
             {(isAdmin || isGM) && (
