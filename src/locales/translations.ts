@@ -53,7 +53,14 @@ export const translations = {
     "all_months": "All Months",
     "all_days": "All Days",
     "all_area_managers": "All Areas",
-    "all_stores": "All Stores"
+    "all_stores": "All Stores",
+    "top_stores_by_achievement": "Top Stores by Achievement",
+    "top_employees_by_achievement": "Top Employees by Achievement", 
+    "top_products_by_sales_value": "Top Products by Sales Value",
+    "dynamic_daily_target": "Dynamic Daily Target",
+    "ai_performance_review": "AI Performance Review",
+    "sales_by_product_category": "Sales by Product Category",
+    "user_management": "User Management"
   },
   ar: {
     "dashboard": "لوحة التحكم",
@@ -109,6 +116,13 @@ export const translations = {
     "all_months": "كل الشهور",
     "all_days": "كل الأيام",
     "all_area_managers": "كل المناطق",
-    "all_stores": "كل المعارض"
+    "all_stores": "كل المعارض",
+    "top_stores_by_achievement": "أفضل المعارض حسب الإنجاز",
+    "top_employees_by_achievement": "أفضل الموظفين حسب الإنجاز",
+    "top_products_by_sales_value": "أفضل المنتجات حسب قيمة المبيعات", 
+    "dynamic_daily_target": "الهدف اليومي الديناميكي",
+    "ai_performance_review": "مراجعة الأداء بالذكاء الاصطناعي",
+    "sales_by_product_category": "المبيعات حسب فئة المنتج",
+    "user_management": "إدارة المستخدمين"
   }
 };

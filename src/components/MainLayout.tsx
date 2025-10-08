@@ -759,9 +759,9 @@ const handleNotificationClick = (notificationId: string) => {
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>
       )}
-      <aside className={`w-72 bg-gradient-to-b from-white to-primary-50/30 border-r border-primary-100 h-screen flex flex-col fixed inset-y-0 ltr:left-0 rtl:right-0 transform ${isSidebarOpen ? 'translate-x-0' : sidebarOffscreenClass} md:translate-x-0 transition-all duration-300 ease-in-out z-30 shadow-xl`}>
+      <aside className={`w-64 sm:w-72 bg-white border-r border-primary-100 h-screen flex flex-col fixed inset-y-0 ltr:left-0 rtl:right-0 transform ${isSidebarOpen ? 'translate-x-0' : sidebarOffscreenClass} md:translate-x-0 transition-all duration-300 ease-in-out z-30 shadow-xl`}>
         {/* الشعار */}
-        <div className="p-6 border-b border-primary-100">
+        <div className="p-4 sm:p-6 border-b border-primary-100">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-lg">K.A</span>
@@ -774,7 +774,7 @@ const handleNotificationClick = (notificationId: string) => {
         </div>
         
         {/* القائمة */}
-        <nav className="flex-grow overflow-y-auto p-4">
+        <nav className="flex-grow overflow-y-auto p-3 sm:p-4">
           <ul className="space-y-2">
              {navItemsConfig.map(item => (
                 <NavItem key={item.name} {...item} activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} />
@@ -783,7 +783,7 @@ const handleNotificationClick = (notificationId: string) => {
         </nav>
         
         {/* معلومات المستخدم */}
-        <div className="p-4 border-t border-primary-100 bg-white/50">
+        <div className="p-3 sm:p-4 border-t border-primary-100 bg-white">
           <div className="flex items-center space-x-3 mb-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
               <span className="text-white text-sm font-bold">
@@ -800,8 +800,8 @@ const handleNotificationClick = (notificationId: string) => {
           </div>
         </div>
       </aside>
-      <main className="flex-1 p-4 sm:p-6 md:ltr:ml-72 md:rtl:mr-72 bg-neutral-50 min-h-screen">
-        <header className="bg-white rounded-2xl shadow-lg border border-neutral-200 p-6 mb-6">
+      <main className="flex-1 p-2 sm:p-4 md:p-6 md:ltr:ml-64 md:rtl:mr-64 lg:ltr:ml-72 lg:rtl:mr-72 bg-neutral-50 min-h-screen">
+        <header className="bg-white rounded-2xl shadow-lg border border-neutral-200 p-4 sm:p-6 mb-4 sm:mb-6">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
                     <button className="md:hidden p-3 text-neutral-600 hover:bg-neutral-100 rounded-xl transition-all duration-200" onClick={() => setIsSidebarOpen(true)}>
