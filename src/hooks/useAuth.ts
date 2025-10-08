@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 // FIX: No longer need direct imports from 'firebase/auth' or 'firebase/firestore' when using compat API.
 import { auth, db, isUserApproved } from '../services/firebase';
+import firebase from 'firebase/app';
 import type { User, UserProfile } from '../types';
 
 export interface AuthState {
@@ -39,6 +40,24 @@ export const useAuth = (): AuthState => {
           if (userProfile) {
               // التحقق من حالة الموافقة
               const approved = await isUserApproved(user.uid);
+              
+              // إذا لم يكن المستخدم معتمد، تحقق من كونه admin بدون status
+              if (!approved && userProfile.role === 'admin' && !userProfile.status) {
+                  console.log('Admin user without status field, auto-approving...');
+                  // إضافة status: 'approved' تلقائياً للـ admin
+                  try {
+                      await db.collection('users').doc(user.uid).update({
+                          status: 'approved',
+                          approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                          approvedBy: 'system'
+                      });
+                      setAuthState({ user, profile: { ...userProfile, status: 'approved' }, loading: false, isApproved: true });
+                      return;
+                  } catch (error) {
+                      console.error('Error auto-approving admin:', error);
+                  }
+              }
+              
               setAuthState({ user, profile: userProfile, loading: false, isApproved: approved });
               
               // إذا لم يكن المستخدم معتمد، امسحه من الجلسة
