@@ -43,8 +43,10 @@ export const useAuth = (): AuthState => {
               
               // إذا لم يكن المستخدم معتمد، امسحه من الجلسة
               if (!approved) {
+                  console.log('User not approved, signing out...');
                   await auth.signOut();
                   setAuthState({ user: null, profile: null, loading: false, isApproved: false });
+                  return;
               }
           } else {
               console.warn(`No profile document found for user with uid ${user.uid}. Falling back to default profile.`);
