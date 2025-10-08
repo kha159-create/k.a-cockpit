@@ -4,18 +4,18 @@ import App from './App';
 import './index.css';
 import { LocaleProvider } from './context/LocaleContext';
 
-// Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/k.a-cockpit/sw.js')
-      .then(registration => {
-        console.log('📱 Service Worker registered successfully:', registration.scope);
-      })
-      .catch(error => {
-        console.log('❌ Service Worker registration failed:', error);
-      });
-  });
-}
+// Register Service Worker for PWA (disabled for GitHub Pages)
+// if ('serviceWorker' in navigator) {
+//   window.addEventListener('load', () => {
+//     navigator.serviceWorker.register('/k.a-cockpit/sw.js')
+//       .then(registration => {
+//         console.log('📱 Service Worker registered successfully:', registration.scope);
+//       })
+//       .catch(error => {
+//         console.log('❌ Service Worker registration failed:', error);
+//       });
+//   });
+// }
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
