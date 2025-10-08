@@ -1,79 +1,35 @@
-name: Deploy to GitHub Pages (peaceiris)
+name: Build and Deploy to GitHub Pages
 
 on:
   push:
     branches:
-      - main                              # Trigger on pushes to main
-  workflow_dispatch:                      # Allow manual runs
-
-permissions:
-  contents: write                         # Required for peaceiris to push to gh-pages
-  pages: read
-  id-token: write
-
-concurrency:
-  group: gh-pages-deploy                  # Prevent concurrent deploys
-  cancel-in-progress: false
+      - main
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository         # Pull repo content
-        uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-      - name: Use Node.js 20.x            # Ensure Node 20 as requested
-        uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: 20
           cache: 'npm'
 
-      - name: Print Node and npm versions # Quick diagnostics in logs
-        run: |
-          node -v
-          npm -v
-
-      # CLEAN START: fully reset installation to avoid Rollup optional dep issues
-      - name: Deep clean workspace        # Remove locks, node_modules, and npm cache
+      - name: Clean install dependencies
         run: |
           rm -rf node_modules package-lock.json
-          rm -rf ~/.npm/_cacache || true
-          rm -rf node_modules/.vite || true
+          npm install
+          npm install rollup @rollup/rollup-linux-x64-gnu --force
 
-      - name: Install dependencies        # Fresh install; include optional for rollup native
-        env:
-          NPM_CONFIG_INCLUDE: optional
-        run: |
-          npm install --legacy-peer-deps --include=optional --no-audit --no-fund
+      - name: Build project
+        run: npm run build
 
-      - name: Force reinstall Rollup      # Ensures @rollup/rollup-<platform> is present
-        run: |
-          npm i -D rollup@^4 --force --include=optional
-          ls -la node_modules/@rollup || true
-
-      # BUILD with fallbacks: normal → no minify → esbuild minify
-      - name: Build project (with fallbacks)
-        shell: bash
-        run: |
-          set -o pipefail
-          echo "🏗️  Running Vite build (default)..."
-          npm run build \
-          || (echo "⚠️  Build failed, retrying without minify..." && npx vite build --minify=false) \
-          || (echo "⚠️  Build failed again, retrying with esbuild minify..." && npx vite build --minify=esbuild)
-          echo "✅ Build completed"
-
-      - name: Verify build output         # Guard to ensure dist exists before publish
-        run: |
-          test -d dist && echo "✅ dist exists" || (echo "❌ dist missing" && exit 1)
-          test -f dist/index.html && echo "✅ index.html exists" || (echo "❌ index.html missing" && exit 1)
-          ls -la dist
-
-      - name: Deploy to GitHub Pages      # Publish /dist to gh-pages via peaceiris
+      - name: Deploy to GitHub Pages 🚀
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
-          publish_branch: gh-pages
-          force_orphan: true
-          commit_message: "chore: deploy via GitHub Actions"
