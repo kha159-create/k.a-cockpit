@@ -3,8 +3,8 @@ import { GoogleGenerativeAI, GenerationConfig } from "@google/generative-ai";
 import type { StoreSummary, DailyMetric, PredictionResult, EmployeeSummary } from '../types.js';
 
 
-// BEST PRACTICE: Use VITE_ prefixed environment variable for Vite compatibility
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "REDACTED_GEMINI_API_KEY";
+// Use hardcoded API key for GitHub Pages deployment
+const GEMINI_API_KEY = "REDACTED_GEMINI_API_KEY";
 
 if (!GEMINI_API_KEY) {
   throw new Error("Gemini API key (VITE_GEMINI_API_KEY) is not set in environment variables.");
