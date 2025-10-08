@@ -7,7 +7,7 @@ import { LocaleProvider } from './context/LocaleContext';
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/alsanicockpitv3/sw.js')
+    navigator.serviceWorker.register('/k.a-cockpit/sw.js')
       .then(registration => {
         console.log('📱 Service Worker registered successfully:', registration.scope);
       })
