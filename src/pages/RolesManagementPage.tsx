@@ -81,10 +81,10 @@ const RolesManagementPage: React.FC = () => {
         u.id === userId ? { ...u, role: newRole } : u
       ));
       
-      alert('تم تحديث الدور بنجاح');
+      alert(t('role_updated_successfully'));
     } catch (error) {
       console.error('Error updating role:', error);
-      alert('حدث خطأ أثناء تحديث الدور');
+      alert(t('failed_to_update_role'));
     } finally {
       setUpdating(null);
     }
@@ -93,7 +93,7 @@ const RolesManagementPage: React.FC = () => {
   const columns = [
     {
       key: 'name',
-      label: t('user_name'),
+      label: t('user_name_new'),
       render: (value: string, record: User) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -110,7 +110,7 @@ const RolesManagementPage: React.FC = () => {
     },
     {
       key: 'employeeId',
-      label: t('employee_id'),
+      label: t('employee_id_new'),
       render: (value: string) => (
         <span className="font-mono font-semibold text-blue-600">
           {value || t('undefined')}
@@ -119,7 +119,7 @@ const RolesManagementPage: React.FC = () => {
     },
     {
       key: 'role',
-      label: t('current_role'),
+      label: t('current_role_new'),
       render: (value: Role) => (
         <RoleBadge role={value} size="md" />
       )
@@ -139,7 +139,7 @@ const RolesManagementPage: React.FC = () => {
     },
     {
       key: 'actions',
-      label: t('change_role'),
+      label: t('change_role_new'),
       render: (_: any, record: User) => (
         <div className="flex gap-2">
           <select
@@ -148,11 +148,11 @@ const RolesManagementPage: React.FC = () => {
             disabled={updating === record.id}
             className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
           >
-            <option value="employee">موظف</option>
-            <option value="store_manager">مدير معرض</option>
-            <option value="area_manager">مدير منطقة</option>
-            <option value="general_manager">مدير عام</option>
-            <option value="admin">مدير النظام</option>
+            <option value="employee">👤 {t('employee')}</option>
+            <option value="store_manager">🏬 {t('store_manager')}</option>
+            <option value="area_manager">📍 {t('area_manager')}</option>
+            <option value="general_manager">🎯 {t('general_manager')}</option>
+            <option value="admin">👑 {t('admin')}</option>
           </select>
           {updating === record.id && (
             <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
@@ -201,12 +201,15 @@ const RolesManagementPage: React.FC = () => {
         <div className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{t('manage_user_roles')}</h2>
-            <p className="text-gray-600 mt-1">{t('modify_roles_for_approved_users')}</p>
+            <h2 className="text-2xl font-bold text-gray-900">{t('manage_user_roles_new')}</h2>
+            <p className="text-gray-600 mt-1">{t('modify_roles_for_approved_users_new')}</p>
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-blue-800 font-medium">🧭 {t('roles_guide_header')}</p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm text-gray-500">إجمالي المستخدمين</p>
+              <p className="text-sm text-gray-500">{t('total_users')}</p>
               <p className="text-2xl font-bold text-orange-600">{users.length}</p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
@@ -238,37 +241,37 @@ const RolesManagementPage: React.FC = () => {
 
       {/* دليل الصلاحيات */}
       <div className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">دليل الصلاحيات</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">{t('roles_guide')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <RoleBadge role="employee" size="sm" />
             </div>
-            <p className="text-sm text-gray-600">عرض مبيعاته الشخصية فقط</p>
+            <p className="text-sm text-gray-600">{t('view_own_sales_only')}</p>
           </div>
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <RoleBadge role="store_manager" size="sm" />
             </div>
-            <p className="text-sm text-gray-600">إدارة موظفي فرعه وإرسال مهام</p>
+            <p className="text-sm text-gray-600">{t('manage_branch_employees')}</p>
           </div>
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <RoleBadge role="area_manager" size="sm" />
             </div>
-            <p className="text-sm text-gray-600">تعديل أهداف الموظفين في منطقته</p>
+            <p className="text-sm text-gray-600">{t('edit_employee_targets')}</p>
           </div>
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <RoleBadge role="general_manager" size="sm" />
             </div>
-            <p className="text-sm text-gray-600">عرض كل المناطق وتعديل الأهداف</p>
+            <p className="text-sm text-gray-600">{t('view_all_areas')}</p>
           </div>
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <RoleBadge role="admin" size="sm" />
             </div>
-            <p className="text-sm text-gray-600">جميع الصلاحيات والتحكم الكامل</p>
+            <p className="text-sm text-gray-600">{t('full_permissions')}</p>
           </div>
         </div>
       </div>

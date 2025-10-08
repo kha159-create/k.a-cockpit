@@ -29,10 +29,10 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
 
     const columns: Column<CommissionEmployeeRow>[] = [
         { key: 'name', label: 'Employee', sortable: true },
-        { key: 'totalSales', label: 'Total Sales', sortable: true, render: item => item.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+        { key: 'totalSales', label: 'Total Sales', sortable: true, render: item => Number(item.totalSales || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
         { key: 'achievement', label: 'Employee Achievement', sortable: true, render: item => `${item.achievement.toFixed(1)}%` },
         { key: 'finalCommissionRate', label: 'Final Commission Rate', sortable: true, render: item => <span className="font-semibold text-blue-600">{`${item.finalCommissionRate.toFixed(2)}%`}</span> },
-        { key: 'commissionAmount', label: 'Commission Amount', sortable: true, render: item => <span className="font-semibold text-green-600">{item.commissionAmount.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span> },
+        { key: 'commissionAmount', label: 'Commission Amount', sortable: true, render: item => <span className="font-semibold text-green-600">{Number(item.commissionAmount || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span> },
     ];
 
     return (

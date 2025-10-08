@@ -36,8 +36,8 @@ const StoresPage: React.FC<StoresPageProps> = ({
 
   const columns: Column<StoreSummary>[] = [
     { key: 'name', label: t('store'), sortable: true, render: (item) => <span onClick={() => onSelectStore(item)} className="cursor-pointer font-medium text-blue-600 hover:underline">{item.name}</span> },
-    { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => item.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-    { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => item.effectiveTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+    { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => Number(item.totalSales || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+    { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => Number(item.effectiveTarget || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'targetAchievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.targetAchievement} /> },
   ];
 

@@ -72,9 +72,9 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
 
   const columns: Column<EmployeeSummary>[] = [
       { key: 'name', label: t('employee'), sortable: true, render: (item) => <span className="font-medium text-blue-600">{item.name}</span> },
-      { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => item.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-      { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (item) => item.atv.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-      { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => item.effectiveTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+      { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => Number(item.totalSales || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+      { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (item) => Number(item.atv || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+      { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => Number(item.effectiveTarget || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
       { key: 'achievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.achievement} /> },
       { key: 'actions', label: t('actions'), render: (item) => (
           <div className="flex space-x-1">

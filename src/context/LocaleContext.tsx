@@ -17,7 +17,9 @@ export const LocaleContext = createContext<LocaleContextType>({
 
 export const LocaleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [locale, setLocaleState] = useState<Locale>(() => {
-    return (localStorage.getItem('locale') as Locale) || 'ar'; // Default to Arabic
+    // Check browser language first, then localStorage, then default to Arabic
+    const browserLang = navigator.language.startsWith('ar') ? 'ar' : 'en';
+    return (localStorage.getItem('locale') as Locale) || browserLang;
   });
 
   useEffect(() => {
