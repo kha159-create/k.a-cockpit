@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/alsanicockpitv3/icon-192.png" />
+    <link rel="apple-touch-icon" href="/alsanicockpitv3/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f97316" />
+    <meta name="description" content="K.A Management Dashboard - لوحة تحكم إدارة K.A" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="COCKPIT" />
+    <meta name="msapplication-TileColor" content="#f97316" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    <title>K.A COCKPIT</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/alsanicockpitv3/manifest.json" />
+
+    <!-- ✅ أضف هذا السطر هنا لتحميل مكتبة XLSX -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.3.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.22.0",
+    "vite": "https://aistudiocdn.com/vite@^7.1.9",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.4",
+    "path": "https://aistudiocdn.com/path@^0.12.7"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>
