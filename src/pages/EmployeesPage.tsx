@@ -38,10 +38,10 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
 
-  // Debug: Log the data to see what we're receiving
-  console.log('EmployeesPage - employeeSummary:', employeeSummary);
-  console.log('EmployeesPage - allEmployees:', allEmployees);
-  console.log('EmployeesPage - isRecalculating:', isRecalculating);
+  // Debug: Log the data to see what we're receiving (removed to prevent infinite re-render)
+  // console.log('EmployeesPage - employeeSummary:', employeeSummary);
+  // console.log('EmployeesPage - allEmployees:', allEmployees);
+  // console.log('EmployeesPage - isRecalculating:', isRecalculating);
 
   const canAdd = profile?.role === 'admin';
   const canDelete = profile?.role === 'admin';
@@ -68,8 +68,8 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
     }, {} as {[storeName: string]: EmployeeSummary[]});
   }, [employeeSummary, searchTerm]);
 
-  // Debug: Log filteredEmployeeSummary after it's defined
-  console.log('EmployeesPage - filteredEmployeeSummary:', filteredEmployeeSummary);
+  // Debug: Log filteredEmployeeSummary after it's defined (removed to prevent infinite re-render)
+  // console.log('EmployeesPage - filteredEmployeeSummary:', filteredEmployeeSummary);
   
   const getRowClassName = (item: EmployeeSummary) => {
     if (item.achievement >= 100) return 'bg-green-50';

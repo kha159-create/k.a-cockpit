@@ -30,9 +30,9 @@ const StoresPage: React.FC<StoresPageProps> = ({
 }) => {
   const { t } = useLocale();
 
-  // Debug: Log the data to see what we're receiving
-  console.log('StoresPage - storeSummary:', storeSummary);
-  console.log('StoresPage - isRecalculating:', isRecalculating);
+  // Debug: Log the data to see what we're receiving (removed to prevent infinite re-render)
+  // console.log('StoresPage - storeSummary:', storeSummary);
+  // console.log('StoresPage - isRecalculating:', isRecalculating);
   const canAdd = profile?.role === 'admin';
   const canDelete = profile?.role === 'admin';
   const canEdit = profile?.role === 'admin' || profile?.role === 'general_manager';
@@ -55,6 +55,10 @@ const StoresPage: React.FC<StoresPageProps> = ({
   }
   
   const storesByAreaManager = useMemo((): { [key: string]: StoreSummary[] } => {
+    if (!Array.isArray(storeSummary) || storeSummary.length === 0) {
+      return {};
+    }
+    
     const grouped: { [key: string]: StoreSummary[] } = {};
     for (const store of storeSummary) {
         const manager = store.areaManager || t('unassigned');
@@ -66,8 +70,8 @@ const StoresPage: React.FC<StoresPageProps> = ({
     return grouped;
   }, [storeSummary, t]);
 
-  // Debug: Log storesByAreaManager after it's defined
-  console.log('StoresPage - storesByAreaManager:', storesByAreaManager);
+  // Debug: Log storesByAreaManager after it's defined (removed to prevent infinite re-render)
+  // console.log('StoresPage - storesByAreaManager:', storesByAreaManager);
 
   const getRowClassName = (item: StoreSummary) => {
     if (item.targetAchievement >= 100) return 'bg-green-50';

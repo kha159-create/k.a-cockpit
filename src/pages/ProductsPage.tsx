@@ -25,9 +25,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
 }) => {
   const [filters, setFilters] = useState({ name: '', alias: '', category: 'All', priceRange: 'All' });
 
-  // Debug: Log the data to see what we're receiving
-  console.log('ProductsPage - productSummary:', productSummary);
-  console.log('ProductsPage - isRecalculating:', isRecalculating);
+  // Debug: Log the data to see what we're receiving (removed to prevent infinite re-render)
+  // console.log('ProductsPage - productSummary:', productSummary);
+  // console.log('ProductsPage - isRecalculating:', isRecalculating);
 
   const filteredProducts = useMemo(() => {
     return productSummary.filter(p => {
@@ -45,8 +45,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     });
   }, [productSummary, filters]);
 
-  // Debug: Log filteredProducts after it's defined
-  console.log('ProductsPage - filteredProducts:', filteredProducts);
+  // Debug: Log filteredProducts after it's defined (removed to prevent infinite re-render)
+  // console.log('ProductsPage - filteredProducts:', filteredProducts);
 
   const columns: Column<ProductSummary>[] = [
     { key: 'name', label: 'Product Name', sortable: true, render: (item) => item.name ?? '—' },
