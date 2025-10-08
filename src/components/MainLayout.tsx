@@ -134,7 +134,7 @@ const UserMenu: React.FC<{ user: User; profile: UserProfile | null; onLogout: ()
         if (user.displayName) return user.displayName;
         if (!user.email) return 'User';
         const namePart = user.email.split('@')[0];
-        return namePart.charAt(0).toUpperCase() + namePart.slice(1);
+        return namePart?.charAt(0)?.toUpperCase() + namePart?.slice(1) || 'User';
     }, [user, profile]);
 
     const toggleLanguage = () => {

@@ -6,7 +6,7 @@ export interface Column<T> {
   key: keyof T | 'actions';
   label: string;
   sortable?: boolean;
-  render?: (item: T) => React.ReactNode;
+  render?: (value: any, record: T) => React.ReactNode;
 }
 
 interface TableProps<T> {
@@ -76,7 +76,7 @@ export const Table = <T extends { id: string }>({ columns, data, initialSortKey,
                       >
                         {columns.map((col) => (
                           <td key={`${item.id}-${String(col.key)}`} className="td">
-                            {col.render ? col.render(item) : (item[col.key as keyof T] as React.ReactNode)}
+                            {col.render ? col.render(item[col.key as keyof T], item) : (item[col.key as keyof T] as React.ReactNode)}
                           </td>
                         ))}
                       </tr>
