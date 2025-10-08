@@ -56,6 +56,7 @@ const SelectiveDataDeletion: React.FC<SelectiveDataDeletionProps> = ({ onSelecti
 };
 
 const EmployeeUpdateSection: React.FC = () => {
+    const { t } = useLocale();
     const [isUpdating, setIsUpdating] = useState(false);
     const [updateResult, setUpdateResult] = useState<{success: boolean, message: string, updatedCount?: number} | null>(null);
 

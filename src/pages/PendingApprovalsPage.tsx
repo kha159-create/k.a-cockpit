@@ -208,11 +208,11 @@ const PendingApprovalsPage: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{t('pending_approvals')}</h2>
-            <p className="text-gray-600 mt-1">إدارة طلبات التسجيل الجديدة</p>
+            <p className="text-gray-600 mt-1">{t('manage_new_registration_requests')}</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm text-gray-500">إجمالي الطلبات</p>
+              <p className="text-sm text-gray-500">{t('total_requests')}</p>
               <p className="text-2xl font-bold text-orange-600">{pendingEmployees.length}</p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
@@ -226,8 +226,8 @@ const PendingApprovalsPage: React.FC = () => {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-green-600 text-2xl">✅</span>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد طلبات معلقة</h3>
-            <p className="text-gray-600">جميع الطلبات تمت معالجتها</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t('no_pending_requests')}</h3>
+            <p className="text-gray-600">{t('all_requests_processed')}</p>
           </div>
         ) : (
           <div className="overflow-hidden">

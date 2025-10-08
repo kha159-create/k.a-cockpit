@@ -93,7 +93,7 @@ const RolesManagementPage: React.FC = () => {
   const columns = [
     {
       key: 'name',
-      label: 'اسم المستخدم',
+      label: t('user_name'),
       render: (value: string, record: User) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -110,36 +110,36 @@ const RolesManagementPage: React.FC = () => {
     },
     {
       key: 'employeeId',
-      label: 'رقم الموظف',
+      label: t('employee_id'),
       render: (value: string) => (
         <span className="font-mono font-semibold text-blue-600">
-          {value || 'غير محدد'}
+          {value || t('undefined')}
         </span>
       )
     },
     {
       key: 'role',
-      label: 'الدور الحالي',
+      label: t('current_role'),
       render: (value: Role) => (
         <RoleBadge role={value} size="md" />
       )
     },
     {
       key: 'status',
-      label: 'الحالة',
+      label: t('status'),
       render: (value: string) => (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
           value === 'approved' || value === 'active'
             ? 'bg-green-100 text-green-800' 
             : 'bg-yellow-100 text-yellow-800'
         }`}>
-          {value === 'approved' || value === 'active' ? 'معتمد' : 'معلق'}
+          {value === 'approved' || value === 'active' ? t('approved') : t('pending')}
         </span>
       )
     },
     {
       key: 'actions',
-      label: 'تغيير الدور',
+      label: t('change_role'),
       render: (_: any, record: User) => (
         <div className="flex gap-2">
           <select
