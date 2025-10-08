@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import type { EmployeeSummary, StoreSummary, SalesTransaction, BusinessRule, UserProfile } from '../types.js';
 import DataExporter from '../components/DataExporter.js';
 import CustomBusinessRules from '../components/CustomBusinessRules.js';
-import UserManagement from '../components/UserManagement.js';
 import { useLocale } from '../context/LocaleContext.js';
 import { updateAllEmployeesWithLinkedAccount } from '../utils/updateEmployees.js';
 
@@ -144,15 +143,11 @@ interface SettingsPageProps {
     onSaveRule: (rule: Omit<BusinessRule, 'id'>) => void;
     onDeleteRule: (id: string) => void;
     profile: UserProfile | null;
-    allUsers: UserProfile[];
-    onUpdateUser: (id: string, data: Partial<UserProfile>) => void;
-    onDeleteUser: (id: string) => void;
-    setModalState: (state: any) => void;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({
     employeeSummary, storeSummary, kingDuvetSales, onAddMonthlyData, onDeleteAllData, onSelectiveDelete, isProcessing,
-    businessRules, onSaveRule, onDeleteRule, profile, allUsers, onUpdateUser, onDeleteUser, setModalState
+    businessRules, onSaveRule, onDeleteRule, profile
 }) => {
     const isAdmin = profile?.role === 'admin';
     const isGM = profile?.role === 'general_manager';
@@ -176,14 +171,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 />
             )}
 
-            {isAdmin && (
-                 <UserManagement 
-                    profile={profile}
-                    allUsers={allUsers}
-                    setModalState={setModalState}
-                    onDeleteUser={onDeleteUser}
-                />
-            )}
 
             {isAdmin && (
                 <EmployeeUpdateSection />

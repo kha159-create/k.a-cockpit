@@ -39,6 +39,7 @@ const RolesManagementPage: React.FC = () => {
       // تصفية المستخدمين المعتمدين
       const approvedUsers = allUsers.filter(user => 
         user.status === 'approved' || 
+        user.status === 'active' ||
         (user.role === 'admin' && !user.status)
       );
       

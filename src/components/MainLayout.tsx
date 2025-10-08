@@ -737,10 +737,6 @@ const handleNotificationClick = (notificationId: string) => {
                   onSaveRule={handleSaveBusinessRule}
                   onDeleteRule={(id) => handleDelete('businessRules', id, 'this rule')}
                   profile={profile}
-                  allUsers={allUsers}
-                  onUpdateUser={handleUpdateUser}
-                  onDeleteUser={handleDeleteUser}
-                  setModalState={setModalState}
                />;
      case 'pendingApprovals':
         return <PendingApprovalsPage />;

@@ -52,7 +52,8 @@ export const getUserStatus = async (userId: string): Promise<string | null> => {
 
 export const isUserApproved = async (userId: string): Promise<boolean> => {
   const status = await getUserStatus(userId);
-  return status === 'approved';
+  // Allow both 'approved' and 'active' statuses for login
+  return status === 'approved' || status === 'active';
 };
 
 export const getUserProfile = async (userId: string) => {
