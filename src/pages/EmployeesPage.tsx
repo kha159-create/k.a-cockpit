@@ -42,7 +42,6 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   console.log('EmployeesPage - employeeSummary:', employeeSummary);
   console.log('EmployeesPage - allEmployees:', allEmployees);
   console.log('EmployeesPage - isRecalculating:', isRecalculating);
-  console.log('EmployeesPage - filteredEmployeeSummary:', filteredEmployeeSummary);
 
   const canAdd = profile?.role === 'admin';
   const canDelete = profile?.role === 'admin';
@@ -68,6 +67,9 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
         return acc;
     }, {} as {[storeName: string]: EmployeeSummary[]});
   }, [employeeSummary, searchTerm]);
+
+  // Debug: Log filteredEmployeeSummary after it's defined
+  console.log('EmployeesPage - filteredEmployeeSummary:', filteredEmployeeSummary);
   
   const getRowClassName = (item: EmployeeSummary) => {
     if (item.achievement >= 100) return 'bg-green-50';

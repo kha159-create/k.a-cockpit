@@ -28,7 +28,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
   // Debug: Log the data to see what we're receiving
   console.log('ProductsPage - productSummary:', productSummary);
   console.log('ProductsPage - isRecalculating:', isRecalculating);
-  console.log('ProductsPage - filteredProducts:', filteredProducts);
 
   const filteredProducts = useMemo(() => {
     return productSummary.filter(p => {
@@ -45,6 +44,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         return nameMatch && aliasMatch && categoryMatch && priceMatch;
     });
   }, [productSummary, filters]);
+
+  // Debug: Log filteredProducts after it's defined
+  console.log('ProductsPage - filteredProducts:', filteredProducts);
 
   const columns: Column<ProductSummary>[] = [
     { key: 'name', label: 'Product Name', sortable: true, render: (item) => item.name ?? '—' },
