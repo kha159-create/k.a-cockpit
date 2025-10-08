@@ -38,7 +38,22 @@ export const translations = {
     "info": "Information",
     "confirm": "Confirm",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "no_tasks": "You have no tasks or alerts.",
+    "smart_upload": "Smart Upload",
+    "lfl_comparison": "LFL Comparison",
+    "commissions": "Commissions",
+    "duvets": "Duvets",
+    "my_tasks_and_alerts": "My Tasks & Alerts",
+    "conversion_rate": "Conversion Rate",
+    "sales_per_visitor": "Sales Per Visitor",
+    "monthly_sales_performance": "Monthly Sales Performance",
+    "sales_by_store": "Sales by Store",
+    "greeting_evening": "Good evening",
+    "all_months": "All Months",
+    "all_days": "All Days",
+    "all_area_managers": "All Areas",
+    "all_stores": "All Stores"
   },
   ar: {
     "dashboard": "لوحة التحكم",
@@ -79,6 +94,21 @@ export const translations = {
     "info": "معلومات",
     "confirm": "تأكيد",
     "yes": "نعم",
-    "no": "لا"
+    "no": "لا",
+    "no_tasks": "ليس لديك مهام أو تنبيهات.",
+    "smart_upload": "الرفع الذكي",
+    "lfl_comparison": "مقارنة LFL",
+    "commissions": "العمولات",
+    "duvets": "الألحفة",
+    "my_tasks_and_alerts": "مهامي وتنبيهاتي",
+    "conversion_rate": "معدل التحويل",
+    "sales_per_visitor": "مبيعات كل زائر",
+    "monthly_sales_performance": "أداء المبيعات الشهري",
+    "sales_by_store": "المبيعات حسب المعرض",
+    "greeting_evening": "مساء الخير",
+    "all_months": "كل الشهور",
+    "all_days": "كل الأيام",
+    "all_area_managers": "كل المناطق",
+    "all_stores": "كل المعارض"
   }
 };
