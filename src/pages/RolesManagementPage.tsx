@@ -81,10 +81,10 @@ const RolesManagementPage: React.FC = () => {
         u.id === userId ? { ...u, role: newRole } : u
       ));
       
-      alert(t('role_updated_successfully'));
+      alert(t('role_updated'));
     } catch (error) {
       console.error('Error updating role:', error);
-      alert(t('failed_to_update_role'));
+      alert(t('role_failed'));
     } finally {
       setUpdating(null);
     }
@@ -93,7 +93,7 @@ const RolesManagementPage: React.FC = () => {
   const columns = [
     {
       key: 'name',
-      label: t('user_name_new'),
+      label: t('user_name'),
       render: (value: string, record: User) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -110,7 +110,7 @@ const RolesManagementPage: React.FC = () => {
     },
     {
       key: 'employeeId',
-      label: t('employee_id_new'),
+      label: t('employee_id'),
       render: (value: string) => (
         <span className="font-mono font-semibold text-blue-600">
           {value || t('undefined')}
@@ -119,7 +119,7 @@ const RolesManagementPage: React.FC = () => {
     },
     {
       key: 'role',
-      label: t('current_role_new'),
+      label: t('current_role'),
       render: (value: Role) => (
         <RoleBadge role={value} size="md" />
       )
@@ -139,7 +139,7 @@ const RolesManagementPage: React.FC = () => {
     },
     {
       key: 'actions',
-      label: t('change_role_new'),
+      label: t('change_role'),
       render: (_: any, record: User) => (
         <div className="flex gap-2">
           <select
@@ -201,10 +201,11 @@ const RolesManagementPage: React.FC = () => {
         <div className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{t('manage_user_roles_new')}</h2>
-            <p className="text-gray-600 mt-1">{t('modify_roles_for_approved_users_new')}</p>
+            <h2 className="text-2xl font-bold text-gray-900">{t('roles_management')}</h2>
+            <p className="text-gray-600 mt-1">{t('modify_roles')}</p>
             <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-blue-800 font-medium">🧭 {t('roles_guide_header')}</p>
+              <p className="text-blue-800 font-medium">🧭 {t('roles_guide')}</p>
+              <p className="text-blue-700 text-sm mt-1">{t('roles_description')}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

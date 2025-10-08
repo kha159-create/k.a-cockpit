@@ -28,10 +28,10 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
     const [openStore, setOpenStore] = useState<string | null>(commissionData.length > 0 ? commissionData[0].name : null);
 
     const columns: Column<CommissionEmployeeRow>[] = [
-        { key: 'name', label: 'Employee', sortable: true },
+        { key: 'name', label: 'Employee', sortable: true, render: (item) => item.name ?? '—' },
         { key: 'totalSales', label: 'Total Sales', sortable: true, render: item => Number(item.totalSales || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-        { key: 'achievement', label: 'Employee Achievement', sortable: true, render: item => `${item.achievement.toFixed(1)}%` },
-        { key: 'finalCommissionRate', label: 'Final Commission Rate', sortable: true, render: item => <span className="font-semibold text-blue-600">{`${item.finalCommissionRate.toFixed(2)}%`}</span> },
+        { key: 'achievement', label: 'Employee Achievement', sortable: true, render: item => `${(item.achievement || 0).toFixed(1)}%` },
+        { key: 'finalCommissionRate', label: 'Final Commission Rate', sortable: true, render: item => <span className="font-semibold text-blue-600">{`${(item.finalCommissionRate || 0).toFixed(2)}%`}</span> },
         { key: 'commissionAmount', label: 'Commission Amount', sortable: true, render: item => <span className="font-semibold text-green-600">{Number(item.commissionAmount || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span> },
     ];
 
@@ -46,7 +46,7 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
                 <div className="text-center p-10 bg-white rounded-lg shadow"><p>No commission data available for the selected period.</p></div>
             ) : (
                 <div className="space-y-4">
-                {commissionData.sort((a,b) => a.name.localeCompare(b.name)).map(store => (
+                 {Array.isArray(commissionData) ? commissionData.sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(store => (
                     <div key={store.name} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                         <div className="p-4 cursor-pointer hover:bg-gray-50" onClick={() => setOpenStore(prev => prev === store.name ? null : store.name)}>
                             <div className="flex justify-between items-center">
@@ -63,7 +63,7 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
                             </div>
                         )}
                     </div>
-                ))}
+                )) : []}
                 </div>
             )
         )}

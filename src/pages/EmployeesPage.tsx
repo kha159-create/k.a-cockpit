@@ -43,16 +43,19 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   const canEdit = profile?.role === 'admin' || profile?.role === 'area_manager';
   const canSendTasks = profile?.role !== 'employee';
 
-  const allEmployeeSummaries = useMemo(() => Object.values(employeeSummary).flat(), [employeeSummary]);
+  const allEmployeeSummaries = useMemo(() => {
+    const summaries = Object.values(employeeSummary);
+    return Array.isArray(summaries) ? summaries.flat() : [];
+  }, [employeeSummary]);
 
   const filteredEmployeeSummary = useMemo(() => {
     return Object.entries(employeeSummary).reduce((acc, [storeName, employees]) => {
-        const employeesArray = employees as EmployeeSummary[];
+        const employeesArray = Array.isArray(employees) ? employees as EmployeeSummary[] : [];
         if (!searchTerm) {
             acc[storeName] = employeesArray;
             return acc;
         }
-        const filteredEmployees = employeesArray.filter(emp => emp.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        const filteredEmployees = employeesArray.filter(emp => (emp.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
         if (filteredEmployees.length > 0) {
             acc[storeName] = filteredEmployees;
         }
@@ -71,11 +74,11 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   };
 
   const columns: Column<EmployeeSummary>[] = [
-      { key: 'name', label: t('employee'), sortable: true, render: (item) => <span className="font-medium text-blue-600">{item.name}</span> },
+      { key: 'name', label: t('employee'), sortable: true, render: (item) => <span className="font-medium text-blue-600">{item.name ?? '—'}</span> },
       { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => Number(item.totalSales || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
       { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (item) => Number(item.atv || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
       { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => Number(item.effectiveTarget || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-      { key: 'achievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.achievement} /> },
+      { key: 'achievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.achievement || 0} /> },
       { key: 'actions', label: t('actions'), render: (item) => (
           <div className="flex space-x-1">
               <button onClick={() => setModalState({type: 'aiCoaching', data: item})} className="text-orange-500 p-1" title={t('ai_coaching_title')}><SparklesIcon /></button>

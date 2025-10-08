@@ -42,9 +42,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
   }, [productSummary, filters]);
 
   const columns: Column<ProductSummary>[] = [
-    { key: 'name', label: 'Product Name', sortable: true },
-    { key: 'alias', label: 'Code', sortable: true },
-    { key: 'soldQty', label: 'Sold Qty', sortable: true },
+    { key: 'name', label: 'Product Name', sortable: true, render: (item) => item.name ?? '—' },
+    { key: 'alias', label: 'Code', sortable: true, render: (item) => item.alias ?? '—' },
+    { key: 'soldQty', label: 'Sold Qty', sortable: true, render: (item) => item.soldQty ?? '—' },
     { key: 'price', label: 'Price', sortable: true, render: item => Number(item.price || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'totalValue', label: 'Total Sales Value', sortable: true, render: item => Number(item.totalValue || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'actions', label: 'Actions', render: (item) => (
