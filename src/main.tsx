@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { LocaleProvider } from './context/LocaleContext';
+import { DirectoryProvider } from '@/context/DirectoryProvider';
 
 // Register Service Worker for PWA (disabled for GitHub Pages)
 // if ('serviceWorker' in navigator) {
@@ -26,7 +27,9 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <LocaleProvider>
-      <App />
+      <DirectoryProvider>
+        <App />
+      </DirectoryProvider>
     </LocaleProvider>
   </React.StrictMode>
 );

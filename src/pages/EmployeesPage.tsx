@@ -6,6 +6,8 @@ import { TableSkeleton } from '../components/SkeletonLoader';
 import { PlusIcon, PencilIcon, TrashIcon, SparklesIcon, PlusCircleIcon, ClipboardListIcon } from '../components/Icons';
 import type { EmployeeSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, Employee, DailyMetric, SalesTransaction, StoreSummary, UserProfile } from '../types';
 import { AchievementBar } from '../components/DashboardComponents';
+import { fmtCurrency } from '@/utils/format';
+import { EmployeeName } from '@/components/Names';
 import Employee360View from '../components/Employee360View';
 import { useLocale } from '../context/LocaleContext';
 
@@ -82,11 +84,15 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   };
 
   const columns: Column<EmployeeSummary>[] = [
-      { key: 'name', label: t('employee'), sortable: true, render: (item) => <span className="font-medium text-blue-600">{item.name ?? '—'}</span> },
-      { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => Number(item.totalSales || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-      { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (item) => Number(item.atv || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-      { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => Number(item.effectiveTarget || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-      { key: 'achievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.achievement || 0} /> },
+      { key: 'name', label: t('employee'), sortable: true, render: (item) => (
+        <span className="font-medium text-blue-600">
+          <EmployeeName id={(item as any).employeeId ?? (item as any).id ?? item.name} fallback={item.name} />
+        </span>
+      ) },
+      { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => fmtCurrency(item.totalSales) },
+      { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (item) => fmtCurrency(item.atv) },
+      { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => fmtCurrency(item.effectiveTarget) },
+      { key: 'achievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.achievement ?? 0} /> },
       { key: 'actions', label: t('actions'), render: (item) => (
           <div className="flex space-x-1">
               <button onClick={() => setModalState({type: 'aiCoaching', data: item})} className="text-orange-500 p-1" title={t('ai_coaching_title')}><SparklesIcon /></button>

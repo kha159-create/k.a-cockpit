@@ -31,15 +31,18 @@ const RolesManagementPage: React.FC = () => {
       const snapshot = await db.collection('users')
         .get();
       
-      const allUsers = snapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name || 'غير محدد',
-        email: doc.data().email || '',
-        employeeId: doc.data().employeeId || '',
-        role: doc.data().role || 'employee',
-        status: doc.data().status || 'pending',
-        ...doc.data()
-      })) as User[];
+      const allUsers = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          name: d.name ?? '',
+          email: d.email ?? '',
+          employeeId: d.employeeId ?? '',
+          role: d.role ?? 'employee',
+          status: d.status ?? 'pending',
+          ...d
+        };
+      }) as User[];
       
       // تصفية المستخدمين المعتمدين
       const approvedUsers = allUsers.filter(user => 
@@ -98,12 +101,12 @@ const RolesManagementPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
             <span className="text-orange-600 font-bold text-lg">
-              {value?.charAt(0)?.toUpperCase() || 'U'}
+              {value?.charAt(0)?.toUpperCase() ?? 'U'}
             </span>
           </div>
           <div>
-            <p className="font-medium text-gray-900">{value || 'غير محدد'}</p>
-            <p className="text-sm text-gray-500">{record.email}</p>
+            <p className="font-medium text-gray-900">{value ?? ''}</p>
+            <p className="text-sm text-gray-500">{record.email ?? ''}</p>
           </div>
         </div>
       )
@@ -113,7 +116,7 @@ const RolesManagementPage: React.FC = () => {
       label: t('employee_id'),
       render: (value: string) => (
         <span className="font-mono font-semibold text-blue-600">
-          {value || t('undefined')}
+          {value ?? ''}
         </span>
       )
     },
@@ -172,7 +175,7 @@ const RolesManagementPage: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">جاري تحميل المستخدمين...</p>
+          <p className="text-gray-600">{t('loading')}</p>
         </div>
       </div>
     );
@@ -224,8 +227,8 @@ const RolesManagementPage: React.FC = () => {
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-gray-400 text-2xl">👥</span>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">لا يوجد مستخدمين</h3>
-            <p className="text-gray-600">لم يتم العثور على أي مستخدمين معتمدين</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t('no_users_found')}</h3>
+            <p className="text-gray-600">{t('check_firebase_or_signup')}</p>
           </div>
         ) : (
           <div className="overflow-hidden">

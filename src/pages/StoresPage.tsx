@@ -7,6 +7,8 @@ import { PlusIcon, PencilIcon, TrashIcon, UsersIcon } from '../components/Icons'
 import type { StoreSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile, DailyMetric } from '../types';
 import { useLocale } from '../context/LocaleContext';
 import { AchievementBar } from '../components/DashboardComponents';
+import { fmtCurrency } from '@/utils/format';
+import { StoreName } from '@/components/Names';
 
 interface StoresPageProps {
   storeSummary: StoreSummary[];
@@ -39,10 +41,14 @@ const StoresPage: React.FC<StoresPageProps> = ({
   const canAddVisitors = ['admin', 'general_manager', 'area_manager', 'store_manager'].includes(profile?.role || '');
 
   const columns: Column<StoreSummary>[] = [
-    { key: 'name', label: t('store'), sortable: true, render: (item) => <span onClick={() => onSelectStore(item)} className="cursor-pointer font-medium text-blue-600 hover:underline">{item.name ?? '—'}</span> },
-    { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => Number(item.totalSales || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-    { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => Number(item.effectiveTarget || 0).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-    { key: 'targetAchievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.targetAchievement || 0} /> },
+    { key: 'name', label: t('store'), sortable: true, render: (item) => (
+      <span onClick={() => onSelectStore(item)} className="cursor-pointer font-medium text-blue-600 hover:underline">
+        <StoreName id={(item as any).store_id ?? (item as any).id ?? item.name} fallback={item.name} />
+      </span>
+    ) },
+    { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => fmtCurrency(item.totalSales) },
+    { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => fmtCurrency(item.effectiveTarget) },
+    { key: 'targetAchievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.targetAchievement ?? 0} /> },
   ];
 
   if (canEdit || canDelete) {

@@ -99,7 +99,10 @@ export const translations = {
     "year": "Year",
     "month": "Month",
     "deleting": "Deleting...",
-    "delete_data_button": "Delete Data"
+    "delete_data_button": "Delete Data",
+    "no_users_found": "No Users Found",
+    "check_firebase_or_signup": "Check Firebase connection or sign up new users",
+    "total_users": "Total Users"
   },
   ar: {
     "dashboard": "لوحة التحكم",
@@ -201,6 +204,9 @@ export const translations = {
     "year": "السنة",
     "month": "الشهر",
     "deleting": "جاري الحذف...",
-    "delete_data_button": "حذف البيانات"
+    "delete_data_button": "حذف البيانات",
+    "no_users_found": "لا يوجد مستخدمين",
+    "check_firebase_or_signup": "تحقق من اتصال Firebase أو سجل مستخدمين جدد",
+    "total_users": "إجمالي المستخدمين"
   }
 };

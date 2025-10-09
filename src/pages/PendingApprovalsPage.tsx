@@ -32,10 +32,20 @@ const PendingApprovalsPage: React.FC = () => {
         .where('status', '==', 'pending')
         .get();
       
-      const employees = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as PendingEmployee[];
+      const employees = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          employeeId: d.employeeId ?? '',
+          email: d.email ?? '',
+          name: d.name ?? '',
+          role: d.role ?? 'employee',
+          status: d.status ?? 'pending',
+          createdAt: d.createdAt,
+          userId: d.userId ?? '',
+          ...d
+        };
+      }) as PendingEmployee[];
       
       // ترتيب محلياً حسب createdAt
       employees.sort((a, b) => {
