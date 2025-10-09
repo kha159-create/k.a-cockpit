@@ -40,14 +40,14 @@ const StoresPage: React.FC<StoresPageProps> = ({
   const canAddVisitors = ['admin', 'general_manager', 'area_manager', 'store_manager'].includes(profile?.role || '');
 
   const columns: Column<StoreSummary>[] = [
-    { key: 'name', label: t('store'), sortable: true, render: (item) => (
-      <span onClick={() => onSelectStore(item)} className="cursor-pointer font-medium text-blue-600 hover:underline">
-        <StoreName id={(item as any).store_id ?? (item as any).id ?? item.name} fallback={item.name} />
+    { key: 'name', label: t('store'), sortable: true, render: (_value, record) => (
+      <span onClick={() => onSelectStore(record)} className="cursor-pointer font-medium text-blue-600 hover:underline">
+        <StoreName id={(record as any).store_id ?? (record as any).id ?? record.name} fallback={record.name} />
       </span>
     ) },
-    { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => item.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-    { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => item.effectiveTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-    { key: 'targetAchievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.targetAchievement ?? 0} /> },
+    { key: 'totalSales', label: t('total_sales'), sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+    { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+    { key: 'targetAchievement', label: t('achievement'), sortable: true, render: (_value, record) => <AchievementBar percentage={record.targetAchievement ?? 0} /> },
   ];
 
   if (canEdit || canDelete) {

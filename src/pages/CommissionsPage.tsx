@@ -29,13 +29,13 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
     const [openStore, setOpenStore] = useState<string | null>(commissionData.length > 0 ? commissionData[0].name : null);
 
     const columns: Column<CommissionEmployeeRow>[] = [
-        { key: 'name', label: 'Employee', sortable: true, render: (item) => (
-            <EmployeeName id={(item as any).employeeId ?? (item as any).id ?? item.name} fallback={item.name} />
+        { key: 'name', label: 'Employee', sortable: true, render: (_value, record) => (
+            <EmployeeName id={(record as any).employeeId ?? (record as any).id ?? record.name} fallback={record.name} />
         ) },
-        { key: 'totalSales', label: 'Total Sales', sortable: true, render: item => item.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-        { key: 'achievement', label: 'Employee Achievement', sortable: true, render: item => `${(item.achievement as number).toFixed(1)}%` },
-        { key: 'finalCommissionRate', label: 'Final Commission Rate', sortable: true, render: item => <span className="font-semibold text-blue-600">{`${(item.finalCommissionRate as number).toFixed(2)}%`}</span> },
-        { key: 'commissionAmount', label: 'Commission Amount', sortable: true, render: item => <span className="font-semibold text-green-600">{item.commissionAmount.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span> },
+        { key: 'totalSales', label: 'Total Sales', sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+        { key: 'achievement', label: 'Employee Achievement', sortable: true, render: (value) => `${(value as number).toFixed(1)}%` },
+        { key: 'finalCommissionRate', label: 'Final Commission Rate', sortable: true, render: (value) => <span className="font-semibold text-blue-600">{`${(value as number).toFixed(2)}%`}</span> },
+        { key: 'commissionAmount', label: 'Commission Amount', sortable: true, render: (value) => <span className="font-semibold text-green-600">{(value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span> },
     ];
 
     return (

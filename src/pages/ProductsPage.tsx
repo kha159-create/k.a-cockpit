@@ -50,11 +50,11 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
   // console.log('ProductsPage - filteredProducts:', filteredProducts);
 
   const columns: Column<ProductSummary>[] = [
-    { key: 'name', label: 'Product Name', sortable: true, render: (item) => item.name ?? '' },
-    { key: 'alias', label: 'Code', sortable: true, render: (item) => item.alias ?? '' },
-    { key: 'soldQty', label: 'Sold Qty', sortable: true, render: (item) => item.soldQty.toLocaleString('en-US') },
-    { key: 'price', label: 'Price', sortable: true, render: item => item.price.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-    { key: 'totalValue', label: 'Total Sales Value', sortable: true, render: item => item.totalValue.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+    { key: 'name', label: 'Product Name', sortable: true, render: (value) => value ?? '' },
+    { key: 'alias', label: 'Code', sortable: true, render: (value) => value ?? '' },
+    { key: 'soldQty', label: 'Sold Qty', sortable: true, render: (value) => (value as number).toLocaleString('en-US') },
+    { key: 'price', label: 'Price', sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+    { key: 'totalValue', label: 'Total Sales Value', sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'actions', label: 'Actions', render: (item) => (
       <button onClick={() => setModalState({ type: 'salesPitch', data: item })} className="text-orange-500 hover:text-orange-700" title="Get AI Sales Pitch">
         <SparklesIcon />

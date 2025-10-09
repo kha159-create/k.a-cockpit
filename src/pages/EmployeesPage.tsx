@@ -83,15 +83,15 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   };
 
   const columns: Column<EmployeeSummary>[] = [
-      { key: 'name', label: t('employee'), sortable: true, render: (item) => (
+      { key: 'name', label: t('employee'), sortable: true, render: (_value, record) => (
         <span className="font-medium text-blue-600">
-          <EmployeeName id={(item as any).employeeId ?? (item as any).id ?? item.name} fallback={item.name} />
+          <EmployeeName id={(record as any).employeeId ?? (record as any).id ?? record.name} fallback={record.name} />
         </span>
       ) },
-      { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => item.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-      { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (item) => item.atv.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-      { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => item.effectiveTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-      { key: 'achievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.achievement ?? 0} /> },
+      { key: 'totalSales', label: t('total_sales'), sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+      { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+      { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+      { key: 'achievement', label: t('achievement'), sortable: true, render: (_value, record) => <AchievementBar percentage={record.achievement ?? 0} /> },
       { key: 'actions', label: t('actions'), render: (item) => (
           <div className="flex space-x-1">
               <button onClick={() => setModalState({type: 'aiCoaching', data: item})} className="text-orange-500 p-1" title={t('ai_coaching_title')}><SparklesIcon /></button>
