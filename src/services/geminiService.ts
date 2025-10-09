@@ -12,15 +12,45 @@ if (!GEMINI_API_KEY) {
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-const callGeminiWithRetry = async (model: string, prompt: string, config?: GenerationConfig, maxRetries = 3): Promise<any> => {
+type StructuredRequest = {
+    contents: any[];
+    systemInstruction?: string;
+    generationConfig?: GenerationConfig;
+};
+
+const callGeminiWithRetry = async (
+    model: string,
+    input: string | StructuredRequest,
+    config?: GenerationConfig,
+    maxRetries = 3
+): Promise<any> => {
     let retries = 0;
     let delay = 1000;
 
     while (retries < maxRetries) {
         try {
             console.log(`🔍 Gemini API call attempt ${retries + 1}/${maxRetries} with model: ${model}`);
-            const generativeModel = genAI.getGenerativeModel({ model, generationConfig: config });
-            const result = await generativeModel.generateContent(prompt);
+            const generativeModel = genAI.getGenerativeModel({ model });
+
+            let result;
+            if (typeof input === 'string') {
+                // Simple text prompt; if config is provided, pass it via generationConfig
+                if (config) {
+                    result = await generativeModel.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: input }]}],
+                        generationConfig: config,
+                    });
+                } else {
+                    result = await generativeModel.generateContent(input);
+                }
+            } else {
+                // Structured chat-style request
+                result = await generativeModel.generateContent({
+                    contents: input.contents,
+                    systemInstruction: input.systemInstruction,
+                    generationConfig: input.generationConfig,
+                });
+            }
             const response = await result.response;
             console.log("✅ Gemini API call successful");
             return response;
@@ -45,8 +75,39 @@ const callGeminiWithRetry = async (model: string, prompt: string, config?: Gener
 };
 
 
-export const generateText = async (prompt: string, model = 'gemini-2.5-flash', maxRetries = 3): Promise<string> => {
-    const response = await callGeminiWithRetry(model, prompt, undefined, maxRetries);
+type GenerateTextParams =
+    | string
+    | {
+        model?: string;
+        // Chat-style payload
+        contents: any[];
+        // Old callers might pass systemInstruction inside config; support both
+        systemInstruction?: string;
+        config?: GenerationConfig & { systemInstruction?: string };
+        generationConfig?: GenerationConfig;
+      };
+
+export const generateText = async (params: GenerateTextParams, model = 'gemini-2.5-flash', maxRetries = 3): Promise<string> => {
+    if (typeof params === 'string') {
+        const response = await callGeminiWithRetry(model, params, undefined, maxRetries);
+        return response.text();
+    }
+
+    const resolvedModel = params.model || model;
+
+    // Normalize config fields
+    const systemInstruction = params.systemInstruction || (params.config as any)?.systemInstruction;
+    const generationConfig: GenerationConfig | undefined = params.generationConfig || (params.config
+        ? Object.fromEntries(Object.entries(params.config).filter(([k]) => k !== 'systemInstruction')) as GenerationConfig
+        : undefined);
+
+    const structured: StructuredRequest = {
+        contents: params.contents,
+        systemInstruction,
+        generationConfig,
+    };
+
+    const response = await callGeminiWithRetry(resolvedModel, structured, undefined, maxRetries);
     return response.text();
 };
 
