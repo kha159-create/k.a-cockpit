@@ -101,6 +101,52 @@ const PendingApprovalsPage: React.FC = () => {
     setProcessing(pendingEmployee.id);
     
     try {
+      const updateOrCreateEmployee = async () => {
+        if (!pendingEmployee.employeeId) return;
+        const empId = String(pendingEmployee.employeeId).trim();
+        const employeesRef = db.collection('employees');
+        const directRef = employeesRef.doc(empId);
+        const directSnap = await directRef.get();
+
+        if (!directSnap.exists) {
+          // Try to find by the employeeId field
+          const q = await employeesRef.where('employeeId', '==', empId).limit(1).get();
+          if (!q.empty) {
+            await q.docs[0].ref.update({
+              linkedAccount: true,
+              userEmail: pendingEmployee.email,
+              userId: pendingEmployee.userId,
+              role: pendingEmployee.role,
+              approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              status: 'active',
+            });
+            return;
+          }
+          // Create a new employee doc with this employeeId
+          await directRef.set({
+            employeeId: empId,
+            name: pendingEmployee.name,
+            userEmail: pendingEmployee.email,
+            userId: pendingEmployee.userId,
+            role: pendingEmployee.role,
+            linkedAccount: true,
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'active',
+          }, { merge: true });
+          return;
+        }
+
+        // Update existing doc
+        await directRef.update({
+          linkedAccount: true,
+          userEmail: pendingEmployee.email,
+          userId: pendingEmployee.userId,
+          role: pendingEmployee.role,
+          approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          status: 'active',
+        });
+      };
+
       if (pendingEmployee.source === 'users') {
         // تحديث حالة المستخدم الموجود بالفعل
         await db.collection('users').doc(pendingEmployee.userId).update({
@@ -108,15 +154,7 @@ const PendingApprovalsPage: React.FC = () => {
           approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
           approvedBy: 'admin',
         });
-        if (pendingEmployee.employeeId) {
-          await db.collection('employees').doc(pendingEmployee.employeeId).update({
-            linkedAccount: true,
-            userEmail: pendingEmployee.email,
-            userId: pendingEmployee.userId,
-            role: pendingEmployee.role,
-            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          });
-        }
+        await updateOrCreateEmployee();
       } else {
         // نقل السجل من pendingEmployees إلى users
         await db.collection('users').doc(pendingEmployee.userId).set({
@@ -129,13 +167,7 @@ const PendingApprovalsPage: React.FC = () => {
           approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
           approvedBy: 'admin'
         });
-        await db.collection('employees').doc(pendingEmployee.employeeId).update({
-          linkedAccount: true,
-          userEmail: pendingEmployee.email,
-          userId: pendingEmployee.userId,
-          role: pendingEmployee.role,
-          approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        });
+        await updateOrCreateEmployee();
         await db.collection('pendingEmployees').doc(pendingEmployee.id).delete();
       }
       
