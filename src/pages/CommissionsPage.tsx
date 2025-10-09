@@ -38,6 +38,9 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
         { key: 'commissionAmount', label: 'Commission Amount', sortable: true, render: (value) => <span className="font-semibold text-green-600">{(value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span> },
     ];
 
+    // Determine manager's store to scope visible employees if needed
+    const effectiveStoreName = profile?.store || '';
+
     return (
     <div className="space-y-6">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -49,7 +52,7 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
                 <div className="text-center p-10 bg-white rounded-lg shadow"><p>No commission data available for the selected period.</p></div>
             ) : (
                 <div className="space-y-4">
-                 {Array.isArray(commissionData) ? commissionData.sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(store => (
+                     {Array.isArray(commissionData) ? commissionData.sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(store => (
                     <div key={store.name} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                         <div className="p-4 cursor-pointer hover:bg-gray-50" onClick={() => setOpenStore(prev => prev === store.name ? null : store.name)}>
                             <div className="flex justify-between items-center">
@@ -60,9 +63,17 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
                                 Store Achievement: {store.achievement.toFixed(1)}% | Applicable Commission Rate: <strong>{store.commissionRate.toFixed(1)}%</strong>
                             </p>
                         </div>
-                        {openStore === store.name && (
+                            {openStore === store.name && (
                             <div className="p-4 border-t border-gray-200">
-                                <Table columns={columns} data={store.employees} initialSortKey="commissionAmount" />
+                                    <Table 
+                                      columns={columns} 
+                                      data={
+                                        profile?.role === 'store_manager' && effectiveStoreName
+                                          ? store.employees.filter(e => (e as any).store === effectiveStoreName)
+                                          : store.employees
+                                      } 
+                                      initialSortKey="commissionAmount" 
+                                    />
                             </div>
                         )}
                     </div>
