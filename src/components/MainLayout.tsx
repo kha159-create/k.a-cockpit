@@ -306,7 +306,7 @@ useEffect(() => {
 
 const handleNotificationClick = (notificationId: string) => {
     setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
-    setActiveTab('settings');
+    setActiveTab('pendingApprovals');
 };
 
 
