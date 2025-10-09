@@ -14,6 +14,7 @@ interface PendingEmployee {
   status: string;
   createdAt: any;
   userId: string;
+  source?: 'pendingEmployees' | 'users';
 }
 
 const PendingApprovalsPage: React.FC = () => {
@@ -23,75 +24,120 @@ const PendingApprovalsPage: React.FC = () => {
   const [processing, setProcessing] = useState<string | null>(null);
 
   useEffect(() => {
-    loadPendingEmployees();
-  }, []);
+    const unsub1 = db
+      .collection('pendingEmployees')
+      .where('status', '==', 'pending')
+      .onSnapshot((snapshot) => {
+        const list = snapshot.docs.map((doc) => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            employeeId: d.employeeId ?? '',
+            email: d.email ?? '',
+            name: d.name ?? '',
+            role: d.role ?? 'employee',
+            status: d.status ?? 'pending',
+            createdAt: d.createdAt,
+            userId: d.userId ?? '',
+            source: 'pendingEmployees' as const,
+            ...d,
+          } as PendingEmployee;
+        });
 
-  const loadPendingEmployees = async () => {
-    try {
-      const snapshot = await db.collection('pendingEmployees')
-        .where('status', '==', 'pending')
-        .get();
-      
-      const employees = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          employeeId: d.employeeId ?? '',
-          email: d.email ?? '',
-          name: d.name ?? '',
-          role: d.role ?? 'employee',
-          status: d.status ?? 'pending',
-          createdAt: d.createdAt,
-          userId: d.userId ?? '',
-          ...d
-        };
-      }) as PendingEmployee[];
-      
-      // ترتيب محلياً حسب createdAt
-      employees.sort((a, b) => {
-        const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-        const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-        return bTime.getTime() - aTime.getTime();
+        setPendingEmployees((prev) => {
+          // سنُدمج لاحقاً مع users في الاشتراك الآخر؛ هنا نُحدّث جزئية المصدر هذا فقط
+          const others = prev.filter((p) => p.source === 'users');
+          const combined = [...list, ...others];
+          combined.sort((a, b) => {
+            const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return bTime.getTime() - aTime.getTime();
+          });
+          return combined;
+        });
+        setLoading(false);
       });
-      
-      setPendingEmployees(employees);
-    } catch (error) {
-      console.error('Error loading pending employees:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+
+    const unsub2 = db
+      .collection('users')
+      .where('status', '==', 'pending')
+      .onSnapshot((snapshot) => {
+        const list = snapshot.docs.map((doc) => {
+          const d = doc.data() as any;
+          return {
+            id: doc.id,
+            employeeId: d.employeeId ?? '',
+            email: d.email ?? '',
+            name: d.name ?? '',
+            role: d.role ?? 'employee',
+            status: d.status ?? 'pending',
+            createdAt: d.createdAt || d.approvedAt || new Date(),
+            userId: doc.id,
+            source: 'users' as const,
+            ...d,
+          } as PendingEmployee;
+        });
+
+        setPendingEmployees((prev) => {
+          const others = prev.filter((p) => p.source === 'pendingEmployees');
+          const combined = [...others, ...list];
+          combined.sort((a, b) => {
+            const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return bTime.getTime() - aTime.getTime();
+          });
+          return combined;
+        });
+        setLoading(false);
+      });
+
+    return () => {
+      unsub1();
+      unsub2();
+    };
+  }, []);
 
   const handleApprove = async (pendingEmployee: PendingEmployee) => {
     setProcessing(pendingEmployee.id);
     
     try {
-      // نقل السجل إلى users
-      await db.collection('users').doc(pendingEmployee.userId).set({
-        id: pendingEmployee.userId,
-        name: pendingEmployee.name,
-        email: pendingEmployee.email,
-        employeeId: pendingEmployee.employeeId,
-        role: pendingEmployee.role,
-        status: 'approved',
-        approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        approvedBy: 'admin' // يمكن تحسين هذا لاحقاً
-      });
-
-      // تحديث سجل الموظف
-      await db.collection('employees').doc(pendingEmployee.employeeId).update({
-        linkedAccount: true,
-        userEmail: pendingEmployee.email,
-        userId: pendingEmployee.userId,
-        role: pendingEmployee.role,
-        approvedAt: serverTimestamp()
-      });
-
-      // حذف السجل من pendingEmployees
-      await db.collection('pendingEmployees').doc(pendingEmployee.id).delete();
-
-      // تحديث القائمة المحلية
-      setPendingEmployees(prev => prev.filter(emp => emp.id !== pendingEmployee.id));
+      if (pendingEmployee.source === 'users') {
+        // تحديث حالة المستخدم الموجود بالفعل
+        await db.collection('users').doc(pendingEmployee.userId).update({
+          status: 'approved',
+          approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          approvedBy: 'admin',
+        });
+        if (pendingEmployee.employeeId) {
+          await db.collection('employees').doc(pendingEmployee.employeeId).update({
+            linkedAccount: true,
+            userEmail: pendingEmployee.email,
+            userId: pendingEmployee.userId,
+            role: pendingEmployee.role,
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      } else {
+        // نقل السجل من pendingEmployees إلى users
+        await db.collection('users').doc(pendingEmployee.userId).set({
+          id: pendingEmployee.userId,
+          name: pendingEmployee.name,
+          email: pendingEmployee.email,
+          employeeId: pendingEmployee.employeeId,
+          role: pendingEmployee.role,
+          status: 'approved',
+          approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          approvedBy: 'admin'
+        });
+        await db.collection('employees').doc(pendingEmployee.employeeId).update({
+          linkedAccount: true,
+          userEmail: pendingEmployee.email,
+          userId: pendingEmployee.userId,
+          role: pendingEmployee.role,
+          approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        await db.collection('pendingEmployees').doc(pendingEmployee.id).delete();
+      }
       
       alert('تم قبول الطلب بنجاح');
     } catch (error) {
@@ -110,14 +156,13 @@ const PendingApprovalsPage: React.FC = () => {
     setProcessing(pendingEmployee.id);
     
     try {
-      // حذف حساب المستخدم من Firebase Auth
-      // ملاحظة: هذا يتطلب صلاحيات خاصة، يمكن تخطيه في المرحلة الأولى
-      
-      // حذف السجل من pendingEmployees
-      await db.collection('pendingEmployees').doc(pendingEmployee.id).delete();
+      if (pendingEmployee.source === 'users') {
+        // غيّر الحالة لتخرج من قائمة الانتظار
+        await db.collection('users').doc(pendingEmployee.userId).update({ status: 'rejected' });
+      } else {
+        await db.collection('pendingEmployees').doc(pendingEmployee.id).delete();
+      }
 
-      // تحديث القائمة المحلية
-      setPendingEmployees(prev => prev.filter(emp => emp.id !== pendingEmployee.id));
       
       alert('تم رفض الطلب');
     } catch (error) {
