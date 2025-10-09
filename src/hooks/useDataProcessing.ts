@@ -56,7 +56,17 @@ export const useDataProcessing = ({
     if (!profile) {
       return { stores: [], employees: [], dailyMetrics: [], kingDuvetSales: [], salesTransactions: [] };
     }
-    const { role, areaManager, store: userStoreName } = profile;
+    const { role } = profile;
+
+    // Derive user's current store and area if missing on profile
+    const derivedStoreFromEmployees = employees.find(e =>
+      (profile.employeeId && e.employeeId === profile.employeeId) ||
+      (e.userId && e.userId === (profile as any).id) ||
+      (e.userEmail && e.userEmail === profile.email)
+    );
+
+    const effectiveStoreName = profile.store || derivedStoreFromEmployees?.currentStore || '';
+    const effectiveAreaManager = profile.areaManager || stores.find(s => s.name === effectiveStoreName)?.areaManager || profile.areaManager || '';
 
     if (role === 'admin' || role === 'general_manager') {
       return { stores, employees: activeEmployees, dailyMetrics, kingDuvetSales, salesTransactions };
@@ -64,12 +74,12 @@ export const useDataProcessing = ({
 
     let visibleStores: Store[];
     if (role === 'area_manager') {
-      visibleStores = stores.filter(s => s.areaManager === areaManager);
+      visibleStores = stores.filter(s => s.areaManager === effectiveAreaManager);
     } else if (role === 'store_manager') {
-      const userStore = stores.find(s => s.name === userStoreName);
+      const userStore = stores.find(s => s.name === effectiveStoreName);
       visibleStores = userStore ? stores.filter(s => s.areaManager === userStore.areaManager) : [];
     } else { // employee
-      visibleStores = stores.filter(s => s.name === userStoreName);
+      visibleStores = stores.filter(s => s.name === effectiveStoreName);
     }
 
     const visibleStoreNames = new Set(visibleStores.map(s => s.name));
@@ -77,10 +87,10 @@ export const useDataProcessing = ({
     let visibleEmployees: Employee[];
     if (role === 'employee') {
        // Sees colleagues in the same store
-      visibleEmployees = activeEmployees.filter(e => e.currentStore === userStoreName);
+      visibleEmployees = activeEmployees.filter(e => e.currentStore === effectiveStoreName);
     } else if (role === 'store_manager') {
       // Sees only employees from their own store
-      visibleEmployees = activeEmployees.filter(e => e.currentStore === userStoreName);
+      visibleEmployees = activeEmployees.filter(e => e.currentStore === effectiveStoreName);
     } else { // area_manager
       visibleEmployees = activeEmployees.filter(e => visibleStoreNames.has(getEmployeeStoreForPeriod(e, dateFilter)));
     }
