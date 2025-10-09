@@ -103,13 +103,13 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
       { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
       { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
       { key: 'achievement', label: t('achievement'), sortable: true, render: (_value, record) => <AchievementBar percentage={record.achievement ?? 0} /> },
-      { key: 'actions', label: t('actions'), render: (item) => (
+      { key: 'actions', label: t('actions'), render: (_value, record) => (
           <div className="flex space-x-1">
-              <button onClick={() => setModalState({type: 'aiCoaching', data: item})} className="text-orange-500 p-1" title={t('ai_coaching_title')}><SparklesIcon /></button>
-              {canSendTasks && <button onClick={() => setModalState({type: 'task', data: item})} className="text-gray-600 p-1" title={t('send_task_title')}><ClipboardListIcon /></button>}
-              {canEdit && <button onClick={() => setModalState({type: 'dailyMetric', data: {mode: 'employee', employee: item.name, store: item.store}})} className="text-green-600 p-1" title={t('add_kpi_title')}><PlusCircleIcon /></button>}
-              {canEdit && <button onClick={() => onEdit(item)} className="text-blue-600 p-1" title={t('edit_title')}><PencilIcon /></button>}
-              {canDelete && <button onClick={() => onDelete(item.id, item.name)} className="text-red-600 p-1" title={t('delete_title')}><TrashIcon /></button>}
+              <button onClick={(e) => { e.stopPropagation(); setModalState({type: 'aiCoaching', data: record}); }} className="text-orange-500 p-1" title={t('ai_coaching_title')}><SparklesIcon /></button>
+              {canSendTasks && <button onClick={(e) => { e.stopPropagation(); setModalState({type: 'task', data: record}); }} className="text-gray-600 p-1" title={t('send_task_title')}><ClipboardListIcon /></button>}
+              {canEdit && <button onClick={(e) => { e.stopPropagation(); setModalState({type: 'dailyMetric', data: {mode: 'employee', employee: record.name, store: (record as any).store}}); }} className="text-green-600 p-1" title={t('add_kpi_title')}><PlusCircleIcon /></button>}
+              {canEdit && <button onClick={(e) => { e.stopPropagation(); onEdit(record); }} className="text-blue-600 p-1" title={t('edit_title')}><PencilIcon /></button>}
+              {canDelete && <button onClick={(e) => { e.stopPropagation(); onDelete(record.id, record.name); }} className="text-red-600 p-1" title={t('delete_title')}><TrashIcon /></button>}
           </div>
       )},
     ];

@@ -53,8 +53,8 @@ const StoresPage: React.FC<StoresPageProps> = ({
   if (canEdit || canDelete) {
     columns.push({ key: 'actions', label: t('actions'), render: (item) => (
       <div className="flex space-x-2">
-        {canEdit && <button onClick={() => onEdit(item)} className="text-blue-600 hover:text-blue-800 p-1"><PencilIcon /></button>}
-        {canDelete && <button onClick={() => onDelete(item.id, item.name)} className="text-red-600 hover:text-red-800 p-1"><TrashIcon /></button>}
+        {canEdit && <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="text-blue-600 hover:text-blue-800 p-1" title={t('edit_title')}><PencilIcon /></button>}
+        {canDelete && <button onClick={(e) => { e.stopPropagation(); onDelete(item.id, item.name); }} className="text-red-600 hover:text-red-800 p-1" title={t('delete_title')}><TrashIcon /></button>}
       </div>
     )});
   }
