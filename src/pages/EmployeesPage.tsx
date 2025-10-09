@@ -55,7 +55,18 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   }, [employeeSummary]);
 
   const filteredEmployeeSummary = useMemo(() => {
+    // Derive manager's effective store (used to scope visibility)
+    const derivedFromEmployees = allEmployees.find(e =>
+      (profile?.employeeId && e.employeeId === profile.employeeId) ||
+      (e.userEmail && profile?.email && e.userEmail === profile.email)
+    );
+    const managerStore = profile?.store || derivedFromEmployees?.currentStore || '';
+
     return Object.entries(employeeSummary).reduce((acc, [storeName, employees]) => {
+        // If user is store_manager, hide employee lists of other stores entirely
+        if (profile?.role === 'store_manager' && storeName !== managerStore) {
+            return acc; // skip rendering this store's employees
+        }
         const employeesArray = Array.isArray(employees) ? employees as EmployeeSummary[] : [];
         if (!searchTerm) {
             acc[storeName] = employeesArray;
