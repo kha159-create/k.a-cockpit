@@ -140,10 +140,24 @@ export const useDataProcessing = ({
         (areaStoreFilter.store === 'All' || store.name === areaStoreFilter.store)
       );
       const storeNames = new Set(filteredStores.map(s => s.name));
-      
+      // default: employees inside selected stores
+      let employeesInScope = roleFilteredData.employees.filter(e => storeNames.has(getEmployeeStoreForPeriod(e, dateFilter)));
+
+      // Special rule: store_manager sees all stores of area, but only employees of own store
+      if (profile?.role === 'store_manager') {
+        // derive effective store again (same logic used above)
+        const derivedStoreFromEmployees = employees.find(e =>
+          (profile.employeeId && e.employeeId === profile.employeeId) ||
+          (e.userId && e.userId === (profile as any).id) ||
+          (e.userEmail && e.userEmail === profile.email)
+        );
+        const effectiveStoreName = profile.store || derivedStoreFromEmployees?.currentStore || '';
+        employeesInScope = roleFilteredData.employees.filter(e => getEmployeeStoreForPeriod(e, dateFilter) === effectiveStoreName);
+      }
+
       return {
           stores: filteredStores,
-          employees: roleFilteredData.employees.filter(e => storeNames.has(getEmployeeStoreForPeriod(e, dateFilter))),
+          employees: employeesInScope,
           metrics: dateFilteredData.metrics.filter(m => storeNames.has(m.store)),
           sales: dateFilteredData.sales.filter(s => storeNames.has(s['Outlet Name'])),
           duvetSales: dateFilteredData.duvetSales.filter(s => storeNames.has(s['Outlet Name'])),
