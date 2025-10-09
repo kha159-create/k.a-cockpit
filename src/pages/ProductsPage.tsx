@@ -4,7 +4,6 @@ import MonthYearFilter from '../components/MonthYearFilter';
 import { Table, Column } from '../components/Table';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import { SparklesIcon } from '../components/Icons';
-import { fmtCurrency, fmtNumber } from '@/utils/format';
 import { StoreName } from '@/components/Names';
 import { getCategory } from '../utils/calculator';
 import type { ProductSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile } from '../types';
@@ -53,9 +52,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
   const columns: Column<ProductSummary>[] = [
     { key: 'name', label: 'Product Name', sortable: true, render: (item) => item.name ?? '' },
     { key: 'alias', label: 'Code', sortable: true, render: (item) => item.alias ?? '' },
-    { key: 'soldQty', label: 'Sold Qty', sortable: true, render: (item) => fmtNumber(item.soldQty) },
-    { key: 'price', label: 'Price', sortable: true, render: item => fmtCurrency(item.price) },
-    { key: 'totalValue', label: 'Total Sales Value', sortable: true, render: item => fmtCurrency(item.totalValue) },
+    { key: 'soldQty', label: 'Sold Qty', sortable: true, render: (item) => item.soldQty.toLocaleString('en-US') },
+    { key: 'price', label: 'Price', sortable: true, render: item => item.price.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+    { key: 'totalValue', label: 'Total Sales Value', sortable: true, render: item => item.totalValue.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'actions', label: 'Actions', render: (item) => (
       <button onClick={() => setModalState({ type: 'salesPitch', data: item })} className="text-orange-500 hover:text-orange-700" title="Get AI Sales Pitch">
         <SparklesIcon />

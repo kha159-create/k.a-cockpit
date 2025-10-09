@@ -7,7 +7,6 @@ import { PlusIcon, PencilIcon, TrashIcon, UsersIcon } from '../components/Icons'
 import type { StoreSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile, DailyMetric } from '../types';
 import { useLocale } from '../context/LocaleContext';
 import { AchievementBar } from '../components/DashboardComponents';
-import { fmtCurrency } from '@/utils/format';
 import { StoreName } from '@/components/Names';
 
 interface StoresPageProps {
@@ -46,8 +45,8 @@ const StoresPage: React.FC<StoresPageProps> = ({
         <StoreName id={(item as any).store_id ?? (item as any).id ?? item.name} fallback={item.name} />
       </span>
     ) },
-    { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => fmtCurrency(item.totalSales) },
-    { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => fmtCurrency(item.effectiveTarget) },
+    { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => item.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+    { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => item.effectiveTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'targetAchievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.targetAchievement ?? 0} /> },
   ];
 

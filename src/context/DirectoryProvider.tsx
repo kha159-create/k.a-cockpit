@@ -42,43 +42,37 @@ export const DirectoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
 
-    const run = async () => {
-      try {
-        setLoading(true);
+    const unsubStores = db.collection('stores').onSnapshot((snap) => {
+      const sMap: MapRec = {};
+      snap.docs.map((doc) => {
+        const data = doc.data();
+        const key = String(data?.store_id ?? data?.id ?? doc.id).trim();
+        sMap[key] = pickStoreName(data, key);
+        return null;
+      });
+      if (!cancelled) setStoreMap(sMap);
+      if (!cancelled) setLoading(false);
+    });
 
-        // Stores
-        const storesSnap = await db.collection('stores').get();
-        const sMap: MapRec = {};
-        storesSnap.forEach((doc) => {
-          const data = doc.data();
-          const key = String(data?.store_id ?? data?.id ?? doc.id).trim();
-          sMap[key] = pickStoreName(data, key);
-        });
+    const unsubEmployees = db.collection('employees').onSnapshot((snap) => {
+      const eMap: MapRec = {};
+      snap.docs.map((doc) => {
+        const data = doc.data();
+        const key = String(data?.employee_id ?? data?.id ?? doc.id).trim();
+        eMap[key] = pickEmployeeName(data, key);
+        return null;
+      });
+      if (!cancelled) setEmployeeMap(eMap);
+      if (!cancelled) setLoading(false);
+    });
 
-        // Employees
-        const employeesSnap = await db.collection('employees').get();
-        const eMap: MapRec = {};
-        employeesSnap.forEach((doc) => {
-          const data = doc.data();
-          const key = String(data?.employee_id ?? data?.id ?? doc.id).trim();
-          eMap[key] = pickEmployeeName(data, key);
-        });
-
-        if (!cancelled) {
-          setStoreMap(sMap);
-          setEmployeeMap(eMap);
-          setError(undefined);
-        }
-      } catch (err: any) {
-        if (!cancelled) setError(err?.message || 'Directory load failed');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+    return () => {
+      cancelled = true;
+      unsubStores();
+      unsubEmployees();
     };
-
-    run();
-    return () => { cancelled = true; };
   }, []);
 
   const value = useMemo(() => ({ storeMap, employeeMap, loading, error }), [storeMap, employeeMap, loading, error]);

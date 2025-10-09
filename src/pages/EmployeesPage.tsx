@@ -6,7 +6,6 @@ import { TableSkeleton } from '../components/SkeletonLoader';
 import { PlusIcon, PencilIcon, TrashIcon, SparklesIcon, PlusCircleIcon, ClipboardListIcon } from '../components/Icons';
 import type { EmployeeSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, Employee, DailyMetric, SalesTransaction, StoreSummary, UserProfile } from '../types';
 import { AchievementBar } from '../components/DashboardComponents';
-import { fmtCurrency } from '@/utils/format';
 import { EmployeeName } from '@/components/Names';
 import Employee360View from '../components/Employee360View';
 import { useLocale } from '../context/LocaleContext';
@@ -89,9 +88,9 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
           <EmployeeName id={(item as any).employeeId ?? (item as any).id ?? item.name} fallback={item.name} />
         </span>
       ) },
-      { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => fmtCurrency(item.totalSales) },
-      { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (item) => fmtCurrency(item.atv) },
-      { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => fmtCurrency(item.effectiveTarget) },
+      { key: 'totalSales', label: t('total_sales'), sortable: true, render: (item) => item.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+      { key: 'atv', label: t('avg_transaction_value'), sortable: true, render: (item) => item.atv.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
+      { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (item) => item.effectiveTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
       { key: 'achievement', label: t('achievement'), sortable: true, render: (item) => <AchievementBar percentage={item.achievement ?? 0} /> },
       { key: 'actions', label: t('actions'), render: (item) => (
           <div className="flex space-x-1">
