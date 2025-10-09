@@ -137,7 +137,17 @@ export const StoreModal: React.FC<StoreModalProps> = ({ data, onSave, onClose, i
     const canEdit = profile?.role === 'admin' || profile?.role === 'general_manager';
 
     useEffect(() => {
-        setSalesTarget(data?.targets?.[targetYear]?.[targetMonth] || 0);
+        // Sync incoming data when editing existing store
+        if (data) {
+            setName(data.name || '');
+            setAreaManager(data.areaManager || '');
+            const currentTarget = data.targets?.[targetYear]?.[targetMonth] || 0;
+            setSalesTarget(currentTarget);
+        } else {
+            setName('');
+            setAreaManager('');
+            setSalesTarget(0);
+        }
     }, [data, targetYear, targetMonth]);
 
     const handleSubmit = (e: React.FormEvent) => {

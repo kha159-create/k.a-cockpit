@@ -194,8 +194,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
-  // Filter States
-  const [dateFilter, setDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: 'all', day: 'all' });
+  // Filter States: default to current year and current month
+  const [dateFilter, setDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' });
   const [areaStoreFilter, setAreaStoreFilter] = useState<AreaStoreFilterState>({
       areaManager: profile?.role === 'area_manager' || profile?.role === 'store_manager' ? profile.areaManager || 'All' : 'All',
       store: profile?.role === 'store_manager' || profile?.role === 'employee' ? profile.store || 'All' : 'All',
