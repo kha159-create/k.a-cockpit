@@ -798,16 +798,16 @@ const handleNotificationClick = (notificationId: string) => {
       </aside>
       <main className="flex-1 p-2 sm:p-4 md:p-6 md:ltr:ml-64 md:rtl:mr-64 lg:ltr:ml-72 lg:rtl:mr-72 bg-neutral-50 min-h-screen">
         <header className="bg-white rounded-2xl shadow-lg border border-neutral-200 p-4 sm:p-6 mb-4 sm:mb-6">
-            <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
+            <div className="flex justify-between items-center flex-wrap gap-3">
+                <div className="flex items-center gap-4 min-w-0">
                     <button className="md:hidden p-3 text-neutral-600 hover:bg-neutral-100 rounded-xl transition-all duration-200" onClick={() => setIsSidebarOpen(true)}>
                         <MenuIcon />
                     </button>
-                    <div>
-                        <h2 className="text-2xl font-bold text-neutral-900 capitalize">{t(activeTab.replace(/([A-Z])/g, ' $1').replace('ai', 'AI'))}</h2>
+                    <div className="min-w-0">
+                        <h2 className="text-2xl font-bold text-neutral-900 capitalize truncate max-w-[70vw] sm:max-w-none">{t(activeTab.replace(/([A-Z])/g, ' $1').replace('ai', 'AI'))}</h2>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0">
                      {isAdmin && <NotificationBell notifications={notifications} onNotificationClick={handleNotificationClick} />}
                      <button onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')} className="px-3 py-1.5 text-xs font-semibold rounded-full border border-zinc-300 hover:bg-gray-100 text-zinc-700" title={locale === 'en' ? 'العربية' : 'English'}>
                         {locale === 'en' ? 'A' : 'ع'} - {locale === 'en' ? 'ع' : 'A'}

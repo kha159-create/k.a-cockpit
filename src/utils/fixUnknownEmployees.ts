@@ -9,11 +9,13 @@ const parseIdFromUnknown = (name?: string): string | null => {
 export type FixUnknownResult = {
   employeesUpdated: number;
   metricsUpdated: number;
+  salesUpdated?: number;
 };
 
 export const fixUnknownEmployeesAndMetrics = async (): Promise<FixUnknownResult> => {
   let employeesUpdated = 0;
   let metricsUpdated = 0;
+  let salesUpdated = 0;
 
   // 1) Fix employees with names like "Unknown 2792" and missing employeeId
   const employeesSnap = await db.collection('employees').get();
@@ -39,7 +41,23 @@ export const fixUnknownEmployeesAndMetrics = async (): Promise<FixUnknownResult>
     }
   }
 
-  return { employeesUpdated, metricsUpdated };
+  // 3) Backfill employeeId in sales collections from SalesMan Name
+  const updateSalesCollection = async (collection: 'salesTransactions' | 'kingDuvetSales') => {
+    const snap = await db.collection(collection).get();
+    for (const doc of snap.docs) {
+      const data = doc.data() as any;
+      if (data?.employeeId) continue;
+      const parsed = parseIdFromUnknown(data?.['SalesMan Name'] || data?.employee);
+      if (parsed) {
+        await db.collection(collection).doc(doc.id).set({ employeeId: parsed }, { merge: true });
+        salesUpdated++;
+      }
+    }
+  };
+  await updateSalesCollection('salesTransactions');
+  await updateSalesCollection('kingDuvetSales');
+
+  return { employeesUpdated, metricsUpdated, salesUpdated };
 };
 
 
