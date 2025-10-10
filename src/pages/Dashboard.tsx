@@ -119,16 +119,14 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {(isRecalculating || !displayKpiData) ? (
-            [...Array(6)].map((_, i) => <KPICardSkeleton key={i} />)
+            [...Array(5)].map((_, i) => <KPICardSkeleton key={i} />)
         ) : (
             <>
                 <KPICard title={t('total_sales')} value={displayKpiData.totalSales} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<CurrencyDollarIcon/>} iconBgColor="bg-orange-100 text-orange-600" onClick={() => !isEmployee && setModalState({ type: 'kpiBreakdown', data: { title: t('total_sales'), kpi: 'totalSales', data: storeSummary } })} />
                 <KPICard title={t('total_transactions')} value={displayKpiData.totalTransactions} format={val => val.toLocaleString('en-US')} icon={<ReceiptTaxIcon/>} iconBgColor="bg-blue-100 text-blue-600" />
                 <KPICard title={t('avg_transaction_value')} value={displayKpiData.averageTransactionValue} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<ScaleIcon/>} iconBgColor="bg-indigo-100 text-indigo-600" />
-                <KPICard title={t('daily_average_sales')} value={dailyAvgSales} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<CurrencyDollarIcon/>} iconBgColor="bg-green-100 text-green-600" />
-                <KPICard title={t('monthly_average_sales')} value={monthlyAvgSales} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<CurrencyDollarIcon/>} iconBgColor="bg-teal-100 text-teal-600" />
                 {!isEmployee && (
                     <>
                         <KPICard title={t('conversion_rate')} value={displayKpiData.conversionRate} format={v => `${v.toFixed(1)}%`} icon={<ChartPieIcon/>} iconBgColor="bg-amber-100 text-amber-600" />
@@ -142,7 +140,15 @@ const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
         <div className="lg:col-span-3">
             {isRecalculating ? <ChartSkeleton/> : (
-               <ChartCard title={lineChartTitle}>
+               <ChartCard title={
+                 <div className="flex items-center justify-between">
+                   <span>{lineChartTitle}</span>
+                   <div className="flex items-center gap-2 text-xs">
+                      <span className="px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 font-semibold">ADS: {dailyAvgSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span>
+                      <span className="px-2 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 font-semibold">AMS: {monthlyAvgSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span>
+                   </div>
+                 </div>
+               }>
                 <LineChart data={salesPerformance} />
               </ChartCard>
             )}
