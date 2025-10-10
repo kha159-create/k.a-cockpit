@@ -115,7 +115,7 @@ const AuthPage: React.FC = () => {
                 </div>
                 <div className="form-container sign-in-container">
                     <form className="auth-form" onSubmit={handleLogin}>
-                        <h1 className="auth-title">Sign in</h1>
+                        <h1 className="auth-title">{t('sign_in')}</h1>
                         <div className="auth-input-container">
                            <span className="auth-input-icon"><EmailIcon/></span>
                            <input className="auth-input" type="text" placeholder={t('email_or_id')} value={loginIdentifier} onChange={e => setLoginIdentifier(e.target.value)} required />
@@ -124,7 +124,7 @@ const AuthPage: React.FC = () => {
                             <span className="auth-input-icon"><PasswordIcon/></span>
                             <input className="auth-input" type="password" placeholder={t('password')} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
                         </div>
-                        <a className="auth-link" href="#">Forgot your password?</a>
+                        <a className="auth-link" href="#">{t('forgot_password')}</a>
                         <button className="auth-button" type="submit" disabled={loading}>{loading ? t('signing_in') : t('sign_in')}</button>
                         {error && !isRightPanelActive && <p className="text-sm text-red-400 mt-2">{error}</p>}
                     </form>
@@ -132,14 +132,14 @@ const AuthPage: React.FC = () => {
                 <div className="overlay-container">
                     <div className="overlay">
                         <div className="overlay-panel overlay-left">
-                            <h1 className="auth-title">Welcome Back!</h1>
-                            <p className="auth-text">To keep connected with us please login with your personal info</p>
-                            <button className="auth-button ghost" onClick={() => {setIsRightPanelActive(false); setError(null);}}>Sign In</button>
+                            <h1 className="auth-title">{t('welcome_back_title')}</h1>
+                            <p className="auth-text">{t('welcome_back_text')}</p>
+                            <button className="auth-button ghost" onClick={() => {setIsRightPanelActive(false); setError(null);}}>{t('sign_in_cta')}</button>
                         </div>
                         <div className="overlay-panel overlay-right">
-                            <h1 className="auth-title">Hello, Friend!</h1>
-                            <p className="auth-text">Enter your personal details and start your journey with us</p>
-                            <button className="auth-button ghost" onClick={() => {setIsRightPanelActive(true); setError(null);}}>Sign Up</button>
+                            <h1 className="auth-title">{t('hello_friend_title')}</h1>
+                            <p className="auth-text">{t('hello_friend_text')}</p>
+                            <button className="auth-button ghost" onClick={() => {setIsRightPanelActive(true); setError(null);}}>{t('sign_up_cta')}</button>
                         </div>
                     </div>
                 </div>
