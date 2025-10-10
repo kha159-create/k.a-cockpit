@@ -81,27 +81,63 @@ const Dashboard: React.FC<DashboardProps> = ({
       : t('daily_sales_performance');
 
   const { dailyAvgSales, monthlyAvgSales } = useMemo(() => {
-      const values = Array.isArray(salesPerformance)
-        ? salesPerformance.map(p => Number((p as any).Sales || 0))
-        : [];
-      if (values.length === 0) return { dailyAvgSales: 0, monthlyAvgSales: 0 };
+      if (dateFilter.year === 'all') return { dailyAvgSales: 0, monthlyAvgSales: 0 };
 
-      const total = values.reduce((a, b) => a + b, 0);
-      if (dateFilter.month === 'all') {
-          const monthsCount = values.length || 1;
-          const monthlyAvg = total / monthsCount;
-          const dailyAvgApprox = monthlyAvg / 30; // simple approximation
-          return { dailyAvgSales: dailyAvgApprox, monthlyAvgSales: monthlyAvg };
+      // حدد المتاجر ضمن الفلتر
+      const storesInScope = allStores.filter(s =>
+        (areaStoreFilter.areaManager === 'All' || s.areaManager === areaStoreFilter.areaManager) &&
+        (areaStoreFilter.store === 'All' || s.name === areaStoreFilter.store)
+      ).map(s => s.name);
+      const storeSet = new Set(storesInScope);
+
+      // اجمع من dailyMetrics فقط داخل allDateData (وجود حقل date و totalSales)
+      const metrics = (allDateData as any[]).filter((d: any) => d && d.date && typeof d.date.toDate === 'function' && d.store && storeSet.has(d.store));
+
+      const Y = dateFilter.year as number;
+      const M = dateFilter.month === 'all' ? 'all' : (dateFilter.month as number); // 0-index
+      const D = dateFilter.day === 'all' ? 'all' : (dateFilter.day as number);
+
+      // شهري: مجموع من يناير إلى M واقسم على (M+1)
+      const monthlyTotals = Array.from({ length: 12 }, () => 0);
+      metrics.forEach((m: any) => {
+        const d = m.date.toDate();
+        if (d.getUTCFullYear() !== Y) return;
+        monthlyTotals[d.getUTCMonth()] += Number(m.totalSales || 0);
+      });
+
+      let monthlyAvg = 0;
+      if (M === 'all') {
+        const totalYear = monthlyTotals.reduce((a, b) => a + b, 0);
+        monthlyAvg = totalYear / 12; // متوسط شهري على كامل السنة
       } else {
-          const daysCount = values.length || 1;
-          const dailyAvg = total / daysCount;
-          const year = Number(dateFilter.year) || new Date().getFullYear();
-          const monthIndex = Number(dateFilter.month);
-          const daysInMonth = Number.isFinite(monthIndex) ? new Date(year, monthIndex + 1, 0).getDate() : 30;
-          const monthlyAvg = dailyAvg * daysInMonth;
-          return { dailyAvgSales: dailyAvg, monthlyAvgSales: monthlyAvg };
+        const upto = M; // 0..M
+        const sum = monthlyTotals.slice(0, upto + 1).reduce((a, b) => a + b, 0);
+        monthlyAvg = (upto + 1) > 0 ? sum / (upto + 1) : 0;
       }
-  }, [salesPerformance, dateFilter]);
+
+      // يومي: داخل الشهر المحدد، اجمع من 1..D واقسم على D
+      let dailyAvg = 0;
+      if (M === 'all') {
+        // عندما لا يوجد شهر محدد: متوسط يومي سنوي = إجمالي السنة / عدد أيام السنة
+        const totalYear = monthlyTotals.reduce((a, b) => a + b, 0);
+        const isLeap = (Y % 4 === 0 && Y % 100 !== 0) || (Y % 400 === 0);
+        dailyAvg = totalYear / (isLeap ? 366 : 365);
+      } else {
+        const daysInMonth = new Date(Y, M + 1, 0).getDate();
+        const dailyTotals = Array.from({ length: daysInMonth }, () => 0);
+        metrics.forEach((m: any) => {
+          const d = m.date.toDate();
+          if (d.getUTCFullYear() !== Y || d.getUTCMonth() !== M) return;
+          const idx = d.getUTCDate() - 1;
+          if (idx >= 0 && idx < daysInMonth) dailyTotals[idx] += Number(m.totalSales || 0);
+        });
+        const uptoDay = D === 'all' ? daysInMonth : Math.min(D, daysInMonth);
+        const sum = dailyTotals.slice(0, uptoDay).reduce((a, b) => a + b, 0);
+        dailyAvg = uptoDay > 0 ? sum / uptoDay : 0;
+      }
+
+      return { dailyAvgSales: dailyAvg, monthlyAvgSales: monthlyAvg };
+  }, [allDateData, allStores, areaStoreFilter, dateFilter]);
 
   return (
     <div className="space-y-6">
