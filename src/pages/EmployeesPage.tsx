@@ -44,9 +44,9 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
   // console.log('EmployeesPage - allEmployees:', allEmployees);
   // console.log('EmployeesPage - isRecalculating:', isRecalculating);
 
-  const canAdd = false; // removed manual add
-  const canDelete = false; // removed manual delete
-  const canEdit = false; // removed manual edit
+  const canAdd = profile?.role === 'admin';
+  const canDelete = profile?.role === 'admin';
+  const canEdit = profile?.role === 'admin' || profile?.role === 'area_manager';
   const canSendTasks = profile?.role !== 'employee';
 
   const allEmployeeSummaries = useMemo(() => {
@@ -128,7 +128,11 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
           onChange={(e) => setSearchTerm(e.target.value)}
           className="input w-full max-w-sm"
         />
-        {/* Manual employee actions removed as per new flow */}
+        {canAdd && (
+            <button onClick={() => setModalState({type: 'employee'})} className="btn-primary flex items-center gap-2">
+                <PlusIcon /> {t('add_employee')}
+            </button>
+        )}
        </div>
         <div className="space-y-6">
             {isRecalculating ? <TableSkeleton /> : (
