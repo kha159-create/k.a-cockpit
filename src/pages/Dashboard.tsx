@@ -143,9 +143,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                <ChartCard title={
                  <div className="flex items-center justify-between">
                    <span>{lineChartTitle}</span>
-                   <div className="flex items-center gap-2 text-xs">
-                      <span className="px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 font-semibold">ADS: {dailyAvgSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span>
-                      <span className="px-2 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 font-semibold">AMS: {monthlyAvgSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span>
+                   <div className="flex items-center gap-2 text-sm">
+                      <span className="px-3 py-1.5 rounded-full bg-green-50 text-green-700 border border-green-200 font-bold">ADS: {dailyAvgSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span>
+                      <span className="px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 font-bold">AMS: {monthlyAvgSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span>
                    </div>
                  </div>
                }>

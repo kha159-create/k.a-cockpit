@@ -139,12 +139,13 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     const renderComparisonSet = (title: string, data: { current: LFLData, previous: LFLData }) => (
         <div className="mt-6 bg-white p-6 rounded-xl shadow-sm border">
             <h3 className="text-xl font-semibold text-zinc-800 mb-4">{title}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                 <DetailedComparisonCard title="Sales" current={data.current.totalSales} previous={data.previous.totalSales} />
                 <DetailedComparisonCard title="Visitors" current={data.current.totalVisitors} previous={data.previous.totalVisitors} />
                 <DetailedComparisonCard title="ATV" current={data.current.atv} previous={data.previous.atv} />
                 <DetailedComparisonCard title="Transactions" current={data.current.totalTransactions} previous={data.previous.totalTransactions} />
                 <DetailedComparisonCard title="Visitor Conversion Rate" current={data.current.visitorRate} previous={data.previous.visitorRate} isPercentage={true} />
+                <DetailedComparisonCard title="Sales per Visitor" current={data.current.totalVisitors > 0 ? data.current.totalSales / data.current.totalVisitors : 0} previous={data.previous.totalVisitors > 0 ? data.previous.totalSales / data.previous.totalVisitors : 0} />
             </div>
         </div>
     );
