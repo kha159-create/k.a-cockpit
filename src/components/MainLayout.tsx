@@ -19,7 +19,7 @@ import LFLPage from '@/pages/LFLPage';
 import SettingsPage from '@/pages/SettingsPage';
 import StoreDetailPage from '@/pages/StoreDetailPage';
 // import NaturalLanguageSearch from '@/components/NaturalLanguageSearch';
-// import AiChatAssistant from '@/components/AiChatAssistant';
+import AiChatAssistant from '@/components/AiChatAssistant';
 import PendingApprovalPage from '@/pages/PendingApprovalPage';
 import PendingApprovalsPage from '@/pages/PendingApprovalsPage';
 import RolesManagementPage from '@/pages/RolesManagementPage';
