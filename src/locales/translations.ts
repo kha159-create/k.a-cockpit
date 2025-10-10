@@ -125,7 +125,11 @@ export const translations = {
     "sign_up_cta": "Sign Up",
     "error_no_user_id": "No user found with this ID",
     "error_no_user_email": "This user does not have an email",
-    "error_login_failed": "Login failed"
+    "error_login_failed": "Login failed",
+    "create_your_account": "Create Your Account",
+    "confirm_password": "Confirm Password",
+    "already_have_account": "Already have an account?",
+    "passwords_do_not_match": "Passwords do not match"
   },
   ar: {
     "dashboard": "لوحة التحكم",
@@ -253,6 +257,10 @@ export const translations = {
     "sign_up_cta": "إنشاء حساب",
     "error_no_user_id": "لا يوجد مستخدم بهذا الرقم",
     "error_no_user_email": "هذا المستخدم لا يملك بريد إلكتروني",
-    "error_login_failed": "فشل تسجيل الدخول"
+    "error_login_failed": "فشل تسجيل الدخول",
+    "create_your_account": "أنشئ حسابك",
+    "confirm_password": "تأكيد كلمة المرور",
+    "already_have_account": "لديك حساب بالفعل؟",
+    "passwords_do_not_match": "كلمتا المرور غير متطابقتين"
   }
 };

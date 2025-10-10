@@ -8,16 +8,17 @@ import { UserIcon, EmailIcon, PasswordIcon } from '../components/Icons';
 
 const AuthPage: React.FC = () => {
     const { t } = useLocale();
-    const [isRightPanelActive, setIsRightPanelActive] = useState(false);
-    
+    const [mode, setMode] = useState<'login' | 'signup'>('login');
+
     // Form States
-    const [loginIdentifier, setLoginIdentifier] = useState('admin@alsani.com');
-    const [loginPassword, setLoginPassword] = useState('password123');
-    
+    const [loginIdentifier, setLoginIdentifier] = useState('');
+    const [loginPassword, setLoginPassword] = useState('');
+
     const [signUpName, setSignUpName] = useState('');
     const [signUpEmployeeId, setSignUpEmployeeId] = useState('');
     const [signUpEmail, setSignUpEmail] = useState('');
     const [signUpPassword, setSignUpPassword] = useState('');
+    const [signUpPasswordConfirm, setSignUpPasswordConfirm] = useState('');
 
     // UI States
     const [error, setError] = useState<string | null>(null);
@@ -57,6 +58,9 @@ const AuthPage: React.FC = () => {
         setError(null);
         setSuccess(null);
         try {
+            if (signUpPassword !== signUpPasswordConfirm) {
+                throw new Error(t('passwords_do_not_match'));
+            }
             // FIX: Use namespaced compat API for authentication.
             const userCredential = await auth.createUserWithEmailAndPassword(signUpEmail, signUpPassword);
             const user = userCredential.user;
@@ -74,9 +78,9 @@ const AuthPage: React.FC = () => {
                 });
                 setSuccess(t('sign_up_success'));
                 setTimeout(() => {
-                    setIsRightPanelActive(false);
+                    setMode('login');
                     setSuccess(null);
-                }, 3000);
+                }, 2000);
             }
         } catch (err: any) {
           setError(err.message);
@@ -84,68 +88,70 @@ const AuthPage: React.FC = () => {
           setLoading(false);
         }
     };
-
-
-    return (
-        <div className="auth-page-body">
-            <div className={`auth-container ${isRightPanelActive ? 'right-panel-active' : ''}`} id="container">
-                <div className="form-container sign-up-container">
-                    <form className="auth-form" onSubmit={handleSignUp}>
-                        <h1 className="auth-title">{t('sign_up_title')}</h1>
-                        <div className="auth-input-container">
-                           <span className="auth-input-icon"><UserIcon/></span>
-                           <input className="auth-input" type="text" placeholder={t('name')} value={signUpName} onChange={e => setSignUpName(e.target.value)} required />
-                        </div>
-                        <div className="auth-input-container">
-                            <span className="auth-input-icon"><UserIcon/></span>
-                            <input className="auth-input" type="text" placeholder={t('employee_id')} value={signUpEmployeeId} onChange={e => setSignUpEmployeeId(e.target.value)} required />
-                        </div>
-                        <div className="auth-input-container">
-                            <span className="auth-input-icon"><EmailIcon/></span>
-                            <input className="auth-input" type="email" placeholder={t('email')} value={signUpEmail} onChange={e => setSignUpEmail(e.target.value)} required />
-                        </div>
-                        <div className="auth-input-container">
-                            <span className="auth-input-icon"><PasswordIcon/></span>
-                            <input className="auth-input" type="password" placeholder={t('password')} value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} required />
-                        </div>
-                        <button className="auth-button mt-4" type="submit" disabled={loading}>{loading ? t('signing_in') : t('sign_up')}</button>
-                        {error && isRightPanelActive && <p className="text-sm text-red-400 mt-2">{error}</p>}
-                        {success && <p className="text-sm text-green-400 mt-2">{success}</p>}
-                    </form>
+    const LoginCard = (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="w-full max-w-lg bg-white rounded-2xl shadow-lg p-8">
+                <div className="text-center mb-4">
+                    <div className="mx-auto mb-4 w-14 h-14 rounded-xl bg-orange-600 text-white flex items-center justify-center font-bold text-xl">K.A</div>
+                    <h1 className="text-3xl font-bold text-gray-900">Cockpit</h1>
+                    <p className="mt-1 text-gray-600">{t('please_sign_in')}</p>
                 </div>
-                <div className="form-container sign-in-container">
-                    <form className="auth-form" onSubmit={handleLogin}>
-                        <h1 className="auth-title">{t('sign_in')}</h1>
-                        <div className="auth-input-container">
-                           <span className="auth-input-icon"><EmailIcon/></span>
-                           <input className="auth-input" type="text" placeholder={t('email_or_id')} value={loginIdentifier} onChange={e => setLoginIdentifier(e.target.value)} required />
-                        </div>
-                        <div className="auth-input-container">
-                            <span className="auth-input-icon"><PasswordIcon/></span>
-                            <input className="auth-input" type="password" placeholder={t('password')} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
-                        </div>
-                        <a className="auth-link" href="#">{t('forgot_password')}</a>
-                        <button className="auth-button" type="submit" disabled={loading}>{loading ? t('signing_in') : t('sign_in')}</button>
-                        {error && !isRightPanelActive && <p className="text-sm text-red-400 mt-2">{error}</p>}
-                    </form>
-                </div>
-                <div className="overlay-container">
-                    <div className="overlay">
-                        <div className="overlay-panel overlay-left">
-                            <h1 className="auth-title">{t('welcome_back_title')}</h1>
-                            <p className="auth-text">{t('welcome_back_text')}</p>
-                            <button className="auth-button ghost" onClick={() => {setIsRightPanelActive(false); setError(null);}}>{t('sign_in_cta')}</button>
-                        </div>
-                        <div className="overlay-panel overlay-right">
-                            <h1 className="auth-title">{t('hello_friend_title')}</h1>
-                            <p className="auth-text">{t('hello_friend_text')}</p>
-                            <button className="auth-button ghost" onClick={() => {setIsRightPanelActive(true); setError(null);}}>{t('sign_up_cta')}</button>
-                        </div>
+                <form className="space-y-4" onSubmit={handleLogin}>
+                    <div className="auth-input-container">
+                        <span className="auth-input-icon"><EmailIcon/></span>
+                        <input className="auth-input" type="text" placeholder={t('email_or_id')} value={loginIdentifier} onChange={e => setLoginIdentifier(e.target.value)} required />
                     </div>
+                    <div className="auth-input-container">
+                        <span className="auth-input-icon"><PasswordIcon/></span>
+                        <input className="auth-input" type="password" placeholder={t('password')} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
+                    </div>
+                    {error && <p className="text-sm text-red-500">{error}</p>}
+                    <button className="auth-button w-full" type="submit" disabled={loading}>{loading ? t('signing_in') : t('sign_in')}</button>
+                </form>
+                <div className="text-center mt-4 text-sm text-gray-600">
+                    {t('no_account')} <button onClick={() => { setMode('signup'); setError(null); }} className="font-medium text-orange-600 hover:underline">{t('sign_up')}</button>
                 </div>
             </div>
         </div>
     );
+
+    const SignUpCard = (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="w-full max-w-2xl bg-white rounded-2xl shadow-lg p-8">
+                <h1 className="text-3xl font-bold text-gray-900 text-center mb-6">{t('create_your_account')}</h1>
+                <form className="grid grid-cols-1 gap-4" onSubmit={handleSignUp}>
+                    <div className="auth-input-container">
+                        <span className="auth-input-icon"><UserIcon/></span>
+                        <input className="auth-input" type="text" placeholder={t('name')} value={signUpName} onChange={e => setSignUpName(e.target.value)} required />
+                    </div>
+                    <div className="auth-input-container">
+                        <span className="auth-input-icon"><UserIcon/></span>
+                        <input className="auth-input" type="text" placeholder={t('employee_id')} value={signUpEmployeeId} onChange={e => setSignUpEmployeeId(e.target.value)} required />
+                    </div>
+                    <div className="auth-input-container">
+                        <span className="auth-input-icon"><EmailIcon/></span>
+                        <input className="auth-input" type="email" placeholder={t('email')} value={signUpEmail} onChange={e => setSignUpEmail(e.target.value)} required />
+                    </div>
+                    <div className="auth-input-container">
+                        <span className="auth-input-icon"><PasswordIcon/></span>
+                        <input className="auth-input" type="password" placeholder={t('password')} value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} required />
+                    </div>
+                    <div className="auth-input-container">
+                        <span className="auth-input-icon"><PasswordIcon/></span>
+                        <input className="auth-input" type="password" placeholder={t('confirm_password')} value={signUpPasswordConfirm} onChange={e => setSignUpPasswordConfirm(e.target.value)} required />
+                    </div>
+                    {error && <p className="text-sm text-red-500">{error}</p>}
+                    {success && <p className="text-sm text-green-600">{success}</p>}
+                    <button className="auth-button w-full mt-2" type="submit" disabled={loading}>{loading ? t('signing_in') : t('sign_up')}</button>
+                </form>
+                <div className="text-center mt-4 text-sm text-gray-600">
+                    {t('already_have_account')} <button onClick={() => { setMode('login'); setError(null); }} className="font-medium text-orange-600 hover:underline">{t('sign_in')}</button>
+                </div>
+            </div>
+        </div>
+    );
+
+    return mode === 'login' ? LoginCard : SignUpCard;
 };
 
 export default AuthPage;

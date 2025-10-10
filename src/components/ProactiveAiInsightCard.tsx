@@ -39,9 +39,12 @@ const ProactiveAiInsightCard: React.FC<ProactiveAiInsightCardProps> = ({ fullDat
     }
   }, [fullData, locale, t]);
 
+  // Avoid implicit loops by calling once on mount. Users can refresh manually.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchInsight();
-  }, [fetchInsight]);
+    // Only run once on mount; do not add fetchInsight as a dependency to prevent repeated calls
+  }, []);
 
   return (
     <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-xl shadow-lg">

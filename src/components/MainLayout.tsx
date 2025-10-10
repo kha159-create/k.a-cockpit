@@ -18,8 +18,8 @@ import SmartUploaderPage from '@/pages/SmartUploaderPage';
 import LFLPage from '@/pages/LFLPage';
 import SettingsPage from '@/pages/SettingsPage';
 import StoreDetailPage from '@/pages/StoreDetailPage';
-import NaturalLanguageSearch from '@/components/NaturalLanguageSearch';
-import AiChatAssistant from '@/components/AiChatAssistant';
+// import NaturalLanguageSearch from '@/components/NaturalLanguageSearch';
+// import AiChatAssistant from '@/components/AiChatAssistant';
 import PendingApprovalPage from '@/pages/PendingApprovalPage';
 import PendingApprovalsPage from '@/pages/PendingApprovalsPage';
 import RolesManagementPage from '@/pages/RolesManagementPage';
@@ -116,7 +116,7 @@ const NotificationBell: React.FC<{
 
 
 const UserMenu: React.FC<{ user: User; profile: UserProfile | null; onLogout: () => void; }> = ({ user, profile, onLogout }) => {
-    const { t, locale, setLocale } = useLocale();
+    const { t } = useLocale();
     const [isOpen, setIsOpen] = useState(false);
     const [timeDetails, setTimeDetails] = useState({ greeting: '', Icon: SunIcon });
 
@@ -137,10 +137,7 @@ const UserMenu: React.FC<{ user: User; profile: UserProfile | null; onLogout: ()
         return namePart?.charAt(0)?.toUpperCase() + namePart?.slice(1) || 'User';
     }, [user, profile]);
 
-    const toggleLanguage = () => {
-        setLocale(locale === 'en' ? 'ar' : 'en');
-        setIsOpen(false);
-    };
+    // Language toggle moved to header; removed from user menu
 
     return (
         <div className="relative">
@@ -150,16 +147,11 @@ const UserMenu: React.FC<{ user: User; profile: UserProfile | null; onLogout: ()
                 <ChevronDownIcon />
             </button>
             {isOpen && (
-                 <div
+                <div
                     className="absolute top-full mt-2 end-0 w-48 bg-white rounded-lg shadow-xl border z-10"
                     onMouseLeave={() => setIsOpen(false)}
                  >
                     <ul className="p-2 text-sm text-gray-700">
-                        <li>
-                            <button onClick={toggleLanguage} className="w-full text-start flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100">
-                                <GlobeIcon /> {locale === 'en' ? 'العربية' : 'English'}
-                            </button>
-                        </li>
                          <li>
                             <button onClick={onLogout} className="w-full text-start flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-red-600">
                                 <LogoutIcon /> {t('logout')}
@@ -179,7 +171,7 @@ interface MainLayoutProps {
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
-  const { t, locale } = useLocale();
+  const { t, locale, setLocale } = useLocale();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
@@ -816,8 +808,10 @@ const handleNotificationClick = (notificationId: string) => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                     <NaturalLanguageSearch onSearch={(query) => setModalState({type: 'naturalLanguageSearch', data: { query }})} />
                      {isAdmin && <NotificationBell notifications={notifications} onNotificationClick={handleNotificationClick} />}
+                     <button onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')} className="p-2 text-zinc-600 hover:bg-gray-100 rounded-full" title={locale === 'en' ? 'العربية' : 'English'}>
+                        <GlobeIcon />
+                     </button>
                      <UserMenu user={user} profile={profile} onLogout={handleLogout} />
                 </div>
             </div>
@@ -825,7 +819,7 @@ const handleNotificationClick = (notificationId: string) => {
         {renderContent()}
       </main>
 
-        <AiChatAssistant fullData={fullProcessedData} currentPage={activeTab} businessRules={businessRules} />
+        {/* Removed floating AI advisor button as requested */}
 
         {modalState.type &&
             <div className="modal-backdrop">

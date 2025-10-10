@@ -19,7 +19,7 @@ const NaturalLanguageSearch: React.FC<NaturalLanguageSearchProps> = ({ onSearch 
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ask your AI advisor..."
+                placeholder="Search..."
                 className="input w-full pr-10"
             />
             <button type="submit" className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
