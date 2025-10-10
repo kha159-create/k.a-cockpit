@@ -4,6 +4,7 @@ import DataExporter from '../components/DataExporter.js';
 import CustomBusinessRules from '../components/CustomBusinessRules.js';
 import { useLocale } from '../context/LocaleContext.js';
 import { updateAllEmployeesWithLinkedAccount } from '../utils/updateEmployees.js';
+import { fixUnknownEmployeesAndMetrics } from '../utils/fixUnknownEmployees.js';
 
 interface SelectiveDataDeletionProps {
     onSelectiveDelete: (dataType: 'visitors' | 'sales', year: number, month: number) => void;
@@ -177,6 +178,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 <EmployeeUpdateSection />
             )}
 
+            {isAdmin && (
+                <div className="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 className="text-xl font-semibold text-zinc-700 mb-2">Fix Unknown Employees</h3>
+                    <p className="text-sm text-zinc-500 mb-4">Extract numeric IDs from names like "Unknown 2792" and backfill missing employeeId in employees and dailyMetrics.</p>
+                    <FixUnknownEmployeesButton />
+                </div>
+            )}
+
             {(isAdmin || isGM) && (
                 <DataExporter 
                     employeeSummary={employeeSummary} 
@@ -207,3 +216,31 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 };
 
 export default SettingsPage;
+
+const FixUnknownEmployeesButton: React.FC = () => {
+    const { t } = useLocale();
+    const [running, setRunning] = React.useState(false);
+    const [result, setResult] = React.useState<{ employeesUpdated: number; metricsUpdated: number } | null>(null);
+
+    const handleRun = async () => {
+        setRunning(true);
+        setResult(null);
+        try {
+            const res = await fixUnknownEmployeesAndMetrics();
+            setResult(res);
+        } finally {
+            setRunning(false);
+        }
+    };
+
+    return (
+        <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+            <button onClick={handleRun} disabled={running} className="btn-primary">
+                {running ? 'Processing...' : 'Fix Unknown Employees & Metrics'}
+            </button>
+            {result && (
+                <p className="text-sm text-blue-800 mt-2">Employees updated: {result.employeesUpdated} — Metrics updated: {result.metricsUpdated}</p>
+            )}
+        </div>
+    );
+};
