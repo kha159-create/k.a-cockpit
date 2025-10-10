@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
+import './DashboardComponents.css';
 
 // --- Reusable UI Components ---
 const Sparkline: React.FC<{ data: number[] }> = ({ data }) => {

@@ -76,9 +76,32 @@ const Dashboard: React.FC<DashboardProps> = ({
         setDashboardPieFilter(prev => prev === sliceName ? null : sliceName);
     };
 
-    const lineChartTitle = dateFilter.month === 'all'
+  const lineChartTitle = dateFilter.month === 'all'
       ? t('monthly_sales_performance')
       : t('daily_sales_performance');
+
+  const { dailyAvgSales, monthlyAvgSales } = useMemo(() => {
+      const values = Array.isArray(salesPerformance)
+        ? salesPerformance.map(p => Number((p as any).Sales || 0))
+        : [];
+      if (values.length === 0) return { dailyAvgSales: 0, monthlyAvgSales: 0 };
+
+      const total = values.reduce((a, b) => a + b, 0);
+      if (dateFilter.month === 'all') {
+          const monthsCount = values.length || 1;
+          const monthlyAvg = total / monthsCount;
+          const dailyAvgApprox = monthlyAvg / 30; // simple approximation
+          return { dailyAvgSales: dailyAvgApprox, monthlyAvgSales: monthlyAvg };
+      } else {
+          const daysCount = values.length || 1;
+          const dailyAvg = total / daysCount;
+          const year = Number(dateFilter.year) || new Date().getFullYear();
+          const monthIndex = Number(dateFilter.month);
+          const daysInMonth = Number.isFinite(monthIndex) ? new Date(year, monthIndex + 1, 0).getDate() : 30;
+          const monthlyAvg = dailyAvg * daysInMonth;
+          return { dailyAvgSales: dailyAvg, monthlyAvgSales: monthlyAvg };
+      }
+  }, [salesPerformance, dateFilter]);
 
   return (
     <div className="space-y-6">
@@ -96,14 +119,16 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {(isRecalculating || !displayKpiData) ? (
-            [...Array(5)].map((_, i) => <KPICardSkeleton key={i} />)
+            [...Array(6)].map((_, i) => <KPICardSkeleton key={i} />)
         ) : (
             <>
                 <KPICard title={t('total_sales')} value={displayKpiData.totalSales} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<CurrencyDollarIcon/>} iconBgColor="bg-orange-100 text-orange-600" onClick={() => !isEmployee && setModalState({ type: 'kpiBreakdown', data: { title: t('total_sales'), kpi: 'totalSales', data: storeSummary } })} />
                 <KPICard title={t('total_transactions')} value={displayKpiData.totalTransactions} format={val => val.toLocaleString('en-US')} icon={<ReceiptTaxIcon/>} iconBgColor="bg-blue-100 text-blue-600" />
                 <KPICard title={t('avg_transaction_value')} value={displayKpiData.averageTransactionValue} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<ScaleIcon/>} iconBgColor="bg-indigo-100 text-indigo-600" />
+                <KPICard title={t('daily_average_sales')} value={dailyAvgSales} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<CurrencyDollarIcon/>} iconBgColor="bg-green-100 text-green-600" />
+                <KPICard title={t('monthly_average_sales')} value={monthlyAvgSales} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<CurrencyDollarIcon/>} iconBgColor="bg-teal-100 text-teal-600" />
                 {!isEmployee && (
                     <>
                         <KPICard title={t('conversion_rate')} value={displayKpiData.conversionRate} format={v => `${v.toFixed(1)}%`} icon={<ChartPieIcon/>} iconBgColor="bg-amber-100 text-amber-600" />

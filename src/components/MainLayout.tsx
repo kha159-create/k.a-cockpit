@@ -809,8 +809,8 @@ const handleNotificationClick = (notificationId: string) => {
                 </div>
                 <div className="flex items-center gap-3">
                      {isAdmin && <NotificationBell notifications={notifications} onNotificationClick={handleNotificationClick} />}
-                     <button onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')} className="p-2 text-zinc-600 hover:bg-gray-100 rounded-full" title={locale === 'en' ? 'العربية' : 'English'}>
-                        <GlobeIcon />
+                     <button onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')} className="px-3 py-1.5 text-xs font-semibold rounded-full border border-zinc-300 hover:bg-gray-100 text-zinc-700" title={locale === 'en' ? 'العربية' : 'English'}>
+                        {locale === 'en' ? 'A' : 'ع'} - {locale === 'en' ? 'ع' : 'A'}
                      </button>
                      <UserMenu user={user} profile={profile} onLogout={handleLogout} />
                 </div>
@@ -819,7 +819,8 @@ const handleNotificationClick = (notificationId: string) => {
         {renderContent()}
       </main>
 
-        {/* Removed floating AI advisor button as requested */}
+        {/* Restore floating AI assistant button */}
+        <AiChatAssistant fullData={fullProcessedData} currentPage={activeTab} businessRules={businessRules} />
 
         {modalState.type &&
             <div className="modal-backdrop">
