@@ -46,6 +46,16 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     });
   }, [productSummary, filters]);
 
+  const totals = useMemo(() => {
+    let qty = 0;
+    let value = 0;
+    for (const p of filteredProducts) {
+      qty += p.soldQty || 0;
+      value += p.totalValue || 0;
+    }
+    return { qty, value };
+  }, [filteredProducts]);
+
   // Debug: Log filteredProducts after it's defined (removed to prevent infinite re-render)
   // console.log('ProductsPage - filteredProducts:', filteredProducts);
 
@@ -89,7 +99,19 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
             </select>
         </div>
 
-        {isRecalculating ? <TableSkeleton /> : <Table columns={columns} data={filteredProducts} initialSortKey="totalValue" />}
+        {isRecalculating ? <TableSkeleton /> : (
+          <>
+            <div className="flex flex-wrap items-center gap-4 mb-3 text-sm text-zinc-700">
+              <div className="px-3 py-1.5 rounded-md bg-zinc-100 border">
+                <span className="font-semibold">Sold Qty:</span> {totals.qty.toLocaleString('en-US')}
+              </div>
+              <div className="px-3 py-1.5 rounded-md bg-zinc-100 border">
+                <span className="font-semibold">Total Value:</span> {totals.value.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}
+              </div>
+            </div>
+            <Table columns={columns} data={filteredProducts} initialSortKey="totalValue" />
+          </>
+        )}
       </div>
     </div>
   );
