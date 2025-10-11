@@ -33,15 +33,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
   // console.log('ProductsPage - isRecalculating:', isRecalculating);
 
   const filteredProducts = useMemo(() => {
-    // Debug: Log first few products to see their structure
-    if (productSummary.length > 0) {
-      console.log('Sample products:', productSummary.slice(0, 3).map(p => ({
-        name: p.name,
-        alias: p.alias,
-        category: getCategory(p)
-      })));
-    }
-    
     return productSummary.filter(p => {
         const nameMatch = p.name?.toLowerCase().includes(filters.name.toLowerCase());
         const aliasMatch = p.alias?.toLowerCase().includes(filters.alias.toLowerCase());
