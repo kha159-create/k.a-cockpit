@@ -8,6 +8,7 @@ import { StoreName } from '@/components/Names';
 import { getCategory } from '../utils/calculator';
 import type { ProductSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile } from '../types';
 import { ChartCard, BarChart, LineChart, PieChart } from '../components/DashboardComponents';
+import { generateText } from '../services/geminiService';
 
 interface ProductsPageProps {
   productSummary: ProductSummary[];
@@ -157,6 +158,98 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     };
   }, [allDateData, allStores, areaStoreFilter, dateFilter, filteredProducts]);
 
+  // ===== Cross-Selling (Frequently Sold Together) =====
+  type PairKey = string;
+  type PairStat = { a: string; b: string; count: number };
+  const crossSelling = useMemo(() => {
+    const Y = dateFilter.year === 'all' ? new Date().getUTCFullYear() : (dateFilter.year as number);
+    const M = dateFilter.month === 'all' ? new Date().getUTCMonth() : (dateFilter.month as number);
+    const storesInScope = allStores
+      .filter(s => (areaStoreFilter.areaManager === 'All' || s.areaManager === areaStoreFilter.areaManager)
+        && (areaStoreFilter.store === 'All' || s.name === areaStoreFilter.store))
+      .map(s => s.name);
+    const storeSet = new Set(storesInScope);
+
+    const sales = (allDateData as any[]).filter((d: any) => d && d['Bill Dt.'] && typeof d['Bill Dt.'].toDate === 'function' && d['Outlet Name'] && storeSet.has(d['Outlet Name']));
+
+    // Group items by a synthetic transaction key (Bill Dt. date + store + maybe bill number if exists)
+    const byTxn = new Map<string, { name: string }[]>();
+    for (const s of sales) {
+      const d = s['Bill Dt.'].toDate();
+      if (d.getUTCFullYear() !== Y || (dateFilter.month !== 'all' && d.getUTCMonth() !== M)) continue;
+      const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}|${s['Outlet Name']}|${s['Invoice No'] || ''}`;
+      const name = String(s['Item Name'] || s['Item Alias'] || '');
+      if (!name) continue;
+      const arr = byTxn.get(key) || [];
+      arr.push({ name });
+      byTxn.set(key, arr);
+    }
+
+    const pairCounts = new Map<PairKey, PairStat>();
+    byTxn.forEach(items => {
+      const names = Array.from(new Set(items.map(i => i.name)));
+      for (let i = 0; i < names.length; i++) {
+        for (let j = i + 1; j < names.length; j++) {
+          const a = names[i];
+          const b = names[j];
+          const key = `${a}__::__${b}`;
+          const cur = pairCounts.get(key) || { a, b, count: 0 };
+          cur.count += 1;
+          pairCounts.set(key, cur);
+        }
+      }
+    });
+
+    const topPairs = Array.from(pairCounts.values()).sort((x, y) => y.count - x.count).slice(0, 20);
+
+    // Prepare heatmap matrix (top N unique items)
+    const uniqueItems = Array.from(new Set(topPairs.flatMap(p => [p.a, p.b]))).slice(0, 12);
+    const index = new Map(uniqueItems.map((n, i) => [n, i] as const));
+    const size = uniqueItems.length;
+    const matrix: number[][] = Array.from({ length: size }, () => Array.from({ length: size }, () => 0));
+    topPairs.forEach(p => {
+      const i = index.get(p.a);
+      const j = index.get(p.b);
+      if (i === undefined || j === undefined) return;
+      matrix[i][j] += p.count;
+      matrix[j][i] += p.count;
+    });
+
+    // Network graph data
+    const nodes = uniqueItems.map(name => ({ id: name, name, value: 1 }));
+    const links = topPairs.map(p => ({ source: p.a, target: p.b, value: p.count }));
+
+    return { topPairs, uniqueItems, matrix, nodes, links };
+  }, [allDateData, allStores, areaStoreFilter, dateFilter]);
+
+  // ===== AI Insights (expandable) =====
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
+
+  const runAiAnalysis = async () => {
+    try {
+      setAiLoading(true);
+      const payload = {
+        contents: [
+          { role: 'user', parts: [{ text: `You are a retail analyst. Compare current month vs previous month performance for products.
+Current Month (upto selected day):
+${JSON.stringify(summary, null, 2)}
+
+Provide 3-5 concise bullet insights like:\n- Product X increased by +24% compared to last month.\n- Product Y dropped by -15% — check stock or display.\n- Product Z often sells with Product W.
+Use short sentences. Output in Arabic.` }]}
+        ],
+        systemInstruction: 'Keep answers concise and organized as bullets. No long paragraphs.'
+      } as any;
+      const text = await generateText(payload, 'gemini-2.5-flash');
+      setAiInsights(text);
+    } catch (e: any) {
+      setAiInsights(`تعذر توليد التحليلات الآن: ${e?.message || e}`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   // Debug: Log filteredProducts after it's defined (removed to prevent infinite re-render)
   // console.log('ProductsPage - filteredProducts:', filteredProducts);
 
@@ -167,9 +260,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     { key: 'price', label: 'Price', sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'totalValue', label: 'Total Sales Value', sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'actions', label: 'Actions', render: (item) => (
+      <div className="flex items-center gap-2">
       <button onClick={() => setModalState({ type: 'salesPitch', data: item })} className="text-orange-500 hover:text-orange-700" title="Get AI Sales Pitch">
         <SparklesIcon />
       </button>
+      <button onClick={() => setModalState({ type: 'productDetails', data: { product: item, allData: allDateData, stores: allStores } })} className="text-zinc-600 hover:text-zinc-900" title="Product Details">
+        ⚙
+      </button>
+      </div>
     )},
   ];
 
@@ -265,6 +363,87 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
             <Table columns={columns} data={filteredProducts} initialSortKey="totalValue" />
           </>
         )}
+      </div>
+      
+      {/* AI Insights */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-zinc-800">AI Insights</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setAiOpen(!aiOpen)} className="px-3 py-1.5 rounded-md border text-sm">{aiOpen ? 'إخفاء' : 'إظهار'}</button>
+            <button onClick={runAiAnalysis} disabled={aiLoading} className="btn-primary text-sm">{aiLoading ? 'تحليل...' : '🔁 Reanalyze with AI'}</button>
+          </div>
+        </div>
+        {aiOpen && (
+          <div className="mt-4 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 whitespace-pre-wrap text-sm">
+            {aiInsights || 'انقر على زر إعادة التحليل لتوليد الرؤى.'}
+          </div>
+        )}
+      </div>
+
+      {/* Cross-Selling Analytics */}
+      <div className="space-y-6">
+        <h3 className="text-xl font-semibold text-zinc-800">Frequently Sold Together</h3>
+
+        {/* Heatmap (simple CSS grid visualization) */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border overflow-auto">
+          <div className="min-w-[640px]">
+            <div className="grid" style={{ gridTemplateColumns: `200px repeat(${crossSelling.uniqueItems.length}, minmax(48px, 1fr))` }}>
+              <div></div>
+              {crossSelling.uniqueItems.map((name) => (
+                <div key={`col-${name}`} className="text-[10px] text-zinc-500 text-center truncate px-1">{name}</div>
+              ))}
+              {crossSelling.uniqueItems.map((rowName, i) => (
+                <React.Fragment key={`row-${rowName}`}>
+                  <div className="text-[10px] text-zinc-600 truncate px-1 py-1">{rowName}</div>
+                  {crossSelling.uniqueItems.map((_, j) => {
+                    const v = crossSelling.matrix[i][j];
+                    const intensity = Math.min(1, v / Math.max(1, crossSelling.topPairs[0]?.count || 1));
+                    const bg = `rgba(34,197,94,${0.1 + intensity * 0.6})`; // green scale
+                    return <div key={`cell-${i}-${j}`} className="h-8 m-0.5 rounded" style={{ backgroundColor: i === j ? '#f1f5f9' : bg }} title={`${v}`}></div>;
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Network Graph (simple SVG force layout approximation) */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <svg width="100%" height="420" viewBox="0 0 960 420">
+            {(() => {
+              const width = 960; const height = 420;
+              const centerX = width / 2; const centerY = height / 2;
+              const R = Math.min(width, height) / 2 - 40;
+              const n = crossSelling.nodes.length || 1;
+              const positions = new Map<string, { x: number; y: number }>();
+              crossSelling.nodes.forEach((node, idx) => {
+                const angle = (idx / n) * Math.PI * 2;
+                positions.set(node.id, { x: centerX + R * Math.cos(angle), y: centerY + R * Math.sin(angle) });
+              });
+              const maxVal = Math.max(1, ...crossSelling.links.map(l => l.value));
+              return (
+                <g>
+                  {crossSelling.links.map((l, i) => {
+                    const s = positions.get(l.source as string)!;
+                    const t = positions.get(l.target as string)!;
+                    const opacity = 0.2 + 0.6 * (l.value / maxVal);
+                    return <line key={`link-${i}`} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#0ea5e9" strokeOpacity={opacity} strokeWidth={2} />;
+                  })}
+                  {crossSelling.nodes.map((node, i) => {
+                    const p = positions.get(node.id)!;
+                    return (
+                      <g key={`node-${i}`}>
+                        <circle cx={p.x} cy={p.y} r={10} fill="#34d399" stroke="#047857" />
+                        <text x={p.x + 12} y={p.y + 4} fontSize={10} fill="#334155">{node.name}</text>
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })()}
+          </svg>
+        </div>
       </div>
       </div>
     </div>

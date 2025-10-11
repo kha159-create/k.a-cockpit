@@ -30,7 +30,7 @@ import {
     VisitorsModal, EmployeeModal, StoreModal, DailyMetricModal, MonthlyStoreMetricModal, UserEditModal,
     AiCoachingModal, SalesForecastModal, SalesPitchModal, AppMessageModal,
     NaturalLanguageSearchModal, AiComparisonModal, AiPredictionModal, KPIBreakdownModal,
-    TaskModal
+    TaskModal, ProductDetailsModal
 } from '@/components/Modals';
 
 import type { User, UserProfile, Store, Employee, DailyMetric, SalesTransaction, ModalState, DateFilter, AreaStoreFilterState, AppMessage, StoreSummary, BusinessRule, UserRole, Notification, Task } from '@/types';
@@ -837,6 +837,7 @@ const handleNotificationClick = (notificationId: string) => {
                 {modalState.type === 'aiComparison' && <AiComparisonModal data={modalState.data.item} allItems={modalState.data.allItems} type={modalState.data.type} onClose={() => setModalState({type: null})} />}
                 {modalState.type === 'aiPrediction' && <AiPredictionModal data={modalState.data} onClose={() => setModalState({type: null})} />}
                 {modalState.type === 'kpiBreakdown' && <KPIBreakdownModal data={modalState.data} onClose={() => setModalState({ type: null })} />}
+                {modalState.type === 'productDetails' && <ProductDetailsModal data={modalState.data} onClose={() => setModalState({ type: null })} />}
                 {modalState.type === 'task' && <TaskModal data={modalState.data} onSave={handleSaveTask} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} />}
             </div>
         }

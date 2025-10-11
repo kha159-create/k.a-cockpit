@@ -704,3 +704,149 @@ export const KPIBreakdownModal: React.FC<KPIBreakdownModalProps> = ({ data: moda
         </div>
     );
 };
+
+// === Product Details Modal ===
+interface ProductDetailsModalProps extends ModalProps {
+  data: {
+    product: ProductSummary;
+    allData: any[]; // filtered sales data in scope
+    stores: Store[];
+  };
+}
+
+export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ data, onClose }) => {
+  const { product, allData, stores } = data;
+  const [branch, setBranch] = useState<string>('All');
+  const [ai, setAi] = useState<string>('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const year = new Date().getUTCFullYear();
+
+  const filteredSales = useMemo(() => {
+    const set = new Set(stores.filter(s => branch === 'All' || s.name === branch).map(s => s.name));
+    return (allData as any[]).filter(s => s && s['Item Alias'] === product.alias && set.has(s['Outlet Name']));
+  }, [allData, product.alias, stores, branch]);
+
+  const monthlyTrend = useMemo(() => {
+    const arr = Array.from({ length: 12 }, (_, i) => ({ name: new Date(0, i).toLocaleString('en-US', { month: 'short' }), Sales: 0, Target: 0 }));
+    filteredSales.forEach(s => {
+      const d = s['Bill Dt.'].toDate();
+      if (d.getUTCFullYear() !== year) return;
+      const val = Number(s['Sold Qty'] || 0) * Number(s['Item Rate'] || 0);
+      arr[d.getUTCMonth()].Sales += val;
+    });
+    return arr;
+  }, [filteredSales, year]);
+
+  const totals = useMemo(() => {
+    const qty = filteredSales.reduce((sum, s) => sum + Number(s['Sold Qty'] || 0), 0);
+    const value = filteredSales.reduce((sum, s) => sum + Number(s['Sold Qty'] || 0) * Number(s['Item Rate'] || 0), 0);
+    return { qty, value };
+  }, [filteredSales]);
+
+  const coSelling = useMemo(() => {
+    // collect transactions containing this product, then count companions
+    const byTxn = new Map<string, string[]>();
+    (allData as any[]).forEach(s => {
+      const d = s['Bill Dt.']?.toDate?.();
+      if (!d) return;
+      const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}|${s['Outlet Name']}|${s['Invoice No'] || ''}`;
+      const arr = byTxn.get(key) || [];
+      arr.push(String(s['Item Name'] || s['Item Alias'] || ''));
+      byTxn.set(key, arr);
+    });
+    const counts = new Map<string, number>();
+    byTxn.forEach(items => {
+      if (!items.some(n => n.includes(product.name) || n.includes(product.alias))) return;
+      const uniq = Array.from(new Set(items));
+      uniq.forEach(n => {
+        if (n.includes(product.name) || n.includes(product.alias)) return;
+        counts.set(n, (counts.get(n) || 0) + 1);
+      });
+    });
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, count]) => ({ name, count }));
+  }, [allData, product]);
+
+  const runAi = async () => {
+    setIsAiLoading(true);
+    try {
+      const prompt = `أنت مستشار مبيعات تجزئة. المنتج: ${product.name} (الكود ${product.alias}) بسعر ${product.price}.
+الملخص: إجمالي الكمية ${totals.qty} وإجمالي القيمة ${totals.value}.
+أهم المنتجات المرافقة: ${coSelling.map(c => `${c.name} (${c.count})`).join(', ')}.
+اعطني توصية عملية قصيرة لتحسين الربط والعرض داخل المعرض.`;
+      const txt = await generateText({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] });
+      setAi(txt);
+    } catch (e: any) { setAi(`تعذر توليد التوصية: ${e?.message || e}`); }
+    finally { setIsAiLoading(false); }
+  };
+
+  const exportCsv = () => {
+    const rows = [
+      ['Product', product.name],
+      ['Code', product.alias],
+      ['Unit Price', String(product.price)],
+      [],
+      ['Month', 'Sales Value'],
+      ...monthlyTrend.map(m => [m.name, String(m.Sales)])
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${product.alias}_insights.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="modal-content max-w-3xl">
+      <h2 className="modal-title flex items-center gap-2">Product Details — {product.name}</h2>
+      <div className="space-y-4">
+        {/* Overview */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-lg border">
+          <div><div className="text-xs text-zinc-500">Code</div><div className="font-semibold">{product.alias}</div></div>
+          <div><div className="text-xs text-zinc-500">Unit Price</div><div className="font-semibold">{product.price.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div></div>
+          <div><div className="text-xs text-zinc-500">Total Qty</div><div className="font-semibold">{totals.qty.toLocaleString('en-US')}</div></div>
+          <div><div className="text-xs text-zinc-500">Total Value</div><div className="font-semibold">{totals.value.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div></div>
+        </div>
+
+        {/* Branch Filter */}
+        <div className="flex items-center gap-2">
+          <label className="label">Branch</label>
+          <select value={branch} onChange={e => setBranch(e.target.value)} className="input w-56">
+            <option value="All">All</option>
+            {stores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+          </select>
+        </div>
+
+        {/* Sales Performance */}
+        <ChartCard title="Monthly Trend (This Year)">
+          <BarChart data={monthlyTrend} dataKey="Sales" nameKey="name" format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} />
+        </ChartCard>
+
+        {/* Cross-selling */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <h3 className="font-semibold mb-2">Sold With (Top 3)</h3>
+          <ul className="list-disc ms-5 text-sm text-zinc-700">
+            {coSelling.length === 0 && <li>لا يوجد بيانات كافية</li>}
+            {coSelling.map(c => <li key={c.name}>{c.name} ({c.count})</li>)}
+          </ul>
+        </div>
+
+        {/* AI Recommendation */}
+        <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 text-blue-900">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">AI Recommendation</h3>
+            <button onClick={runAi} className="btn-primary text-sm" disabled={isAiLoading}>{isAiLoading ? 'Generating...' : 'Generate'}</button>
+          </div>
+          {ai && <div className="mt-2 whitespace-pre-wrap text-sm">{ai}</div>}
+        </div>
+
+        {/* Export */}
+        <div className="flex justify-end">
+          <button onClick={exportCsv} className="btn-secondary">📤 Export Insights</button>
+        </div>
+      </div>
+      <div className="modal-actions"><button onClick={onClose} className="btn-secondary">Close</button></div>
+    </div>
+  );
+};
