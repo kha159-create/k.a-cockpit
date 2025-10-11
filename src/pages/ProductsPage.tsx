@@ -217,7 +217,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
 
     // Network graph data
     const nodes = uniqueItems.map(name => ({ id: name, name, value: 1 }));
-    const links = topPairs.map(p => ({ source: p.a, target: p.b, value: p.count }));
+    const allowed = new Set(uniqueItems);
+    const links = topPairs
+      .filter(p => allowed.has(p.a) && allowed.has(p.b))
+      .map(p => ({ source: p.a, target: p.b, value: p.count }));
 
     return { topPairs, uniqueItems, matrix, nodes, links };
   }, [allDateData, allStores, areaStoreFilter, dateFilter]);
@@ -425,13 +428,15 @@ Use short sentences. Output in Arabic.` }]}
               return (
                 <g>
                   {crossSelling.links.map((l, i) => {
-                    const s = positions.get(l.source as string)!;
-                    const t = positions.get(l.target as string)!;
+                    const s = positions.get(l.source as string);
+                    const t = positions.get(l.target as string);
+                    if (!s || !t) return null;
                     const opacity = 0.2 + 0.6 * (l.value / maxVal);
                     return <line key={`link-${i}`} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#0ea5e9" strokeOpacity={opacity} strokeWidth={2} />;
                   })}
                   {crossSelling.nodes.map((node, i) => {
-                    const p = positions.get(node.id)!;
+                    const p = positions.get(node.id);
+                    if (!p) return null;
                     return (
                       <g key={`node-${i}`}>
                         <circle cx={p.x} cy={p.y} r={10} fill="#34d399" stroke="#047857" />
