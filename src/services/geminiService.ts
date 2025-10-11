@@ -4,7 +4,7 @@ import type { StoreSummary, DailyMetric, PredictionResult, EmployeeSummary } fro
 
 
 // Use environment variable for API key
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "REDACTED_GEMINI_API_KEY";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
   throw new Error("Gemini API key (VITE_GEMINI_API_KEY) is not set in environment variables.");

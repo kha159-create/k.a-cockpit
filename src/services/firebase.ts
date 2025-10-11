@@ -4,13 +4,19 @@ import 'firebase/firestore';
 
 // Firebase configuration using environment variables
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "REDACTED_FIREBASE_API_KEY",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "REDACTED_FIREBASE_DOMAIN",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "alsani-cockpit-v3",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "alsani-cockpit-v3.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "REDACTED_SENDER_ID",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:REDACTED_SENDER_ID:web:64428acfb48922fbc76898"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
+
+// Validate that all required environment variables are set
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  console.error('Missing Firebase environment variables. Please check your .env.local file.');
+  throw new Error('Firebase configuration is incomplete. Check environment variables.');
+}
 
 // Initialize Firebase
 
