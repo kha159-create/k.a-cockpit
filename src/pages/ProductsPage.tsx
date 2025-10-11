@@ -262,12 +262,12 @@ Use short sentences. Output in Arabic.` }]}
     { key: 'soldQty', label: 'Sold Qty', sortable: true, render: (value) => (value as number).toLocaleString('en-US') },
     { key: 'price', label: 'Price', sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'totalValue', label: 'Total Sales Value', sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-    { key: 'actions', label: 'Actions', render: (item) => (
+    { key: 'actions', label: 'Actions', render: (_value, record) => (
       <div className="flex items-center gap-2">
-      <button onClick={() => setModalState({ type: 'salesPitch', data: item })} className="text-orange-500 hover:text-orange-700" title="Get AI Sales Pitch">
+      <button onClick={() => setModalState({ type: 'salesPitch', data: record })} className="text-orange-500 hover:text-orange-700" title="Get AI Sales Pitch">
         <SparklesIcon />
       </button>
-      <button onClick={() => setModalState({ type: 'productDetails', data: { product: item, allData: allDateData, stores: allStores } })} className="text-zinc-600 hover:text-zinc-900" title="Product Details">
+      <button onClick={() => setModalState({ type: 'productDetails', data: { product: record, allData: allDateData, stores: allStores } })} className="text-zinc-600 hover:text-zinc-900" title="Product Details">
         ⚙
       </button>
       </div>
@@ -312,24 +312,24 @@ Use short sentences. Output in Arabic.` }]}
         </div>
 
         {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-3">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-1">
             <ChartCard title="Top 10 Selling Products">
               <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
             </ChartCard>
           </div>
-          <div className="lg:col-span-2">
+          <div className="xl:col-span-1">
             <ChartCard title="Category Share">
               <PieChart data={summary.charts.categoryShare} />
             </ChartCard>
           </div>
+          <div className="xl:col-span-1">
+            <ChartCard title="Monthly Sales Trend">
+              <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
+            </ChartCard>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1">
-          <ChartCard title="Monthly Sales Trend">
-            <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
-          </ChartCard>
-        </div>
 
         {/* Table Section */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
@@ -413,11 +413,11 @@ Use short sentences. Output in Arabic.` }]}
 
         {/* Network Graph (simple SVG force layout approximation) */}
         <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <svg width="100%" height="420" viewBox="0 0 960 420">
+          <svg width="100%" height="560" viewBox="0 0 1200 560">
             {(() => {
-              const width = 960; const height = 420;
+              const width = 1200; const height = 560;
               const centerX = width / 2; const centerY = height / 2;
-              const R = Math.min(width, height) / 2 - 40;
+              const R = Math.min(width, height) / 2 - 60;
               const n = crossSelling.nodes.length || 1;
               const positions = new Map<string, { x: number; y: number }>();
               crossSelling.nodes.forEach((node, idx) => {
@@ -439,8 +439,8 @@ Use short sentences. Output in Arabic.` }]}
                     if (!p) return null;
                     return (
                       <g key={`node-${i}`}>
-                        <circle cx={p.x} cy={p.y} r={10} fill="#34d399" stroke="#047857" />
-                        <text x={p.x + 12} y={p.y + 4} fontSize={10} fill="#334155">{node.name}</text>
+                        <circle cx={p.x} cy={p.y} r={12} fill="#34d399" stroke="#047857" />
+                        <text x={p.x + 14} y={p.y + 4} fontSize={12} fill="#334155">{node.name}</text>
                       </g>
                     );
                   })}
