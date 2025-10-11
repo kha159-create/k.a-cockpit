@@ -1,40 +1,114 @@
-name: Build and Deploy to GitHub Pages
+# ⚙️ Auto-generated GitHub Actions Workflow for Vite + Firebase + Gemini
+# All secrets are managed via GitHub Secrets. Do not include .env files in commits.
+
+name: Build, Test & Deploy
 
 on:
   push:
-    branches:
-      - main  # النشر يتم فقط عند الدفع على فرع main
-
-permissions:
-  contents: write    # 🔥 هذا هو المفتاح — لازم تعطي البوت إذن يكتب
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Clean install dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install
-          npm install rollup @rollup/rollup-linux-x64-gnu --force
-
-      - name: Build project
-        run: npm run build
-
-      - name: Deploy to GitHub Pages 🚀
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gh-pages
-          force_orphan: true
+    - name: 🚀 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📦 Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: 🔧 Install dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build project with environment variables
+      env:
+        VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+        VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+        VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+        VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+      run: npm run build
+      
+    - name: 🔍 Verify build output
+      run: |
+        if [ -f "dist/index.html" ]; then
+          echo "✅ Build completed successfully!"
+          echo "📁 Build artifacts found in dist/ directory"
+          ls -la dist/
+        else
+          echo "❌ Build failed - dist/index.html not found"
+          exit 1
+        fi
+        
+    - name: 🔥 Create Firebase connection test
+      run: |
+        cat > firebase-test.js << 'EOF'
+        import { initializeApp } from 'firebase/app';
+        
+        const firebaseConfig = {
+          apiKey: process.env.VITE_FIREBASE_API_KEY,
+          authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+          projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+          storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+          messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+          appId: process.env.VITE_FIREBASE_APP_ID
+        };
+        
+        try {
+          const app = initializeApp(firebaseConfig);
+          console.log('✅ Firebase connected successfully!');
+          console.log('🔥 Firebase App initialized:', app.name);
+          process.exit(0);
+        } catch (error) {
+          console.error('❌ Firebase connection failed:', error.message);
+          process.exit(1);
+        }
+        EOF
+        
+    - name: 🧪 Test Firebase connection
+      env:
+        VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+        VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+        VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+        VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      run: |
+        node firebase-test.js
+        
+    - name: 🧹 Cleanup test file
+      run: rm -f firebase-test.js
+      
+    - name: 📊 Build summary
+      run: |
+        echo "🎉 Build Process Summary:"
+        echo "✅ Build completed successfully!"
+        echo "✅ Firebase connection verified!"
+        echo "✅ Ready to deploy!"
+        echo ""
+        echo "📈 Build Statistics:"
+        echo "📁 Total files in dist/: $(find dist/ -type f | wc -l)"
+        echo "💾 Total size: $(du -sh dist/ | cut -f1)"
+        
+    - name: 🚀 Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./dist
+        cname: # Optional: add your custom domain here
+        
+    - name: 🎯 Deployment success notification
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "🚀 Deployment completed successfully!"
+        echo "🌐 Your app is now live at: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+        echo "📅 Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"

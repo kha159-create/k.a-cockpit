@@ -1,0 +1,48 @@
+# 🧪 Test Build Workflow - للاختبار المحلي
+name: Test Build Only
+
+on:
+  workflow_dispatch: # يمكن تشغيله يدوياً
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🚀 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📦 Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: 🔧 Install dependencies
+      run: npm ci
+      
+    - name: 🏗️ Test build with environment variables
+      env:
+        VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+        VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+        VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+        VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+      run: npm run build
+      
+    - name: 🔍 Verify build output
+      run: |
+        if [ -f "dist/index.html" ]; then
+          echo "✅ Build test completed successfully!"
+          echo "📁 Build artifacts:"
+          ls -la dist/
+          echo "📊 Build size:"
+          du -sh dist/
+        else
+          echo "❌ Build test failed - dist/index.html not found"
+          exit 1
+        fi
