@@ -33,6 +33,15 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
   // console.log('ProductsPage - isRecalculating:', isRecalculating);
 
   const filteredProducts = useMemo(() => {
+    // Debug: Log first few products to see their structure
+    if (productSummary.length > 0) {
+      console.log('Sample products:', productSummary.slice(0, 3).map(p => ({
+        name: p.name,
+        alias: p.alias,
+        category: getCategory(p)
+      })));
+    }
+    
     return productSummary.filter(p => {
         const nameMatch = p.name?.toLowerCase().includes(filters.name.toLowerCase());
         const aliasMatch = p.alias?.toLowerCase().includes(filters.alias.toLowerCase());
@@ -345,6 +354,7 @@ Use short sentences. Output in Arabic.` }]}
             <select value={filters.category} onChange={e => setFilters(prev => ({...prev, category: e.target.value}))} className="input">
                 <option value="All">All Categories</option>
                 <option value="Duvets">Duvets</option>
+                <option value="Duvets Full">Duvets Full</option>
                 <option value="Pillows">Pillows</option>
                 <option value="Toppers">Toppers</option>
                 <option value="Other">Other</option>
