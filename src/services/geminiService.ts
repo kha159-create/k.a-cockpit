@@ -10,6 +10,34 @@ console.log('🔍 Gemini API Key:', import.meta.env.VITE_GEMINI_API_KEY ? '✅ S
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
+// Helper function to reduce data size for Gemini API
+const reduceDataSize = (data: any, maxLength = 5000): string => {
+    let jsonString = JSON.stringify(data);
+    
+    if (jsonString.length > maxLength) {
+        // If data is too large, create a summary
+        if (Array.isArray(data)) {
+            const summary = {
+                type: 'array',
+                length: data.length,
+                sample: data.slice(0, 3), // Only first 3 items
+                summary: `Array with ${data.length} items`
+            };
+            jsonString = JSON.stringify(summary);
+        } else if (typeof data === 'object') {
+            // For objects, keep only essential fields
+            const essential = {
+                name: data.name || 'Unknown',
+                type: typeof data,
+                keys: Object.keys(data).slice(0, 10) // Only first 10 keys
+            };
+            jsonString = JSON.stringify(essential);
+        }
+    }
+    
+    return jsonString;
+};
+
 type StructuredRequest = {
     contents: any[];
     systemInstruction?: string;
@@ -59,11 +87,24 @@ const callGeminiWithRetry = async (
                 details: error.details || 'No additional details'
             });
             
+            // Don't retry on token limit errors (400 with specific message)
+            if (error.status === 400 && (error.message?.includes('token') || error.message?.includes('maximum number of tokens'))) {
+                console.error('❌ Token limit exceeded. Data too large for Gemini API.');
+                throw new Error('Data size exceeds Gemini API limits. Please reduce the amount of data being analyzed.');
+            }
+            
             if (retries >= maxRetries - 1) {
                 throw new Error(`AI analysis failed after ${maxRetries} retries. Last error: ${error.message}`);
             }
             
-            console.log(`🔄 Retrying in ${delay}ms...`);
+            // Check if it's a rate limit error (429)
+            if (error.status === 429) {
+                console.log(`🔄 Rate limit hit, waiting ${delay}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2; // Exponential backoff
+            } else {
+                console.log(`🔄 Retrying in ${delay}ms...`);
+            }
             await new Promise(resolve => setTimeout(resolve, delay));
             delay *= 2; // Exponential backoff
             retries++;
@@ -114,6 +155,9 @@ export const generateEmployeeCoachingSummary = async (employee: EmployeeSummary,
         ? 'IMPORTANT: The response must be in Arabic, formatted using markdown with bold headings for each section.' 
         : 'Format the response using markdown with bold headings for each section.';
     
+    // Reduce data size to avoid token limits
+    const reducedData = reduceDataSize(employee, 3000);
+    
     const prompt = `You are an expert retail performance coach named 'Hassan'. Analyze the provided performance data for an employee named ${employee.name}.
     
     Your task is to provide a concise, three-part summary for their manager:
@@ -122,7 +166,7 @@ export const generateEmployeeCoachingSummary = async (employee: EmployeeSummary,
     3.  **Actionable Tip:** Provide one specific, practical coaching tip the manager can give them.
     
     Data:
-    ${JSON.stringify(employee, null, 2)}
+    ${reducedData}
     
     ${languageInstruction}`;
 
@@ -152,7 +196,7 @@ export const generatePrediction = async (store: StoreSummary, historicalMetrics:
 
 Store Name: ${store.name}
 Monthly Sales Target: ${store.effectiveTarget.toFixed(2)} SAR
-Current Sales Data (This Month So Far): ${JSON.stringify(salesThisMonth)}
+Current Sales Data (This Month So Far): ${reduceDataSize(salesThisMonth, 2000)}
 
 Based ONLY on this data, provide a JSON object with your analysis.
 1.  **predictedSales**: Your realistic forecast for total sales by the end of the month.
