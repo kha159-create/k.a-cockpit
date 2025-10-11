@@ -528,12 +528,30 @@ const handleNotificationClick = (notificationId: string) => {
                     } else if (dataType === 'products') {
                         const startDate = Timestamp.fromDate(new Date(year, month, 1));
                         const endDate = Timestamp.fromDate(new Date(year, month + 1, 0, 23, 59, 59));
-                        const prodQuery1 = db.collection('salesTransactions').where('Bill Dt.', '>=', startDate).where('Bill Dt.', '<=', endDate);
-                        const prodSnap1 = await prodQuery1.get();
-                        prodSnap1.forEach(doc => batch.delete(doc.ref));
-                        const prodQuery2 = db.collection('kingDuvetSales').where('Bill Dt.', '>=', startDate).where('Bill Dt.', '<=', endDate);
-                        const prodSnap2 = await prodQuery2.get();
-                        prodSnap2.forEach(doc => batch.delete(doc.ref));
+
+                        const deleteInChunks = async (collectionName: string) => {
+                            const snap = await db.collection(collectionName)
+                                .where('Bill Dt.', '>=', startDate)
+                                .where('Bill Dt.', '<=', endDate)
+                                .get();
+                            console.log(`[SelectiveDelete] ${collectionName} matched:`, snap.size);
+                            let count = 0;
+                            let localBatch = db.batch();
+                            for (const d of snap.docs) {
+                                localBatch.delete(d.ref);
+                                count++;
+                                if (count % 400 === 0) {
+                                    await localBatch.commit();
+                                    console.log(`[SelectiveDelete] ${collectionName} committed 400 deletes`);
+                                    localBatch = db.batch();
+                                }
+                            }
+                            await localBatch.commit();
+                            console.log(`[SelectiveDelete] ${collectionName} final commit; total deleted: ${count}`);
+                        };
+
+                        await deleteInChunks('salesTransactions');
+                        await deleteInChunks('kingDuvetSales');
                     }
     
                     await batch.commit();
