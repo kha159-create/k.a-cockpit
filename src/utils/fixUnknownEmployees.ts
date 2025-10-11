@@ -10,9 +10,15 @@ const parseEmployeeIdFromSalesman = (name?: string): string | null => {
   if (!name) return null;
   const str = String(name).trim();
   // 4325-Maryam or 4325 Maryam
-  const leading = str.match(/^(\d{2,10})\b/);
+  const leading = str.match(/^(\d{3,4})\b/);
   if (leading) return leading[1];
-  return parseIdFromUnknown(str);
+  // Unknown 262 or Unknown_2792
+  const unk = str.match(/unknown[\s_\-]*(\d{3,4})/i);
+  if (unk) return unk[1];
+  // trailing 3-4 digits e.g., Amal 2792
+  const trailing = str.match(/(\d{3,4})\s*$/);
+  if (trailing) return trailing[1];
+  return null;
 };
 
 export type FixUnknownResult = {

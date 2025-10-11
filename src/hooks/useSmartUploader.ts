@@ -22,6 +22,20 @@ export const useSmartUploader = (
     const clearUploadResult = () => setUploadResult(null);
 
     const normalizeKey = (k: string) => k.toLowerCase().trim().replace(/[\s_.-]+/g, '');
+    const parseEmployeeIdFromName = (name: any): string | null => {
+        if (!name) return null;
+        const s = String(name).trim();
+        // leading 3-4 digits e.g., 4325-Maryam
+        let m = s.match(/^(\d{3,4})\b/);
+        if (m) return m[1];
+        // Unknown 262 or Unknown_2792
+        m = s.match(/unknown[\s_\-]*(\d{3,4})/i);
+        if (m) return m[1];
+        // trailing 3-4 digits e.g., Amal 2792
+        m = s.match(/(\d{3,4})\s*$/);
+        if (m) return m[1];
+        return null;
+    };
     const findValueByKeyVariations = (row: any, keys: string[]) => {
         const normalizedRowKeys: Record<string, string> = {};
         for (const rowKey in row) normalizedRowKeys[normalizeKey(rowKey)] = rowKey;
@@ -140,7 +154,7 @@ ${preview}`;
                                 const transactionCount = parseNumber(findValueByKeyVariations(row, [headerMap['Total Sales Bills']]));
 
                                 if (dateString && outletName && salesmanName) {
-                                    const employeeId = String(salesmanName).match(/^\d+/)?.[0] || null;
+                                const employeeId = parseEmployeeIdFromName(salesmanName);
                                     const firestoreTimestamp = Timestamp.fromDate(new Date(dateString));
                                     const dailyMetricRef = dbInstance.collection('dailyMetrics').doc();
                                     batch.set(dailyMetricRef, { date: firestoreTimestamp, store: String(outletName).trim(), employee: String(salesmanName).trim(), employeeId, totalSales, transactionCount });
@@ -160,7 +174,7 @@ ${preview}`;
                                     const totalSales = parseNumber(findValueByKeyVariations(row, [headerMap['Net Amount']]));
                                     const transactionCount = parseNumber(findValueByKeyVariations(row, [headerMap['Total Sales Bills']]));
                                     if(dateString) {
-                                        const employeeId = String(currentSalesmanName).match(/^\d+/)?.[0] || null;
+                                        const employeeId = parseEmployeeIdFromName(currentSalesmanName);
                                         const firestoreTimestamp = Timestamp.fromDate(new Date(dateString));
                                         const dailyMetricRef = dbInstance.collection('dailyMetrics').doc();
                                         batch.set(dailyMetricRef, { date: firestoreTimestamp, store: String(outletName).trim(), employee: currentSalesmanName, employeeId, totalSales, transactionCount });
@@ -181,7 +195,7 @@ ${preview}`;
                             const billNo = findValueByKeyVariations(row, ['Bill_No','bill_no','Bill No','BillNo','Invoice','InvoiceNo','Invoice No','Transaction_ID','Transaction ID','Bill Number']);
                             
                             if (dateString && store && employee && itemName && alias) {
-                                const employeeId = String(employee).match(/^\d+/)?.[0] || null;
+                                const employeeId = parseEmployeeIdFromName(employee);
                                 const firestoreTimestamp = Timestamp.fromDate(new Date(dateString));
                                 const isKingDuvet = String(alias).startsWith('4') && String(itemName).toUpperCase().includes('COMFORTER');
                                 const collectionName = isKingDuvet ? 'kingDuvetSales' : 'salesTransactions';
