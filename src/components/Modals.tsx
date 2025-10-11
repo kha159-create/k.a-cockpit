@@ -852,8 +852,8 @@ ${context}
         <div className="bg-white p-4 rounded-xl shadow-sm border">
           <h3 className="font-semibold mb-2">Sold With (Top 3)</h3>
           <ul className="list-disc ms-5 text-sm text-zinc-700">
-            {coSelling.length === 0 && <li>لا يوجد بيانات كافية</li>}
-            {coSelling.map(c => <li key={c.name}>{c.name} ({c.count})</li>)}
+            {coSelling.top.length === 0 && <li>لا يوجد بيانات كافية</li>}
+            {coSelling.top.map(c => <li key={c.key}>{c.key} ({c.count})</li>)}
           </ul>
         </div>
 
