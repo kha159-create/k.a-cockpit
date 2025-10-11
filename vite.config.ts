@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     define: {
-      // No environment variables needed - using hardcoded values
+      // Environment variables are loaded automatically by Vite
     },
     envPrefix: 'VITE_',
     resolve: {
