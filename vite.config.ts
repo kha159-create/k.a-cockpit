@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '')
   
   return {
-    base: './',
+    base: '/k.a-cockpit/',
     plugins: [react()],
     publicDir: 'public',
     build: {
