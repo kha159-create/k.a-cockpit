@@ -7,6 +7,7 @@ import { SparklesIcon } from '../components/Icons';
 import { StoreName } from '@/components/Names';
 import { getCategory } from '../utils/calculator';
 import type { ProductSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile } from '../types';
+import { ChartCard, BarChart, LineChart, PieChart } from '../components/DashboardComponents';
 
 interface ProductsPageProps {
   productSummary: ProductSummary[];
@@ -56,6 +57,106 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     return { qty, value };
   }, [filteredProducts]);
 
+  // ===== Dashboard Summary (Month-to-Date and Charts) =====
+  const summary = useMemo(() => {
+    const Y = dateFilter.year === 'all' ? new Date().getUTCFullYear() : (dateFilter.year as number);
+    const M = dateFilter.month === 'all' ? new Date().getUTCMonth() : (dateFilter.month as number); // 0-index
+    const D = dateFilter.day === 'all' ? 'all' : (dateFilter.day as number);
+
+    const storesInScope = allStores
+      .filter(s => (areaStoreFilter.areaManager === 'All' || s.areaManager === areaStoreFilter.areaManager)
+        && (areaStoreFilter.store === 'All' || s.name === areaStoreFilter.store))
+      .map(s => s.name);
+    const storeSet = new Set(storesInScope);
+
+    type Sale = any;
+    const isSale = (d: any): d is Sale => d && d['Bill Dt.'] && typeof d['Bill Dt.'].toDate === 'function' && d['Outlet Name'];
+
+    const sales = (allDateData as any[]).filter(isSale).filter(s => storeSet.has(s['Outlet Name']));
+
+    const daysInMonth = new Date(Y, M + 1, 0).getDate();
+    const uptoDay = D === 'all' ? daysInMonth : Math.min(D, daysInMonth);
+
+    const currentMonth = sales.filter(s => {
+      const d = s['Bill Dt.'].toDate();
+      return d.getUTCFullYear() === Y && d.getUTCMonth() === M && d.getUTCDate() <= uptoDay;
+    });
+
+    const prevMonthDate = new Date(Date.UTC(Y, M - 1, 1));
+    const PY = prevMonthDate.getUTCFullYear();
+    const PM = prevMonthDate.getUTCMonth();
+    const prevMonth = sales.filter(s => {
+      const d = s['Bill Dt.'].toDate();
+      return d.getUTCFullYear() === PY && d.getUTCMonth() === PM;
+    });
+
+    // Group by product alias (fallback to name)
+    const groupBy = (arr: Sale[]) => {
+      const map = new Map<string, { name: string; qty: number; value: number; rate: number }>();
+      for (const s of arr) {
+        const alias = String(s['Item Alias'] || s.alias || s['Item Name'] || '');
+        const name = String(s['Item Name'] || alias);
+        const qty = Number(s['Sold Qty'] || 0);
+        const rate = Number(s['Item Rate'] || 0);
+        const value = qty * rate;
+        const prev = map.get(alias) || { name, qty: 0, value: 0, rate };
+        prev.qty += qty;
+        prev.value += value;
+        prev.rate = rate || prev.rate;
+        map.set(alias, prev);
+      }
+      return map;
+    };
+
+    const curMap = groupBy(currentMonth);
+    const prevMap = groupBy(prevMonth);
+
+    let totalQty = 0; let totalValue = 0;
+    for (const { qty, value } of curMap.values()) { totalQty += qty; totalValue += value; }
+
+    // Best and weakest products by value
+    let best: { name: string; value: number; growth: number } | null = null;
+    let weak: { name: string; value: number; growth: number } | null = null;
+    curMap.forEach((cur, key) => {
+      const prevVal = prevMap.get(key)?.value || 0;
+      const growth = prevVal === 0 ? (cur.value > 0 ? 100 : 0) : ((cur.value - prevVal) / prevVal) * 100;
+      if (!best || cur.value > best.value) best = { name: cur.name, value: cur.value, growth };
+      if ((cur.value > 0) && (!weak || cur.value < weak.value)) weak = { name: cur.name, value: cur.value, growth };
+    });
+
+    const avgDaily = uptoDay > 0 ? totalValue / uptoDay : 0;
+
+    const prevTotal = Array.from(prevMap.values()).reduce((s, v) => s + v.value, 0);
+    const monthlyGrowth = prevTotal === 0 ? (totalValue > 0 ? 100 : 0) : ((totalValue - prevTotal) / prevTotal) * 100;
+
+    // Charts data
+    const top10 = Array.from(curMap.values())
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 10)
+      .map(p => ({ name: p.name, value: p.qty }));
+
+    const monthlyTrend = Array.from({ length: 12 }, (_, i) => ({ name: new Date(0, i).toLocaleString('en-US', { month: 'short' }), value: 0 }));
+    sales.forEach(s => {
+      const d = s['Bill Dt.'].toDate();
+      if (d.getUTCFullYear() !== Y) return;
+      const m = d.getUTCMonth();
+      monthlyTrend[m].value += Number(s['Sold Qty'] || 0) * Number(s['Item Rate'] || 0);
+    });
+
+    // Category share using current filtered products
+    const categoryMap = new Map<string, number>();
+    filteredProducts.forEach(p => {
+      const cat = getCategory(p) || 'Other';
+      categoryMap.set(cat, (categoryMap.get(cat) || 0) + (p.totalValue || 0));
+    });
+    const categoryShare = Array.from(categoryMap.entries()).map(([name, value]) => ({ name, value }));
+
+    return {
+      totalQty, totalValue, best, weak, avgDaily, monthlyGrowth,
+      charts: { top10, monthlyTrend, categoryShare },
+    };
+  }, [allDateData, allStores, areaStoreFilter, dateFilter, filteredProducts]);
+
   // Debug: Log filteredProducts after it's defined (removed to prevent infinite re-render)
   // console.log('ProductsPage - filteredProducts:', filteredProducts);
 
@@ -78,7 +179,59 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         <MonthYearFilter dateFilter={dateFilter} setDateFilter={setDateFilter} allData={allDateData} />
         <AreaStoreFilter stores={allStores} filters={areaStoreFilter} setFilters={setAreaStoreFilter} profile={profile}/>
       </div>
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+      <div className="space-y-6">
+        {/* Summary Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Total Products Sold (MTD)</div>
+            <div className="text-2xl font-bold">{summary.totalQty.toLocaleString('en-US')}</div>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Total Sales Value (MTD)</div>
+            <div className="text-2xl font-bold">{summary.totalValue.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Best Performing Product</div>
+            <div className="text-sm font-semibold truncate" title={summary.best?.name || ''}>{summary.best?.name || '-'}</div>
+            <div className="text-green-600 text-xs">{summary.best ? `${summary.best.growth.toFixed(1)}%` : '-'}</div>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Weakest Performing Product</div>
+            <div className="text-sm font-semibold truncate" title={summary.weak?.name || ''}>{summary.weak?.name || '-'}</div>
+            <div className="text-red-600 text-xs">{summary.weak ? `${summary.weak.growth.toFixed(1)}%` : '-'}</div>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Average Daily Sales</div>
+            <div className="text-2xl font-bold">{summary.avgDaily.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Monthly Growth Rate</div>
+            <div className={`text-2xl font-bold ${summary.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{`${summary.monthlyGrowth.toFixed(1)}%`}</div>
+          </div>
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3">
+            <ChartCard title="Top 10 Selling Products">
+              <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
+            </ChartCard>
+          </div>
+          <div className="lg:col-span-2">
+            <ChartCard title="Category Share">
+              <PieChart data={summary.charts.categoryShare} />
+            </ChartCard>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1">
+          <ChartCard title="Monthly Sales Trend">
+            <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
+          </ChartCard>
+        </div>
+
+        {/* Table Section */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
         <h3 className="text-xl font-semibold text-zinc-800 mb-4">Products Overview</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
@@ -112,6 +265,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
             <Table columns={columns} data={filteredProducts} initialSortKey="totalValue" />
           </>
         )}
+      </div>
       </div>
     </div>
   );
