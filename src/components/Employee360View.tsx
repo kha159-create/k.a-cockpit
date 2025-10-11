@@ -48,11 +48,17 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
         // --- Basic Employee Metrics (uses filtered data) ---
         const metrics = filteredMetrics.filter(m => m.employee === employee.name);
         const totalSales = metrics.reduce((sum, m) => sum + (m.totalSales || 0), 0);
-        const totalTransactions = metrics.reduce((sum, m) => sum + (m.transactionCount || 0), 0);
+        // Compute transactions via distinct bill_no for accuracy
+        const combinedSales = [...filteredSalesTransactions, ...filteredKingDuvetSales].filter(s => s['SalesMan Name'] === employee.name);
+        const distinctBillsForEmployee = new Set<string>();
+        combinedSales.forEach(s => {
+            const bill = (s as any).bill_no || (s as any)['Bill_No'] || (s as any)['Invoice'] || (s as any)['Invoice No'] || (s as any)['Transaction_ID'] || '';
+            if (bill) distinctBillsForEmployee.add(String(bill));
+        });
+        const totalTransactions = distinctBillsForEmployee.size || metrics.reduce((sum, m) => sum + (m.transactionCount || 0), 0);
         const atv = totalTransactions > 0 ? totalSales / totalTransactions : 0;
         const effectiveTarget = calculateEffectiveTarget(employee.targets, dateFilter);
         const achievement = effectiveTarget > 0 ? (totalSales / effectiveTarget) * 100 : 0;
-        const combinedSales = [...filteredSalesTransactions, ...filteredKingDuvetSales].filter(s => s['SalesMan Name'] === employee.name);
         const totalItemsSold = combinedSales.reduce((sum, sale) => sum + (sale['Sold Qty'] || 0), 0);
         const avgItemsPerBill = totalTransactions > 0 ? totalItemsSold / totalTransactions : 0;
 
@@ -64,7 +70,15 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
         const storeTotalItems = [...filteredSalesTransactions, ...filteredKingDuvetSales]
             .filter(s => s['Outlet Name'] === employee.store)
             .reduce((sum, s) => sum + (s['Sold Qty'] || 0), 0);
-        const storeTotalTransactions = store?.transactionCount || 0;
+        // Store-level average uses distinct bills per store
+        const distinctBillsForStore = new Set<string>();
+        [...filteredSalesTransactions, ...filteredKingDuvetSales]
+            .filter(s => s['Outlet Name'] === employee.store)
+            .forEach(s => {
+                const bill = (s as any).bill_no || (s as any)['Bill_No'] || (s as any)['Invoice'] || (s as any)['Invoice No'] || (s as any)['Transaction_ID'] || '';
+                if (bill) distinctBillsForStore.add(String(bill));
+            });
+        const storeTotalTransactions = distinctBillsForStore.size || (store?.transactionCount || 0);
         const storeAvgUpt = storeTotalTransactions > 0 ? storeTotalItems / storeTotalTransactions : 0;
         
         // --- Interactive Category & Product Data (uses filtered data) ---
