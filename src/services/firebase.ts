@@ -2,21 +2,21 @@ import firebase from 'firebase/app';
 import 'firebase/auth';
 import 'firebase/firestore';
 
-// Firebase configuration using environment variables
+// Firebase configuration using environment variables with fallbacks
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD7p6iK1b0lG7sGP187VU7tBlTZyGo1wBA",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "alsani-cockpit-v3.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "alsani-cockpit-v3",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "alsani-cockpit-v3.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1055161240393",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1055161240393:web:64428acfb48922fbc76898"
 };
 
-// Validate that all required environment variables are set
-if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
-  console.error('Missing Firebase environment variables. Please check your .env.local file.');
-  throw new Error('Firebase configuration is incomplete. Check environment variables.');
-}
+// Log environment variable status
+console.log('🔍 Firebase Environment Variables:');
+console.log('API Key:', import.meta.env.VITE_FIREBASE_API_KEY ? '✅ Set from env' : '⚠️ Using fallback');
+console.log('Auth Domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? '✅ Set from env' : '⚠️ Using fallback');
+console.log('Project ID:', import.meta.env.VITE_FIREBASE_PROJECT_ID ? '✅ Set from env' : '⚠️ Using fallback');
 
 // Initialize Firebase
 

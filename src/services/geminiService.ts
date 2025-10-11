@@ -3,12 +3,10 @@ import { GoogleGenerativeAI, GenerationConfig } from "@google/generative-ai";
 import type { StoreSummary, DailyMetric, PredictionResult, EmployeeSummary } from '../types.js';
 
 
-// Use environment variable for API key
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// Use environment variable for API key with fallback
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyBJeuf5Ne_IsEvgKlxIfbsOS7Sm9Xjl4Ws";
 
-if (!GEMINI_API_KEY) {
-  throw new Error("Gemini API key (VITE_GEMINI_API_KEY) is not set in environment variables.");
-}
+console.log('🔍 Gemini API Key:', import.meta.env.VITE_GEMINI_API_KEY ? '✅ Set from env' : '⚠️ Using fallback');
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
