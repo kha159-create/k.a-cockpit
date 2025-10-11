@@ -720,6 +720,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ data, 
   const [ai, setAi] = useState<string>('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const normalize = (v: any) => String(v ?? '').trim().toUpperCase();
+  useEffect(() => { console.log('✅ Stage 4 Completed — Ready for Next Step'); }, []);
 
   const filteredSales = useMemo(() => {
     const set = new Set(stores.filter(s => branch === 'All' || s.name === branch).map(s => s.name));
@@ -752,37 +753,54 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ data, 
   }, [filteredSales]);
 
   const coSelling = useMemo(() => {
-    // collect transactions containing this product, then count companions
-    const byTxn = new Map<string, string[]>();
+    // collect by bill_no (fallback warns) with strict equality on alias/name
+    const byTxn = new Map<string, { alias: string; name: string }[]>();
     (allData as any[]).forEach(s => {
       const d = s['Bill Dt.']?.toDate?.();
       if (!d) return;
-      const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}|${s['Outlet Name']}|${s['Invoice No'] || ''}`;
+      const billNo = (s.bill_no || s['Bill_No'] || s['Invoice'] || s['Transaction_ID'] || s['Bill Number'] || s['Invoice No'] || '').toString();
+      const key = billNo
+        ? String(billNo)
+        : `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}|${s['Outlet Name']}|${s['SalesMan Name'] || ''}`;
+      if (!billNo) console.warn('⚠ Missing Bill_No, using fallback mode');
       const arr = byTxn.get(key) || [];
-      arr.push(String(s['Item Name'] || s['Item Alias'] || ''));
+      arr.push({ alias: normalize(s['Item Alias']), name: normalize(s['Item Name']) });
       byTxn.set(key, arr);
     });
+    const targetAlias = normalize(product.alias);
+    const targetName = normalize(product.name);
     const counts = new Map<string, number>();
+    let invoicesWithTarget = 0;
     byTxn.forEach(items => {
-      if (!items.some(n => n.includes(product.name) || n.includes(product.alias))) return;
-      const uniq = Array.from(new Set(items));
+      const uniq = Array.from(new Set(items.map(i => i.alias || i.name)));
+      const hasTarget = uniq.includes(targetAlias) || uniq.includes(targetName);
+      if (!hasTarget) return;
+      invoicesWithTarget++;
       uniq.forEach(n => {
-        if (n.includes(product.name) || n.includes(product.alias)) return;
+        if (n === targetAlias || n === targetName) return;
         counts.set(n, (counts.get(n) || 0) + 1);
       });
     });
-    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, count]) => ({ name, count }));
+    const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key, count]) => ({ key, count }));
+    return { top, invoicesWithTarget };
   }, [allData, product]);
 
   const runAi = async () => {
     setIsAiLoading(true);
     try {
-      const prompt = `أنت مستشار مبيعات تجزئة. المنتج: ${product.name} (الكود ${product.alias}) بسعر ${product.price}.
-الملخص: إجمالي الكمية ${totals.qty} وإجمالي القيمة ${totals.value}.
-أهم المنتجات المرافقة: ${coSelling.map(c => `${c.name} (${c.count})`).join(', ')}.
-اعطني توصية عملية قصيرة لتحسين الربط والعرض داخل المعرض.`;
-      const txt = await generateText({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] });
-      setAi(txt);
+      const { top, invoicesWithTarget } = coSelling;
+      if (!invoicesWithTarget || invoicesWithTarget < 3 || top.length === 0) {
+        setAi('لا توجد بيانات كافية لإصدار توصية دقيقة.');
+      } else {
+        const withPerc = top.map(t => ({ key: t.key, count: t.count, pct: Math.round((t.count / invoicesWithTarget) * 100) }));
+        const context = `يعتمد هذا التحليل على bill_no فقط. عدد الفواتير التي ظهر فيها المنتج: ${invoicesWithTarget}.\nأفضل ارتباطات: ${withPerc.map(w => `${w.key}: ${w.count} (${w.pct}%)`).join(', ')}`;
+        const prompt = `أنت نظام توصية يعتمد بالكامل على رقم الفاتورة bill_no.
+المنتج: ${product.name} (الكود ${product.alias}).
+${context}
+اكتب 2-3 توصيات عملية ومباشرة بالعربية، مثل: "ينباع عادةً مع X بناءً على بيانات الفواتير"، واذكر النِسَب %. تجنب أي استدلالات لا تعتمد على bill_no.`;
+        const txt = await generateText({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] });
+        setAi(txt);
+      }
     } catch (e: any) { setAi(`تعذر توليد التوصية: ${e?.message || e}`); }
     finally { setIsAiLoading(false); }
   };

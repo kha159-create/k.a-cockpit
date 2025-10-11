@@ -13,7 +13,7 @@ interface SelectiveDataDeletionProps {
 
 const SelectiveDataDeletion: React.FC<SelectiveDataDeletionProps> = ({ onSelectiveDelete, isProcessing }) => {
     const { t } = useLocale();
-    const [dataType, setDataType] = useState<'visitors' | 'sales'>('visitors');
+    const [dataType, setDataType] = useState<'visitors' | 'sales' | 'products'>('visitors');
     const [year, setYear] = useState(new Date().getFullYear());
     const [month, setMonth] = useState(new Date().getMonth());
 
@@ -34,6 +34,7 @@ const SelectiveDataDeletion: React.FC<SelectiveDataDeletionProps> = ({ onSelecti
                     <select value={dataType} onChange={e => setDataType(e.target.value as any)} className="input">
                         <option value="visitors">{t('visitors')}</option>
                         <option value="sales">{t('sales')}</option>
+                        <option value="products">products</option>
                     </select>
                 </div>
                 <div>

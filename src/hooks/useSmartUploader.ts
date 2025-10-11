@@ -160,6 +160,7 @@ ${preview}`;
                             const alias = findValueByKeyVariations(row, [headerMap['Item Alias']]);
                             const qty = parseNumber(findValueByKeyVariations(row, [headerMap['Sold Qty']]));
                             const rate = parseNumber(findValueByKeyVariations(row, [headerMap['Item Rate']]));
+                            const billNo = findValueByKeyVariations(row, ['Bill_No','bill_no','Invoice','Transaction_ID','Bill Number','Invoice No']);
                             
                             if (dateString && store && employee && itemName && alias) {
                                 const employeeId = String(employee).match(/^\d+/)?.[0] || null;
@@ -167,7 +168,13 @@ ${preview}`;
                                 const isKingDuvet = String(alias).startsWith('4') && String(itemName).toUpperCase().includes('COMFORTER');
                                 const collectionName = isKingDuvet ? 'kingDuvetSales' : 'salesTransactions';
                                 const saleRef = dbInstance.collection(collectionName).doc();
-                                batch.set(saleRef, { 'Bill Dt.': firestoreTimestamp, 'Outlet Name': store, 'SalesMan Name': employee, employeeId, 'Item Name': itemName, 'Item Alias': alias, 'Sold Qty': qty, 'Item Rate': rate });
+                                const payload: any = { 'Bill Dt.': firestoreTimestamp, 'Outlet Name': store, 'SalesMan Name': employee, employeeId, 'Item Name': itemName, 'Item Alias': alias, 'Sold Qty': qty, 'Item Rate': rate };
+                                if (billNo !== undefined && billNo !== null && String(billNo).trim() !== '') {
+                                    payload.bill_no = String(billNo).trim();
+                                } else {
+                                    console.warn('Bill number not found, sold-with analysis may be limited');
+                                }
+                                batch.set(saleRef, payload);
                                 successfulRecords.push({dataType: 'Item Sale', name: itemName, value: `Qty: ${qty}`});
                             } else { skippedCount++; }
                             break;

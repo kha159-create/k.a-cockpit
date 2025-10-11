@@ -481,9 +481,9 @@ const handleNotificationClick = (notificationId: string) => {
     };
 
     // FIX: Added missing handleSelectiveDelete function for targeted data removal.
-    const handleSelectiveDelete = async (dataType: 'visitors' | 'sales', year: number, month: number) => {
+    const handleSelectiveDelete = async (dataType: 'visitors' | 'sales' | 'products', year: number, month: number) => {
         const monthName = new Date(year, month).toLocaleString(locale, { month: 'long' });
-        const confirmationKey = dataType === 'visitors' ? 'confirm_delete_visitors_data' : 'confirm_delete_sales_data';
+        const confirmationKey = dataType === 'visitors' ? 'confirm_delete_visitors_data' : (dataType === 'sales' ? 'confirm_delete_sales_data' : 'confirm_delete_products_data');
         const confirmationText = t(confirmationKey, { month: monthName, year: year.toString() });
     
         setAppMessage({
@@ -525,6 +525,15 @@ const handleNotificationClick = (notificationId: string) => {
                         const duvetQuery = db.collection('kingDuvetSales').where('Bill Dt.', '>=', startDate).where('Bill Dt.', '<=', endDate);
                         const duvetSnapshot = await duvetQuery.get();
                         duvetSnapshot.forEach(doc => batch.delete(doc.ref));
+                    } else if (dataType === 'products') {
+                        const startDate = Timestamp.fromDate(new Date(year, month, 1));
+                        const endDate = Timestamp.fromDate(new Date(year, month + 1, 0, 23, 59, 59));
+                        const prodQuery1 = db.collection('salesTransactions').where('Bill Dt.', '>=', startDate).where('Bill Dt.', '<=', endDate);
+                        const prodSnap1 = await prodQuery1.get();
+                        prodSnap1.forEach(doc => batch.delete(doc.ref));
+                        const prodQuery2 = db.collection('kingDuvetSales').where('Bill Dt.', '>=', startDate).where('Bill Dt.', '<=', endDate);
+                        const prodSnap2 = await prodQuery2.get();
+                        prodSnap2.forEach(doc => batch.delete(doc.ref));
                     }
     
                     await batch.commit();

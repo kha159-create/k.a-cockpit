@@ -172,12 +172,16 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
 
     const sales = (allDateData as any[]).filter((d: any) => d && d['Bill Dt.'] && typeof d['Bill Dt.'].toDate === 'function' && d['Outlet Name'] && storeSet.has(d['Outlet Name']));
 
-    // Group items by a synthetic transaction key (Bill Dt. date + store + maybe bill number if exists)
+    // Group items by bill_no if available; fallback to synthetic key
     const byTxn = new Map<string, { name: string }[]>();
     for (const s of sales) {
       const d = s['Bill Dt.'].toDate();
       if (d.getUTCFullYear() !== Y || (dateFilter.month !== 'all' && d.getUTCMonth() !== M)) continue;
-      const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}|${s['Outlet Name']}|${s['Invoice No'] || ''}`;
+      const billNo = (s.bill_no || s['Bill_No'] || s['Invoice'] || s['Transaction_ID'] || s['Bill Number'] || s['Invoice No'] || '').toString();
+      const key = billNo
+        ? String(billNo)
+        : `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}|${s['Outlet Name']}|${s['SalesMan Name'] || ''}`;
+      if (!billNo) console.warn('⚠ Missing Bill_No, using fallback mode');
       const name = String(s['Item Name'] || s['Item Alias'] || '');
       if (!name) continue;
       const arr = byTxn.get(key) || [];
