@@ -6,6 +6,11 @@
   <p>Progressive Web App (PWA) with AI-powered analytics</p>
 </div>
 
+## ⚠️ **Security Notice**
+**All API keys are securely stored in GitHub Secrets. No sensitive keys are exposed in the codebase.**
+
+⚠️ **ملاحظة أمنية**: جميع المفاتيح محفوظة في GitHub Secrets، ولا توجد أي مفاتيح مكشوفة في الكود.
+
 ## 🎯 **Overview**
 
 K.A COCKPIT is a comprehensive management dashboard built with React, TypeScript, and Firebase. It provides real-time analytics, employee management, store performance tracking, and AI-powered insights.
