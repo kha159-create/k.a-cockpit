@@ -90,6 +90,22 @@ ${preview}`;
             format = analysis.format;
 
             if (!fileType || !headerMap) throw new Error("AI could not determine file structure.");
+
+            // Ensure bill number header mapping exists for item_wise_sales
+            if (fileType === 'item_wise_sales') {
+                const billCandidates = ['Bill_No','bill_no','Bill No','Invoice','Invoice No','Transaction_ID','Bill Number'];
+                const found = billCandidates.find(k => Object.keys(headerMap).some(h => h.toLowerCase().trim() === k.toLowerCase().trim()));
+                if (!found) {
+                    // Add a soft mapping if source file has a near match
+                    const firstRowKeys = Object.keys(parsedData[0] || {});
+                    const near = firstRowKeys.find(k => billCandidates.some(c => k.toLowerCase().trim() === c.toLowerCase().trim()));
+                    if (near) {
+                        (headerMap as any)['Bill_No'] = near;
+                    } else {
+                        console.warn('Bill number not found, sold-with analysis may be limited');
+                    }
+                }
+            }
             setAppMessage({ isOpen: true, text: `AI identified file as: ${fileType}. Starting upload...`, type: 'alert' });
 
         } catch (error: any) {

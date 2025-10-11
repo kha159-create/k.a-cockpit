@@ -34,7 +34,7 @@ const SelectiveDataDeletion: React.FC<SelectiveDataDeletionProps> = ({ onSelecti
                     <select value={dataType} onChange={e => setDataType(e.target.value as any)} className="input">
                         <option value="visitors">{t('visitors')}</option>
                         <option value="sales">{t('sales')}</option>
-                        <option value="products">products</option>
+                        {/* products option removed per request */}
                     </select>
                 </div>
                 <div>

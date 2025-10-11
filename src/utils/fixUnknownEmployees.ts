@@ -6,6 +6,15 @@ const parseIdFromUnknown = (name?: string): string | null => {
   return match ? match[1] : null;
 };
 
+const parseEmployeeIdFromSalesman = (name?: string): string | null => {
+  if (!name) return null;
+  const str = String(name).trim();
+  // 4325-Maryam or 4325 Maryam
+  const leading = str.match(/^(\d{2,10})\b/);
+  if (leading) return leading[1];
+  return parseIdFromUnknown(str);
+};
+
 export type FixUnknownResult = {
   employeesUpdated: number;
   metricsUpdated: number;
@@ -47,7 +56,7 @@ export const fixUnknownEmployeesAndMetrics = async (): Promise<FixUnknownResult>
     for (const doc of snap.docs) {
       const data = doc.data() as any;
       if (data?.employeeId) continue;
-      const parsed = parseIdFromUnknown(data?.['SalesMan Name'] || data?.employee);
+      const parsed = parseEmployeeIdFromSalesman(data?.['SalesMan Name'] || data?.employee);
       if (parsed) {
         await db.collection(collection).doc(doc.id).set({ employeeId: parsed }, { merge: true });
         salesUpdated++;
