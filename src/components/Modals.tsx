@@ -754,34 +754,43 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ data, 
 
   const coSelling = useMemo(() => {
     // collect by bill_no (fallback warns) with strict equality on alias/name
-    const byTxn = new Map<string, { alias: string; name: string }[]>();
+    const byTxn = new Map<string, { key: string; aliasRaw: string; nameRaw: string }[]>();
+    const details = new Map<string, { alias: string; name: string }>();
     (allData as any[]).forEach(s => {
       const d = s['Bill Dt.']?.toDate?.();
       if (!d) return;
       const billNo = (s.bill_no || s['Bill_No'] || s['Invoice'] || s['Transaction_ID'] || s['Bill Number'] || s['Invoice No'] || '').toString();
-      const key = billNo
+      const groupKey = billNo
         ? String(billNo)
         : `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}|${s['Outlet Name']}|${s['SalesMan Name'] || ''}`;
       if (!billNo) console.warn('⚠ Missing Bill_No, using fallback mode');
-      const arr = byTxn.get(key) || [];
-      arr.push({ alias: normalize(s['Item Alias']), name: normalize(s['Item Name']) });
-      byTxn.set(key, arr);
+      const aliasRaw = String(s['Item Alias'] || '').trim();
+      const nameRaw = String(s['Item Name'] || '').trim();
+      const aliasNorm = normalize(aliasRaw);
+      const nameNorm = normalize(nameRaw);
+      const key = aliasNorm || nameNorm;
+      if (key) {
+        if (!details.has(key)) details.set(key, { alias: aliasRaw, name: nameRaw });
+        const arr = byTxn.get(groupKey) || [];
+        arr.push({ key, aliasRaw, nameRaw });
+        byTxn.set(groupKey, arr);
+      }
     });
     const targetAlias = normalize(product.alias);
     const targetName = normalize(product.name);
     const counts = new Map<string, number>();
     let invoicesWithTarget = 0;
     byTxn.forEach(items => {
-      const uniq = Array.from(new Set(items.map(i => i.alias || i.name)));
-      const hasTarget = uniq.includes(targetAlias) || uniq.includes(targetName);
+      const uniqKeys = Array.from(new Set(items.map(i => i.key)));
+      const hasTarget = uniqKeys.includes(targetAlias) || uniqKeys.includes(targetName);
       if (!hasTarget) return;
       invoicesWithTarget++;
-      uniq.forEach(n => {
-        if (n === targetAlias || n === targetName) return;
-        counts.set(n, (counts.get(n) || 0) + 1);
+      uniqKeys.forEach(k => {
+        if (k === targetAlias || k === targetName) return;
+        counts.set(k, (counts.get(k) || 0) + 1);
       });
     });
-    const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key, count]) => ({ key, count }));
+    const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key, count]) => ({ key, count, alias: details.get(key)?.alias || '', name: details.get(key)?.name || '' }));
     return { top, invoicesWithTarget };
   }, [allData, product]);
 
@@ -853,7 +862,7 @@ ${context}
           <h3 className="font-semibold mb-2">Sold With (Top 3)</h3>
           <ul className="list-disc ms-5 text-sm text-zinc-700">
             {coSelling.top.length === 0 && <li>لا يوجد بيانات كافية</li>}
-            {coSelling.top.map(c => <li key={c.key}>{c.key} ({c.count})</li>)}
+            {coSelling.top.map(c => <li key={c.key}>{c.alias || c.key} — {c.name} ({c.count})</li>)}
           </ul>
         </div>
 
