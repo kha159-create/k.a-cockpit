@@ -324,7 +324,7 @@ const handleNotificationClick = (notificationId: string) => {
     profile,
   });
 
-  const allDateData = useMemo(() => [...dailyMetrics, ...salesTransactions], [dailyMetrics, salesTransactions]);
+  const allDateData = useMemo(() => [...dailyMetrics, ...salesTransactions, ...kingDuvetSales], [dailyMetrics, salesTransactions, kingDuvetSales]);
   
   const { handleSmartUpload, uploadResult, clearUploadResult } = useSmartUploader(db, setAppMessage, setIsProcessing, employees, stores);
 

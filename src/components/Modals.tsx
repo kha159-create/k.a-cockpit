@@ -764,7 +764,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ data, 
         ? String(billNo)
         : `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}|${s['Outlet Name']}|${s['SalesMan Name'] || ''}`;
       if (!billNo) console.warn('⚠ Missing Bill_No, using fallback mode');
-      const aliasRaw = String(s['Item Alias'] || '').trim();
+      const aliasRaw = String(s['Item Alias'] || s.alias || '').trim();
       const nameRaw = String(s['Item Name'] || '').trim();
       const aliasNorm = normalize(aliasRaw);
       const nameNorm = normalize(nameRaw);
@@ -790,7 +790,10 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ data, 
         counts.set(k, (counts.get(k) || 0) + 1);
       });
     });
-    const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key, count]) => ({ key, count, alias: details.get(key)?.alias || '', name: details.get(key)?.name || '' }));
+    const top = Array.from(counts.entries())
+      .map(([key, count]) => ({ key, count, alias: details.get(key)?.alias || '', name: details.get(key)?.name || '' }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
     return { top, invoicesWithTarget };
   }, [allData, product]);
 
