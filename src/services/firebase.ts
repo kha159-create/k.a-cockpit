@@ -2,14 +2,14 @@ import firebase from 'firebase/app';
 import 'firebase/auth';
 import 'firebase/firestore';
 
-// Firebase configuration with fallback values
+// Firebase configuration using environment variables
 const firebaseConfig = {
-  apiKey: "REDACTED_FIREBASE_API_KEY",
-  authDomain: "REDACTED_FIREBASE_DOMAIN",
-  projectId: "alsani-cockpit-v3",
-  storageBucket: "alsani-cockpit-v3.firebasestorage.app",
-  messagingSenderId: "REDACTED_SENDER_ID",
-  appId: "1:REDACTED_SENDER_ID:web:64428acfb48922fbc76898"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "REDACTED_FIREBASE_API_KEY",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "REDACTED_FIREBASE_DOMAIN",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "alsani-cockpit-v3",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "alsani-cockpit-v3.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "REDACTED_SENDER_ID",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:REDACTED_SENDER_ID:web:64428acfb48922fbc76898"
 };
 
 // Initialize Firebase
