@@ -3,7 +3,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLocale } from '@/context/LocaleContext';
 import MainLayout from '@/components/MainLayout';
 import AuthPage from '@/pages/AuthPage';
-import './test-env'; // Test environment variables
 
 const LoadingSpinner: React.FC = () => (
   <div className="flex items-center justify-center h-screen bg-gray-50">
