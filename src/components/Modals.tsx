@@ -719,24 +719,31 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ data, 
   const [branch, setBranch] = useState<string>('All');
   const [ai, setAi] = useState<string>('');
   const [isAiLoading, setIsAiLoading] = useState(false);
-
-  const year = new Date().getUTCFullYear();
+  const normalize = (v: any) => String(v ?? '').trim().toUpperCase();
 
   const filteredSales = useMemo(() => {
     const set = new Set(stores.filter(s => branch === 'All' || s.name === branch).map(s => s.name));
-    return (allData as any[]).filter(s => s && s['Item Alias'] === product.alias && set.has(s['Outlet Name']));
-  }, [allData, product.alias, stores, branch]);
+    const targetAlias = normalize(product.alias);
+    const targetName = normalize(product.name);
+    return (allData as any[]).filter(s => {
+      if (!s || !set.has(s['Outlet Name'])) return false;
+      const alias = normalize(s['Item Alias']);
+      const name = normalize(s['Item Name']);
+      return alias === targetAlias || name === targetName;
+    });
+  }, [allData, product.alias, product.name, stores, branch]);
 
   const monthlyTrend = useMemo(() => {
     const arr = Array.from({ length: 12 }, (_, i) => ({ name: new Date(0, i).toLocaleString('en-US', { month: 'short' }), Sales: 0, Target: 0 }));
+    const activeYear = filteredSales[0]?.['Bill Dt.']?.toDate?.()?.getUTCFullYear?.() ?? new Date().getUTCFullYear();
     filteredSales.forEach(s => {
       const d = s['Bill Dt.'].toDate();
-      if (d.getUTCFullYear() !== year) return;
+      if (d.getUTCFullYear() !== activeYear) return;
       const val = Number(s['Sold Qty'] || 0) * Number(s['Item Rate'] || 0);
       arr[d.getUTCMonth()].Sales += val;
     });
     return arr;
-  }, [filteredSales, year]);
+  }, [filteredSales]);
 
   const totals = useMemo(() => {
     const qty = filteredSales.reduce((sum, s) => sum + Number(s['Sold Qty'] || 0), 0);
@@ -800,7 +807,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ data, 
   return (
     <div className="modal-content max-w-3xl">
       <h2 className="modal-title flex items-center gap-2">Product Details — {product.name}</h2>
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
         {/* Overview */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-lg border">
           <div><div className="text-xs text-zinc-500">Code</div><div className="font-semibold">{product.alias}</div></div>
