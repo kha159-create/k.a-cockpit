@@ -39,7 +39,8 @@ export const getCategory = (product: { name?: string, alias?: string }): string 
     const alias = String(product.alias || '');
     
     if (alias.startsWith('4')) return 'Duvets';
-    if (name.includes('matterspad')) return 'Toppers';
+    if (alias.startsWith('2')) return 'Duvets Full';
+    if (name.includes('mattresspad')) return 'Toppers';
     if (name.includes('pillow') && !name.includes('case')) return 'Pillows';
     
     return 'Other';
