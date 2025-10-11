@@ -21,15 +21,17 @@ export const useSmartUploader = (
 
     const clearUploadResult = () => setUploadResult(null);
 
+    const normalizeKey = (k: string) => k.toLowerCase().trim().replace(/[\s_.-]+/g, '');
     const findValueByKeyVariations = (row: any, keys: string[]) => {
+        const normalizedRowKeys: Record<string, string> = {};
+        for (const rowKey in row) normalizedRowKeys[normalizeKey(rowKey)] = rowKey;
         for (const key of keys) {
             if (!key) continue;
-            const lowerKey = key.toLowerCase().trim();
-            for (const rowKey in row) {
-                if (rowKey.toLowerCase().trim() === lowerKey) {
-                    const value = row[rowKey];
-                    if (value !== undefined && value !== null) return value;
-                }
+            const nk = normalizeKey(String(key));
+            const actualKey = normalizedRowKeys[nk];
+            if (actualKey !== undefined) {
+                const value = row[actualKey];
+                if (value !== undefined && value !== null) return value;
             }
         }
         return undefined;
@@ -176,7 +178,7 @@ ${preview}`;
                             const alias = findValueByKeyVariations(row, [headerMap['Item Alias']]);
                             const qty = parseNumber(findValueByKeyVariations(row, [headerMap['Sold Qty']]));
                             const rate = parseNumber(findValueByKeyVariations(row, [headerMap['Item Rate']]));
-                            const billNo = findValueByKeyVariations(row, ['Bill_No','bill_no','Invoice','Transaction_ID','Bill Number','Invoice No']);
+                            const billNo = findValueByKeyVariations(row, ['Bill_No','bill_no','Bill No','BillNo','Invoice','InvoiceNo','Invoice No','Transaction_ID','Transaction ID','Bill Number']);
                             
                             if (dateString && store && employee && itemName && alias) {
                                 const employeeId = String(employee).match(/^\d+/)?.[0] || null;
