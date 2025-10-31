@@ -19,7 +19,6 @@ import LFLPage from '@/pages/LFLPage';
 import SettingsPage from '@/pages/SettingsPage';
 import StoreDetailPage from '@/pages/StoreDetailPage';
 // import NaturalLanguageSearch from '@/components/NaturalLanguageSearch';
-import AiChatAssistant from '@/components/AiChatAssistant';
 import PendingApprovalPage from '@/pages/PendingApprovalPage';
 import PendingApprovalsPage from '@/pages/PendingApprovalsPage';
 import RolesManagementPage from '@/pages/RolesManagementPage';
@@ -845,9 +844,6 @@ const handleNotificationClick = (notificationId: string) => {
         </header>
         {renderContent()}
       </main>
-
-        {/* Restore floating AI assistant button */}
-        <AiChatAssistant fullData={fullProcessedData} currentPage={activeTab} businessRules={businessRules} />
 
         {modalState.type &&
             <div className="modal-backdrop">
