@@ -44,29 +44,43 @@ export const DirectoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     let cancelled = false;
     setLoading(true);
 
-    const unsubStores = db.collection('stores').onSnapshot((snap) => {
-      const sMap: MapRec = {};
-      snap.docs.map((doc) => {
-        const data = doc.data();
-        const key = String(data?.store_id ?? data?.id ?? doc.id).trim();
-        sMap[key] = pickStoreName(data, key);
-        return null;
-      });
-      if (!cancelled) setStoreMap(sMap);
-      if (!cancelled) setLoading(false);
-    });
+    const unsubStores = db.collection('stores').onSnapshot(
+      (snap) => {
+        const sMap: MapRec = {};
+        snap.docs.map((doc) => {
+          const data = doc.data();
+          const key = String(data?.store_id ?? data?.id ?? doc.id).trim();
+          sMap[key] = pickStoreName(data, key);
+          return null;
+        });
+        if (!cancelled) setStoreMap(sMap);
+        if (!cancelled) setLoading(false);
+      },
+      (err) => {
+        console.error('DirectoryProvider stores listener error:', err);
+        if (!cancelled) setError(err?.message || 'Missing or insufficient permissions');
+        if (!cancelled) setLoading(false);
+      }
+    );
 
-    const unsubEmployees = db.collection('employees').onSnapshot((snap) => {
-      const eMap: MapRec = {};
-      snap.docs.map((doc) => {
-        const data = doc.data();
-        const key = String(data?.employee_id ?? data?.id ?? doc.id).trim();
-        eMap[key] = pickEmployeeName(data, key);
-        return null;
-      });
-      if (!cancelled) setEmployeeMap(eMap);
-      if (!cancelled) setLoading(false);
-    });
+    const unsubEmployees = db.collection('employees').onSnapshot(
+      (snap) => {
+        const eMap: MapRec = {};
+        snap.docs.map((doc) => {
+          const data = doc.data();
+          const key = String(data?.employee_id ?? data?.id ?? doc.id).trim();
+          eMap[key] = pickEmployeeName(data, key);
+          return null;
+        });
+        if (!cancelled) setEmployeeMap(eMap);
+        if (!cancelled) setLoading(false);
+      },
+      (err) => {
+        console.error('DirectoryProvider employees listener error:', err);
+        if (!cancelled) setError(err?.message || 'Missing or insufficient permissions');
+        if (!cancelled) setLoading(false);
+      }
+    );
 
     return () => {
       cancelled = true;
