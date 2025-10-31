@@ -142,7 +142,10 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
         const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
         const remainingDays = Math.max(0, totalDaysInMonth - now.getDate() + 1);
         const requiredDailyAverage = remainingDays > 0 ? Math.max(0, remainingTarget) / remainingDays : 0;
-        const dynamicTarget = { salesMTD: salesThisMonth, monthlyTarget, remainingTarget, remainingDays, requiredDailyAverage };
+        const monthlyTarget90 = monthlyTarget * 0.9;
+        const remainingTarget90 = monthlyTarget90 - salesThisMonth;
+        const requiredDailyAverage90 = remainingDays > 0 ? Math.max(0, remainingTarget90) / remainingDays : 0;
+        const dynamicTarget = { salesMTD: salesThisMonth, monthlyTarget, remainingTarget, remainingDays, requiredDailyAverage, requiredDailyAverage90 };
 
         const monthlyDuvetTarget = employee.duvetTargets?.[year]?.[String(month + 1)] || 0;
         const duvetsSoldThisMonth = kingDuvetSales.filter(s => {
@@ -236,6 +239,7 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
                                 <div className="flex justify-between border-t pt-2 mt-2"><span className="font-bold">{t('remaining_target')}</span><span className="font-bold text-red-600">{employeeData.dynamicTarget.remainingTarget > 0 ? employeeData.dynamicTarget.remainingTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) : t('achieved')}</span></div>
                                 <div className="flex justify-between"><span>{t('remaining_days')}</span><span className="font-semibold">{employeeData.dynamicTarget.remainingDays}</span></div>
                                 <div className="flex justify-between items-center bg-orange-50 p-2 rounded-lg mt-2"><span className="font-bold text-orange-700">{t('required_daily_avg')}</span><span className="font-bold text-orange-700 text-md">{employeeData.dynamicTarget.requiredDailyAverage.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span></div>
+                                <div className="flex justify-between items-center bg-amber-50 p-2 rounded-lg"><span className="font-bold text-amber-700">{t('required_daily_avg_90')}</span><span className="font-bold text-amber-700 text-md">{employeeData.dynamicTarget.requiredDailyAverage90.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span></div>
                             </div>
                         </div>
                     </ChartCard>
