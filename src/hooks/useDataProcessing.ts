@@ -115,8 +115,28 @@ export const useDataProcessing = ({
 
         const yearMatch = dateFilter.year === 'all' || itemDate.getUTCFullYear() === dateFilter.year;
         const monthMatch = dateFilter.month === 'all' || itemDate.getUTCMonth() === dateFilter.month;
-        const dayMatch = dateFilter.day === 'all' || itemDate.getUTCDate() === dateFilter.day;
-        return yearMatch && monthMatch && dayMatch;
+
+        // Range-aware day matching
+        const mode = dateFilter.mode ?? 'single';
+        if (!yearMatch || !monthMatch) return yearMatch && monthMatch; // early exit
+
+        if (mode === 'range' && dateFilter.month !== 'all' && dateFilter.year !== 'all') {
+            const from = dateFilter.dayFrom === undefined ? 'all' : dateFilter.dayFrom;
+            const to = dateFilter.dayTo === undefined ? 'all' : dateFilter.dayTo;
+            const itemDay = itemDate.getUTCDate();
+            if (from === 'all' && to === 'all') return true;
+            if (from === 'all' && typeof to === 'number') return itemDay <= to;
+            if (typeof from === 'number' && to === 'all') return itemDay >= from;
+            if (typeof from === 'number' && typeof to === 'number') {
+                const min = Math.min(from, to);
+                const max = Math.max(from, to);
+                return itemDay >= min && itemDay <= max;
+            }
+            return true;
+        } else {
+            const dayMatch = dateFilter.day === 'all' || itemDate.getUTCDate() === dateFilter.day;
+            return yearMatch && monthMatch && dayMatch;
+        }
     };
     const combinedSales = [...roleFilteredData.salesTransactions, ...roleFilteredData.kingDuvetSales];
     const filteredCombinedSales = combinedSales.filter(filterByDate);

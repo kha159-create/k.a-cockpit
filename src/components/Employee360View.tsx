@@ -37,6 +37,24 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
 
             const yearMatch = dateFilter.year === 'all' || itemDate.getUTCFullYear() === dateFilter.year;
             const monthMatch = dateFilter.month === 'all' || itemDate.getUTCMonth() === dateFilter.month;
+            if (!yearMatch || !monthMatch) return yearMatch && monthMatch;
+
+            const mode = dateFilter.mode ?? 'single';
+            if (mode === 'range' && dateFilter.month !== 'all' && dateFilter.year !== 'all') {
+                const from = dateFilter.dayFrom === undefined ? 'all' : dateFilter.dayFrom;
+                const to = dateFilter.dayTo === undefined ? 'all' : dateFilter.dayTo;
+                const d = itemDate.getUTCDate();
+                if (from === 'all' && to === 'all') return true;
+                if (from === 'all' && typeof to === 'number') return d <= to;
+                if (typeof from === 'number' && to === 'all') return d >= from;
+                if (typeof from === 'number' && typeof to === 'number') {
+                    const min = Math.min(from, to);
+                    const max = Math.max(from, to);
+                    return d >= min && d <= max;
+                }
+                return true;
+            }
+
             const dayMatch = dateFilter.day === 'all' || itemDate.getUTCDate() === dateFilter.day;
             return yearMatch && monthMatch && dayMatch;
         };
