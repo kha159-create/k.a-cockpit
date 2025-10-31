@@ -84,12 +84,17 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({ store, allMetrics, on
             
         const monthlyTarget = calculateEffectiveTarget(store.targets, {year, month, day: 'all'});
         const remainingTarget = monthlyTarget - salesThisMonth;
+
+        // 90% goal calculations
+        const monthlyTarget90 = monthlyTarget * 0.9;
+        const remainingTarget90 = monthlyTarget90 - salesThisMonth;
         
         return {
             salesMTD: salesThisMonth,
             remainingTarget,
             remainingDays,
             requiredDailyAverage: remainingDays > 0 ? Math.max(0, remainingTarget) / remainingDays : 0,
+            requiredDailyAverage90: remainingDays > 0 ? Math.max(0, remainingTarget90) / remainingDays : 0,
         };
     }, [store.name, store.targets, allMetrics]);
     
@@ -161,7 +166,8 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({ store, allMetrics, on
                          <div className="flex justify-between"><span>{t('sales_this_month')}</span><span className="font-semibold">{dynamicTargetData.salesMTD.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span></div>
                          <div className="flex justify-between"><span>{t('remaining_target')}</span><span className="font-semibold text-red-600">{dynamicTargetData.remainingTarget > 0 ? dynamicTargetData.remainingTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) : t('achieved')}</span></div>
                          <div className="flex justify-between"><span>{t('remaining_days')}</span><span className="font-semibold">{dynamicTargetData.remainingDays}</span></div>
-                         <div className="flex justify-between items-center bg-orange-50 p-2 rounded-lg mt-2"><span className="font-bold text-orange-700">{t('required_daily_avg')}</span><span className="font-bold text-orange-700 text-lg">{dynamicTargetData.requiredDailyAverage.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span></div>
+                        <div className="flex justify-between items-center bg-orange-50 p-2 rounded-lg mt-2"><span className="font-bold text-orange-700">{t('required_daily_avg')}</span><span className="font-bold text-orange-700 text-lg">{dynamicTargetData.requiredDailyAverage.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span></div>
+                        <div className="flex justify-between items-center bg-amber-50 p-2 rounded-lg"><span className="font-bold text-amber-700">{t('required_daily_avg_90')}</span><span className="font-bold text-amber-700 text-lg">{dynamicTargetData.requiredDailyAverage90.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span></div>
                      </div>
                  </div>
             </div>
