@@ -319,54 +319,7 @@ Use short sentences. Output in Arabic.` }]}
             </select>
         </div>
         
-        {/* Summary Dashboard (moved below Products Overview) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <div className="text-xs text-zinc-500 mb-1">Total Products Sold (MTD)</div>
-            <div className="text-2xl font-bold">{summary.totalQty.toLocaleString('en-US')}</div>
-          </div>
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <div className="text-xs text-zinc-500 mb-1">Total Sales Value (MTD)</div>
-            <div className="text-2xl font-bold">{summary.totalValue.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
-          </div>
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <div className="text-xs text-zinc-500 mb-1">Best Performing Product</div>
-            <div className="text-sm font-semibold truncate" title={summary.best?.name || ''}>{summary.best?.name || '-'}</div>
-            <div className="text-green-600 text-xs">{summary.best ? `${summary.best.growth.toFixed(1)}%` : '-'}</div>
-          </div>
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <div className="text-xs text-zinc-500 mb-1">Weakest Performing Product</div>
-            <div className="text-sm font-semibold truncate" title={summary.weak?.name || ''}>{summary.weak?.name || '-'}</div>
-            <div className="text-red-600 text-xs">{summary.weak ? `${summary.weak.growth.toFixed(1)}%` : '-'}</div>
-          </div>
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <div className="text-xs text-zinc-500 mb-1">Average Daily Sales</div>
-            <div className="text-2xl font-bold">{summary.avgDaily.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
-          </div>
-          <div className={`bg-white p-4 rounded-xl shadow-sm border`}>
-            <div className="text-xs text-zinc-500 mb-1">Monthly Growth Rate</div>
-            <div className={`text-2xl font-bold ${summary.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{`${summary.monthlyGrowth.toFixed(1)}%`}</div>
-          </div>
-        </div>
-
-        {/* Charts (moved below Products Overview) */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-1">
-            <ChartCard title="Top 10 Selling Products">
-              <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
-            </ChartCard>
-          </div>
-          <div className="xl:col-span-1">
-            <ChartCard title="Category Share">
-              <PieChart data={summary.charts.categoryShare} />
-            </ChartCard>
-          </div>
-          <div className="xl:col-span-1">
-            <ChartCard title="Monthly Sales Trend">
-              <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
-            </ChartCard>
-          </div>
-        </div>
+        
 
         {isRecalculating ? <TableSkeleton /> : (
           <>
@@ -383,6 +336,55 @@ Use short sentences. Output in Arabic.` }]}
         )}
       </div>
       
+      {/* Summary Dashboard (below Products Overview table) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="text-xs text-zinc-500 mb-1">Total Products Sold (MTD)</div>
+          <div className="text-2xl font-bold">{summary.totalQty.toLocaleString('en-US')}</div>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="text-xs text-zinc-500 mb-1">Total Sales Value (MTD)</div>
+          <div className="text-2xl font-bold">{summary.totalValue.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="text-xs text-zinc-500 mb-1">Best Performing Product</div>
+          <div className="text-sm font-semibold truncate" title={summary.best?.name || ''}>{summary.best?.name || '-'}</div>
+          <div className="text-green-600 text-xs">{summary.best ? `${summary.best.growth.toFixed(1)}%` : '-'}</div>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="text-xs text-zinc-500 mb-1">Weakest Performing Product</div>
+          <div className="text-sm font-semibold truncate" title={summary.weak?.name || ''}>{summary.weak?.name || '-'}</div>
+          <div className="text-red-600 text-xs">{summary.weak ? `${summary.weak.growth.toFixed(1)}%` : '-'}</div>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="text-xs text-zinc-500 mb-1">Average Daily Sales</div>
+          <div className="text-2xl font-bold">{summary.avgDaily.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
+        </div>
+        <div className={`bg-white p-4 rounded-xl shadow-sm border`}>
+          <div className="text-xs text-zinc-500 mb-1">Monthly Growth Rate</div>
+          <div className={`text-2xl font-bold ${summary.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{`${summary.monthlyGrowth.toFixed(1)}%`}</div>
+        </div>
+      </div>
+
+      {/* Charts (below Products Overview table) */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-1">
+          <ChartCard title="Top 10 Selling Products">
+            <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
+          </ChartCard>
+        </div>
+        <div className="xl:col-span-1">
+          <ChartCard title="Category Share">
+            <PieChart data={summary.charts.categoryShare} />
+          </ChartCard>
+        </div>
+        <div className="xl:col-span-1">
+          <ChartCard title="Monthly Sales Trend">
+            <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
+          </ChartCard>
+        </div>
+      </div>
+
       {/* Cross-Selling Analytics */}
       <div className="space-y-6">
         <h3 className="text-xl font-semibold text-zinc-800">Frequently Sold Together</h3>
