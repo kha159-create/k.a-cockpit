@@ -296,7 +296,30 @@ Use short sentences. Output in Arabic.` }]}
         <AreaStoreFilter stores={allStores} filters={areaStoreFilter} setFilters={setAreaStoreFilter} profile={profile}/>
       </div>
       <div className="space-y-6">
-        {/* Summary Dashboard */}
+        {/* Table Section */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <h3 className="text-xl font-semibold text-zinc-800 mb-4">Products Overview</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+            <input type="text" placeholder="Filter by Product Name..." value={filters.name} onChange={e => setFilters(prev => ({...prev, name: e.target.value}))} className="input" />
+            <input type="text" placeholder="Filter by Code (use + for multiple)..." value={filters.alias} onChange={e => setFilters(prev => ({...prev, alias: e.target.value}))} className="input" />
+            <select value={filters.category} onChange={e => setFilters(prev => ({...prev, category: e.target.value}))} className="input">
+                <option value="All">All Categories</option>
+                <option value="Duvets">Duvets</option>
+                <option value="Duvets Full">Duvets Full</option>
+                <option value="Pillows">Pillows</option>
+                <option value="Toppers">Toppers</option>
+                <option value="Other">Other</option>
+            </select>
+            <select value={filters.priceRange} onChange={e => setFilters(prev => ({...prev, priceRange: e.target.value}))} className="input">
+                <option value="All">All Prices</option>
+                <option value="<150">&lt; 150 SAR</option>
+                <option value="150-500">150 - 500 SAR</option>
+                <option value=">500">&gt; 500 SAR</option>
+            </select>
+        </div>
+        
+        {/* Summary Dashboard (moved below Products Overview) */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="bg-white p-4 rounded-xl shadow-sm border">
             <div className="text-xs text-zinc-500 mb-1">Total Products Sold (MTD)</div>
@@ -320,13 +343,13 @@ Use short sentences. Output in Arabic.` }]}
             <div className="text-xs text-zinc-500 mb-1">Average Daily Sales</div>
             <div className="text-2xl font-bold">{summary.avgDaily.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
           </div>
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className={`bg-white p-4 rounded-xl shadow-sm border`}>
             <div className="text-xs text-zinc-500 mb-1">Monthly Growth Rate</div>
             <div className={`text-2xl font-bold ${summary.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{`${summary.monthlyGrowth.toFixed(1)}%`}</div>
           </div>
         </div>
 
-        {/* Charts */}
+        {/* Charts (moved below Products Overview) */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-1">
             <ChartCard title="Top 10 Selling Products">
@@ -343,30 +366,6 @@ Use short sentences. Output in Arabic.` }]}
               <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
             </ChartCard>
           </div>
-        </div>
-
-
-        {/* Table Section */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <h3 className="text-xl font-semibold text-zinc-800 mb-4">Products Overview</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
-            <input type="text" placeholder="Filter by Product Name..." value={filters.name} onChange={e => setFilters(prev => ({...prev, name: e.target.value}))} className="input" />
-            <input type="text" placeholder="Filter by Code (use + for multiple)..." value={filters.alias} onChange={e => setFilters(prev => ({...prev, alias: e.target.value}))} className="input" />
-            <select value={filters.category} onChange={e => setFilters(prev => ({...prev, category: e.target.value}))} className="input">
-                <option value="All">All Categories</option>
-                <option value="Duvets">Duvets</option>
-                <option value="Duvets Full">Duvets Full</option>
-                <option value="Pillows">Pillows</option>
-                <option value="Toppers">Toppers</option>
-                <option value="Other">Other</option>
-            </select>
-            <select value={filters.priceRange} onChange={e => setFilters(prev => ({...prev, priceRange: e.target.value}))} className="input">
-                <option value="All">All Prices</option>
-                <option value="<150">&lt; 150 SAR</option>
-                <option value="150-500">150 - 500 SAR</option>
-                <option value=">500">&gt; 500 SAR</option>
-            </select>
         </div>
 
         {isRecalculating ? <TableSkeleton /> : (
