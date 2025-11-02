@@ -383,22 +383,6 @@ Use short sentences. Output in Arabic.` }]}
         )}
       </div>
       
-      {/* AI Insights */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-zinc-800">AI Insights</h3>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setAiOpen(!aiOpen)} className="px-3 py-1.5 rounded-md border text-sm">{aiOpen ? 'إخفاء' : 'إظهار'}</button>
-            <button onClick={runAiAnalysis} disabled={aiLoading} className="btn-primary text-sm">{aiLoading ? 'تحليل...' : '🔁 Reanalyze with AI'}</button>
-          </div>
-        </div>
-        {aiOpen && (
-          <div className="mt-4 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 whitespace-pre-wrap text-sm">
-            {aiInsights || 'انقر على زر إعادة التحليل لتوليد الرؤى.'}
-          </div>
-        )}
-      </div>
-
       {/* Cross-Selling Analytics */}
       <div className="space-y-6">
         <h3 className="text-xl font-semibold text-zinc-800">Frequently Sold Together</h3>
@@ -464,6 +448,22 @@ Use short sentences. Output in Arabic.` }]}
             })()}
           </svg>
         </div>
+      </div>
+
+      {/* AI Insights (moved below Cross-Selling) */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-zinc-800">AI Insights</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setAiOpen(!aiOpen)} className="px-3 py-1.5 rounded-md border text-sm">{aiOpen ? 'إخفاء' : 'إظهار'}</button>
+            <button onClick={runAiAnalysis} disabled={aiLoading} className="btn-primary text-sm">{aiLoading ? 'تحليل...' : '🔁 Reanalyze with AI'}</button>
+          </div>
+        </div>
+        {aiOpen && (
+          <div className="mt-4 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 whitespace-pre-wrap text-sm">
+            {aiInsights || 'انقر على زر إعادة التحليل لتوليد الرؤى.'}
+          </div>
+        )}
       </div>
       </div>
     </div>
