@@ -33,9 +33,20 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
   // console.log('ProductsPage - isRecalculating:', isRecalculating);
 
   const filteredProducts = useMemo(() => {
+    const nameQuery = filters.name.trim().toLowerCase();
+    // Support multi-code search: split by +, comma, or whitespace
+    const codeTokens = filters.alias
+      .toLowerCase()
+      .split(/[+,\s]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
     return productSummary.filter(p => {
-        const nameMatch = p.name?.toLowerCase().includes(filters.name.toLowerCase());
-        const aliasMatch = p.alias?.toLowerCase().includes(filters.alias.toLowerCase());
+        const nameMatch = p.name?.toLowerCase().includes(nameQuery);
+        const aliasLower = (p.alias || '').toLowerCase();
+        const aliasMatch = codeTokens.length === 0
+          ? aliasLower.includes(filters.alias.toLowerCase())
+          : codeTokens.some(token => aliasLower.includes(token));
         const categoryMatch = filters.category === 'All' || getCategory(p) === filters.category;
         
         const price = p.price || 0;
@@ -341,7 +352,7 @@ Use short sentences. Output in Arabic.` }]}
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
             <input type="text" placeholder="Filter by Product Name..." value={filters.name} onChange={e => setFilters(prev => ({...prev, name: e.target.value}))} className="input" />
-            <input type="text" placeholder="Filter by Code..." value={filters.alias} onChange={e => setFilters(prev => ({...prev, alias: e.target.value}))} className="input" />
+            <input type="text" placeholder="Filter by Code (use + for multiple)..." value={filters.alias} onChange={e => setFilters(prev => ({...prev, alias: e.target.value}))} className="input" />
             <select value={filters.category} onChange={e => setFilters(prev => ({...prev, category: e.target.value}))} className="input">
                 <option value="All">All Categories</option>
                 <option value="Duvets">Duvets</option>
