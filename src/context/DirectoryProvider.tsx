@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { db } from '@/services/firebase';
+import { db, auth } from '@/services/firebase';
 
 type MapRec = Record<string, string>;
 
@@ -42,50 +42,75 @@ export const DirectoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    let unsubStores: (() => void) | null = null;
+    let unsubEmployees: (() => void) | null = null;
 
-    const unsubStores = db.collection('stores').onSnapshot(
-      (snap) => {
-        const sMap: MapRec = {};
-        snap.docs.map((doc) => {
-          const data = doc.data();
-          const key = String(data?.store_id ?? data?.id ?? doc.id).trim();
-          sMap[key] = pickStoreName(data, key);
-          return null;
-        });
-        if (!cancelled) setStoreMap(sMap);
-        if (!cancelled) setLoading(false);
-      },
-      (err) => {
-        console.error('DirectoryProvider stores listener error:', err);
-        if (!cancelled) setError(err?.message || 'Missing or insufficient permissions');
-        if (!cancelled) setLoading(false);
-      }
-    );
+    const startListeners = () => {
+      setLoading(true);
+      unsubStores = db.collection('stores').onSnapshot(
+        (snap) => {
+          const sMap: MapRec = {};
+          snap.docs.map((doc) => {
+            const data = doc.data();
+            const key = String(data?.store_id ?? data?.id ?? doc.id).trim();
+            sMap[key] = pickStoreName(data, key);
+            return null;
+          });
+          if (!cancelled) setStoreMap(sMap);
+          if (!cancelled) setLoading(false);
+        },
+        (err) => {
+          console.error('DirectoryProvider stores listener error:', err);
+          if (!cancelled) setError(err?.message || 'Missing or insufficient permissions');
+          if (!cancelled) setLoading(false);
+        }
+      );
 
-    const unsubEmployees = db.collection('employees').onSnapshot(
-      (snap) => {
-        const eMap: MapRec = {};
-        snap.docs.map((doc) => {
-          const data = doc.data();
-          const key = String(data?.employee_id ?? data?.id ?? doc.id).trim();
-          eMap[key] = pickEmployeeName(data, key);
-          return null;
-        });
-        if (!cancelled) setEmployeeMap(eMap);
-        if (!cancelled) setLoading(false);
-      },
-      (err) => {
-        console.error('DirectoryProvider employees listener error:', err);
-        if (!cancelled) setError(err?.message || 'Missing or insufficient permissions');
-        if (!cancelled) setLoading(false);
+      unsubEmployees = db.collection('employees').onSnapshot(
+        (snap) => {
+          const eMap: MapRec = {};
+          snap.docs.map((doc) => {
+            const data = doc.data();
+            const key = String(data?.employee_id ?? data?.id ?? doc.id).trim();
+            eMap[key] = pickEmployeeName(data, key);
+            return null;
+          });
+          if (!cancelled) setEmployeeMap(eMap);
+          if (!cancelled) setLoading(false);
+        },
+        (err) => {
+          console.error('DirectoryProvider employees listener error:', err);
+          if (!cancelled) setError(err?.message || 'Missing or insufficient permissions');
+          if (!cancelled) setLoading(false);
+        }
+      );
+    };
+
+    const stopListeners = () => {
+      if (unsubStores) unsubStores();
+      if (unsubEmployees) unsubEmployees();
+      unsubStores = null;
+      unsubEmployees = null;
+      if (!cancelled) {
+        setStoreMap({});
+        setEmployeeMap({});
       }
-    );
+    };
+
+    const unsubAuth = auth.onAuthStateChanged((user) => {
+      if (cancelled) return;
+      if (user) {
+        startListeners();
+      } else {
+        stopListeners();
+        setLoading(false);
+      }
+    });
 
     return () => {
       cancelled = true;
-      unsubStores();
-      unsubEmployees();
+      stopListeners();
+      unsubAuth();
     };
   }, []);
 
