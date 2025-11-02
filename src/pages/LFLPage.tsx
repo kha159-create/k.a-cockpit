@@ -22,6 +22,7 @@ const ComparisonTypeSelector: React.FC<{ value: string, onChange: (value: string
         { id: 'mtd', label: 'Month-to-Date' },
         { id: 'ytd', label: 'Year-to-Date' },
         { id: 'monthly', label: 'Full Month' },
+        { id: 'dayRange', label: 'Day Range' },
     ];
     return (
         <div className="flex bg-gray-100 rounded-lg p-1 border">
@@ -45,6 +46,10 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     const [monthFilter, setMonthFilter] = useState(new Date().getMonth());
     const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().split('T')[0]);
     const [comparisonType, setComparisonType] = useState('daily');
+    const [rangeAStart, setRangeAStart] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+    const [rangeAEnd, setRangeAEnd] = useState(() => new Date().toISOString().split('T')[0]);
+    const [rangeBStart, setRangeBStart] = useState('');
+    const [rangeBEnd, setRangeBEnd] = useState('');
 
     const visibleStores = useMemo(() => {
         if (!profile) return [];
@@ -82,6 +87,11 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                 // Visitor rate is transaction / visitors
                 visitorRate: totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0,
             };
+        };
+
+        const parseYmd = (s: string) => {
+            const [y, m, d] = s.split('-').map(Number);
+            return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
         };
 
         const now = new Date();
@@ -129,8 +139,20 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             previous: processPeriod(dataForFilter, startOfMonthFilterLY, endOfMonthFilterLY),
         }
 
-        return { daily, mtd, ytd, monthly };
-    }, [allMetrics, storeFilter, monthFilter, dailyDate]);
+        // Day Range (custom vs custom)
+        const hasRangeA = rangeAStart && rangeAEnd;
+        const hasRangeB = rangeBStart && rangeBEnd;
+        const rangeCurrentStart = hasRangeA ? parseYmd(rangeAStart) : startOfMonth;
+        const rangeCurrentEnd = hasRangeA ? parseYmd(rangeAEnd) : now;
+        const rangePrevStart = hasRangeB ? parseYmd(rangeBStart) : startOfMonthLY;
+        const rangePrevEnd = hasRangeB ? parseYmd(rangeBEnd) : yesterdayLY;
+        const dayRange = {
+            current: processPeriod(dataForFilter, rangeCurrentStart, rangeCurrentEnd),
+            previous: processPeriod(dataForFilter, rangePrevStart, rangePrevEnd),
+        };
+
+        return { daily, mtd, ytd, monthly, dayRange };
+    }, [allMetrics, storeFilter, monthFilter, dailyDate, rangeAStart, rangeAEnd, rangeBStart, rangeBEnd]);
 
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const currentYear = new Date().getFullYear();
@@ -162,6 +184,11 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                 return renderComparisonSet(`Year-to-Date Comparison (YTD vs YTD Last Year)`, lflData.ytd);
             case 'monthly':
                 return renderComparisonSet(`Full Month Comparison (${months[monthFilter]} ${currentYear} vs ${previousYear})`, lflData.monthly);
+            case 'dayRange':
+                return renderComparisonSet(
+                    `Day Range Comparison (${rangeAStart || '—'} to ${rangeAEnd || '—'} vs ${rangeBStart || '—'} to ${rangeBEnd || '—'})`,
+                    lflData.dayRange
+                );
             default:
                 return null;
         }
@@ -195,6 +222,24 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                         <select value={monthFilter} onChange={e => setMonthFilter(Number(e.target.value))} className="input">
                             {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
                         </select>
+                    </div>
+                )}
+                {comparisonType === 'dayRange' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="label">Range A (Current):</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input type="date" value={rangeAStart} onChange={e => setRangeAStart(e.target.value)} className="input" />
+                                <input type="date" value={rangeAEnd} onChange={e => setRangeAEnd(e.target.value)} className="input" />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="label">Range B (Compare To):</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input type="date" value={rangeBStart} onChange={e => setRangeBStart(e.target.value)} className="input" />
+                                <input type="date" value={rangeBEnd} onChange={e => setRangeBEnd(e.target.value)} className="input" />
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
