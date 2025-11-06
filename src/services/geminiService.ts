@@ -4,9 +4,21 @@ import type { StoreSummary, DailyMetric, PredictionResult, EmployeeSummary } fro
 
 
 // Read Gemini API key strictly from env (GitHub Secrets at build time)
-const GEMINI_API_KEY = ((import.meta as any).env?.VITE_GEMINI_API_KEY) as string;
-if (!GEMINI_API_KEY) {
-    throw new Error('Missing VITE_GEMINI_API_KEY. Please set it in GitHub Secrets (and .env.local for local dev).');
+// Vite automatically loads .env.local in development mode and injects env vars at build time
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+
+// Better error handling with more context
+if (!GEMINI_API_KEY || GEMINI_API_KEY.trim() === '') {
+    const availableVars = Object.keys(import.meta.env).filter(k => k.startsWith('VITE_'));
+    const isProduction = import.meta.env.PROD;
+    const errorMsg = isProduction 
+        ? 'Missing VITE_GEMINI_API_KEY in GitHub Secrets. Please add it in Repository Settings → Secrets → Actions.'
+        : 'Missing VITE_GEMINI_API_KEY. Please set it in .env.local for local development.';
+    
+    console.error('❌ VITE_GEMINI_API_KEY is missing or empty');
+    console.error('Environment:', isProduction ? 'Production' : 'Development');
+    console.error('Available VITE_ env vars:', availableVars);
+    throw new Error(errorMsg);
 }
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
