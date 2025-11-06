@@ -23,6 +23,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify secrets are set
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+        run: |
+          echo "Checking if required secrets are set..."
+          if [ -z "$VITE_FIREBASE_API_KEY" ]; then
+            echo "❌ VITE_FIREBASE_API_KEY is not set"
+            exit 1
+          fi
+          if [ -z "$VITE_GEMINI_API_KEY" ]; then
+            echo "❌ VITE_GEMINI_API_KEY is not set"
+            exit 1
+          fi
+          echo "✅ All required secrets are set"
+          echo "Firebase API Key length: ${#VITE_FIREBASE_API_KEY}"
+          echo "Firebase API Key starts with: ${VITE_FIREBASE_API_KEY:0:4}"
+
       - name: Build project
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}

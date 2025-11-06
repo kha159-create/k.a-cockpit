@@ -42,19 +42,41 @@ if (missingVars.length > 0) {
   throw new Error(errorMsg);
 }
 
+// Trim all values to remove any whitespace (common issue with GitHub Secrets)
 const firebaseConfig = {
-  apiKey: requiredEnvVars.apiKey!,
-  authDomain: requiredEnvVars.authDomain!,
-  projectId: requiredEnvVars.projectId!,
-  storageBucket: requiredEnvVars.storageBucket!,
-  messagingSenderId: requiredEnvVars.messagingSenderId!,
-  appId: requiredEnvVars.appId!,
+  apiKey: requiredEnvVars.apiKey!.trim(),
+  authDomain: requiredEnvVars.authDomain!.trim(),
+  projectId: requiredEnvVars.projectId!.trim(),
+  storageBucket: requiredEnvVars.storageBucket!.trim(),
+  messagingSenderId: requiredEnvVars.messagingSenderId!.trim(),
+  appId: requiredEnvVars.appId!.trim(),
 };
 
-// Avoid logging secrets status in production
+// Debug: Log config status (without exposing full key) - in both dev and prod
+const apiKeyPreview = firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 10)}...` : 'MISSING';
+console.log('🔍 Firebase Config Status:', {
+  apiKey: apiKeyPreview,
+  apiKeyLength: firebaseConfig.apiKey?.length || 0,
+  authDomain: firebaseConfig.authDomain || 'MISSING',
+  projectId: firebaseConfig.projectId || 'MISSING',
+  env: import.meta.env.PROD ? 'Production' : 'Development',
+});
+
+// Validate API key format (should start with AIza and be ~39 chars)
+if (!firebaseConfig.apiKey.startsWith('AIza')) {
+  console.error('❌ Invalid Firebase API Key format. Key should start with "AIza"');
+  console.error('Key preview:', firebaseConfig.apiKey.substring(0, 20));
+  console.error('Key length:', firebaseConfig.apiKey.length);
+  console.error('Full key (first 30 chars):', firebaseConfig.apiKey.substring(0, 30));
+  throw new Error('Invalid Firebase API Key format. Please check GitHub Secrets.');
+}
+
+if (firebaseConfig.apiKey.length < 35 || firebaseConfig.apiKey.length > 45) {
+  console.warn('⚠️ Firebase API Key length seems unusual:', firebaseConfig.apiKey.length);
+  console.warn('Expected length: ~39 characters');
+}
 
 // Initialize Firebase
-
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
