@@ -17,7 +17,8 @@ export default defineConfig(({ mode }) => {
   };
   
   // Debug: Log environment variables during build (without exposing full values)
-  if (mode === 'production') {
+  // Check only in CI/CD (when process.env.CI is set), not in local builds
+  if (mode === 'production' && process.env.CI) {
     const requiredVars = [
       'VITE_FIREBASE_API_KEY',
       'VITE_FIREBASE_AUTH_DOMAIN',
@@ -28,8 +29,8 @@ export default defineConfig(({ mode }) => {
       'VITE_GEMINI_API_KEY',
     ];
     
-    console.log('🔍 Checking environment variables during build...');
-    console.log('Source: process.env (GitHub Actions) + .env files');
+    console.log('🔍 Checking environment variables during CI/CD build...');
+    console.log('Source: loadEnv() + process.env (GitHub Actions)');
     requiredVars.forEach(varName => {
       const value = env[varName];
       if (value) {
@@ -38,7 +39,9 @@ export default defineConfig(({ mode }) => {
           : value;
         console.log(`✅ ${varName}: ${preview}`);
       } else {
+        // In CI/CD, this is an error
         console.error(`❌ ${varName}: MISSING`);
+        console.error(`   Checked env[${varName}]: NOT FOUND`);
         console.error(`   Checked process.env.${varName}: ${process.env[varName] ? 'EXISTS' : 'NOT FOUND'}`);
       }
     });
