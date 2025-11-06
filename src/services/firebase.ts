@@ -4,6 +4,14 @@ import 'firebase/firestore';
 
 // Firebase configuration - must read from environment variables (GitHub Secrets at build time)
 // Vite automatically loads .env.local in development mode and injects env vars at build time
+// Debug: Log what import.meta.env contains
+console.log('🔍 import.meta.env check:', {
+  hasVITE_FIREBASE_API_KEY: !!import.meta.env.VITE_FIREBASE_API_KEY,
+  VITE_FIREBASE_API_KEY_type: typeof import.meta.env.VITE_FIREBASE_API_KEY,
+  VITE_FIREBASE_API_KEY_value: import.meta.env.VITE_FIREBASE_API_KEY ? `${String(import.meta.env.VITE_FIREBASE_API_KEY).substring(0, 10)}...` : 'undefined',
+  allViteKeys: Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')),
+});
+
 const requiredEnvVars = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
