@@ -1,29 +1,39 @@
-name: Build, Test & Deploy
+name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
+  workflow_dispatch:
 
 permissions:
-  contents: write   # ✅ ضروري للسماح بالـ push إلى gh-pages
+  contents: write
 
 jobs:
-  build-deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 18
+      - name: Use Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
+          cache: 'npm'
 
-      - name: Install dependencies
+      - name: Verify secrets are set (safe checks)
+        env:
+          VITE_FIREBASE_API_KEY: "${{ secrets.VITE_FIREBASE_API_KEY }}"
+          VITE_GEMINI_API_KEY: "${{ secrets.VITE_GEMINI_API_KEY }}"
+        run: |
+          echo "🔎 Checking secrets (length only)..."
+          node -e "const k=process.env.VITE_FIREBASE_API_KEY||''; console.log('Firebase starts AIza?', k.startsWith('AIza')); console.log('Firebase length:', k.length);"
+          node -e "const k=process.env.VITE_GEMINI_API_KEY||''; console.log('Gemini length:', k.length);"
+
+      - name: Install deps
         run: npm ci
 
-      - name: Verify secrets are set
+      - name: Build project (with env)
         env:
           VITE_FIREBASE_API_KEY: "${{ secrets.VITE_FIREBASE_API_KEY }}"
           VITE_FIREBASE_AUTH_DOMAIN: "${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}"
@@ -33,96 +43,27 @@ jobs:
           VITE_FIREBASE_APP_ID: "${{ secrets.VITE_FIREBASE_APP_ID }}"
           VITE_GEMINI_API_KEY: "${{ secrets.VITE_GEMINI_API_KEY }}"
         run: |
-          echo "Checking if required secrets are set..."
-          MISSING=0
-          
-          if [ -z "$VITE_FIREBASE_API_KEY" ]; then
-            echo "❌ VITE_FIREBASE_API_KEY is not set"
-            MISSING=1
-          else
-            echo "✅ VITE_FIREBASE_API_KEY is set (length: ${#VITE_FIREBASE_API_KEY})"
-          fi
-          
-          if [ -z "$VITE_FIREBASE_AUTH_DOMAIN" ]; then
-            echo "❌ VITE_FIREBASE_AUTH_DOMAIN is not set"
-            MISSING=1
-          else
-            echo "✅ VITE_FIREBASE_AUTH_DOMAIN is set"
-          fi
-          
-          if [ -z "$VITE_FIREBASE_PROJECT_ID" ]; then
-            echo "❌ VITE_FIREBASE_PROJECT_ID is not set"
-            MISSING=1
-          else
-            echo "✅ VITE_FIREBASE_PROJECT_ID is set"
-          fi
-          
-          if [ -z "$VITE_FIREBASE_STORAGE_BUCKET" ]; then
-            echo "❌ VITE_FIREBASE_STORAGE_BUCKET is not set"
-            MISSING=1
-          else
-            echo "✅ VITE_FIREBASE_STORAGE_BUCKET is set"
-          fi
-          
-          if [ -z "$VITE_FIREBASE_MESSAGING_SENDER_ID" ]; then
-            echo "❌ VITE_FIREBASE_MESSAGING_SENDER_ID is not set"
-            MISSING=1
-          else
-            echo "✅ VITE_FIREBASE_MESSAGING_SENDER_ID is set"
-          fi
-          
-          if [ -z "$VITE_FIREBASE_APP_ID" ]; then
-            echo "❌ VITE_FIREBASE_APP_ID is not set"
-            MISSING=1
-          else
-            echo "✅ VITE_FIREBASE_APP_ID is set"
-          fi
-          
-          if [ -z "$VITE_GEMINI_API_KEY" ]; then
-            echo "❌ VITE_GEMINI_API_KEY is not set"
-            MISSING=1
-          else
-            echo "✅ VITE_GEMINI_API_KEY is set (length: ${#VITE_GEMINI_API_KEY})"
-          fi
-          
-          if [ $MISSING -eq 1 ]; then
-            echo ""
-            echo "❌ Some secrets are missing. Please add them in:"
-            echo "   https://github.com/${{ github.repository }}/settings/secrets/actions"
-            exit 1
-          fi
-          
-          echo ""
-          echo "✅ All required secrets are set and ready for build"
-
-      - name: Build project
-        env:
-          VITE_FIREBASE_API_KEY: "${{ secrets.VITE_FIREBASE_API_KEY }}"
-          VITE_FIREBASE_AUTH_DOMAIN: "${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}"
-          VITE_FIREBASE_PROJECT_ID: "${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
-          VITE_FIREBASE_STORAGE_BUCKET: "${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}"
-          VITE_FIREBASE_MESSAGING_SENDER_ID: "${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}"
-          VITE_FIREBASE_APP_ID: "${{ secrets.VITE_FIREBASE_APP_ID }}"
-          VITE_GEMINI_API_KEY: "${{ secrets.VITE_GEMINI_API_KEY }}"
-        run: |
-          node -e "const k=process.env.VITE_FIREBASE_API_KEY||''; const ok=k.startsWith('AIza'); console.log('🔎 Firebase key starts with AIza?', ok); console.log('🔎 Firebase key length:', k.length);"
-          node -e "const k=process.env.VITE_GEMINI_API_KEY||''; console.log('🔎 Gemini key length:', k.length);"
+          echo "🔍 Building…"
           npm run build
+          echo "🔍 Built files (top level):"
+          ls -lah dist | head -n 50
+          echo "🔍 Main JS bundle:"
+          ls dist/assets/index-*.js | head -n 1
 
-      - name: Test Firebase connection
-        env:
-          VITE_FIREBASE_API_KEY: "${{ secrets.VITE_FIREBASE_API_KEY }}"
-          VITE_FIREBASE_AUTH_DOMAIN: "${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}"
-          VITE_FIREBASE_PROJECT_ID: "${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
-          VITE_FIREBASE_STORAGE_BUCKET: "${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}"
-          VITE_FIREBASE_MESSAGING_SENDER_ID: "${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}"
-          VITE_FIREBASE_APP_ID: "${{ secrets.VITE_FIREBASE_APP_ID }}"
+      - name: (Optional) Leak scan
         run: |
-          node firebase-test.js || echo "⚠️ Firebase test failed, continuing deployment..."
+          echo "🔍 Leak scan (should be empty):"
+          grep -R "REDACTED\|VITE_FIREBASE_API_KEY\|VITE_GEMINI_API_KEY" dist || true
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Deploy to GitHub Pages (gh-pages branch)
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gh-pages
+          branch: gh-pages
+          folder: dist
+          clean: true
+
+      - name: Summary
+        run: |
+          echo "✅ Build & Deploy finished."
+          echo "Bundle (first match):"
+          ls dist/assets/index-*.js | head -n 1

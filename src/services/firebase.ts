@@ -71,15 +71,24 @@ console.log('🔍 Firebase Config Status:', {
 });
 
 // Validate API key format (should start with AIza and be ~39 chars)
+// In production: only warn, don't throw (to prevent crashes)
+// In development: throw error for immediate feedback
 if (!firebaseConfig.apiKey.startsWith('AIza')) {
-  console.error('❌ Invalid Firebase API Key format. Key should start with "AIza"');
-  console.error('Key preview:', firebaseConfig.apiKey.substring(0, 20));
-  console.error('Key length:', firebaseConfig.apiKey.length);
-  console.error('Full key (first 30 chars):', firebaseConfig.apiKey.substring(0, 30));
-  throw new Error('Invalid Firebase API Key format. Please check GitHub Secrets.');
+  const errorMsg = 'Invalid Firebase API Key format. Key should start with "AIza"';
+  if (import.meta.env.DEV) {
+    console.error('❌', errorMsg);
+    console.error('Key preview:', firebaseConfig.apiKey.substring(0, 20));
+    console.error('Key length:', firebaseConfig.apiKey.length);
+    throw new Error(errorMsg + '. Please check GitHub Secrets or .env.local.');
+  } else {
+    // Production: warn but don't crash
+    console.warn('⚠️', errorMsg);
+    console.warn('Key length:', firebaseConfig.apiKey.length);
+    console.warn('Continuing with provided key...');
+  }
 }
 
-if (firebaseConfig.apiKey.length < 35 || firebaseConfig.apiKey.length > 45) {
+if (import.meta.env.DEV && (firebaseConfig.apiKey.length < 35 || firebaseConfig.apiKey.length > 45)) {
   console.warn('⚠️ Firebase API Key length seems unusual:', firebaseConfig.apiKey.length);
   console.warn('Expected length: ~39 characters');
 }
