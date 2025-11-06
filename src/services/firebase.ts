@@ -2,14 +2,53 @@ import firebase from 'firebase/app';
 import 'firebase/auth';
 import 'firebase/firestore';
 
-// Firebase configuration using environment variables with fallbacks
+// Firebase configuration - must read from environment variables (GitHub Secrets at build time)
+// Vite automatically loads .env.local in development mode and injects env vars at build time
+const requiredEnvVars = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID as string | undefined,
+};
+
+// Validate required environment variables
+const envVarMap: Record<string, string> = {
+  apiKey: 'VITE_FIREBASE_API_KEY',
+  authDomain: 'VITE_FIREBASE_AUTH_DOMAIN',
+  projectId: 'VITE_FIREBASE_PROJECT_ID',
+  storageBucket: 'VITE_FIREBASE_STORAGE_BUCKET',
+  messagingSenderId: 'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  appId: 'VITE_FIREBASE_APP_ID',
+};
+
+const missingVars: string[] = [];
+Object.entries(requiredEnvVars).forEach(([key, value]) => {
+  if (!value || value.trim() === '') {
+    missingVars.push(envVarMap[key]);
+  }
+});
+
+if (missingVars.length > 0) {
+  const isProduction = import.meta.env.PROD;
+  const errorMsg = isProduction
+    ? `Missing Firebase env vars in GitHub Secrets: ${missingVars.join(', ')}. Please add them in Repository Settings → Secrets → Actions.`
+    : `Missing Firebase env vars in .env.local: ${missingVars.join(', ')}. Please set them for local development.`;
+  
+  console.error('❌ Firebase configuration is incomplete');
+  console.error('Environment:', isProduction ? 'Production' : 'Development');
+  console.error('Missing variables:', missingVars);
+  throw new Error(errorMsg);
+}
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD7p6iK1b0lG7sGP187VU7tBlTZyGo1wBA",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "alsani-cockpit-v3.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "alsani-cockpit-v3",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "alsani-cockpit-v3.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1055161240393",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1055161240393:web:64428acfb48922fbc76898"
+  apiKey: requiredEnvVars.apiKey!,
+  authDomain: requiredEnvVars.authDomain!,
+  projectId: requiredEnvVars.projectId!,
+  storageBucket: requiredEnvVars.storageBucket!,
+  messagingSenderId: requiredEnvVars.messagingSenderId!,
+  appId: requiredEnvVars.appId!,
 };
 
 // Avoid logging secrets status in production
