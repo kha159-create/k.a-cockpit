@@ -12,11 +12,7 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1055161240393:web:64428acfb48922fbc76898"
 };
 
-// Log environment variable status
-console.log('🔍 Firebase Environment Variables:');
-console.log('API Key:', import.meta.env.VITE_FIREBASE_API_KEY ? '✅ Set from env' : '⚠️ Using fallback');
-console.log('Auth Domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? '✅ Set from env' : '⚠️ Using fallback');
-console.log('Project ID:', import.meta.env.VITE_FIREBASE_PROJECT_ID ? '✅ Set from env' : '⚠️ Using fallback');
+// Avoid logging secrets status in production
 
 // Initialize Firebase
 
