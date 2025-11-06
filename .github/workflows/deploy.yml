@@ -25,13 +25,13 @@ jobs:
 
       - name: Verify secrets are set
         env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_FIREBASE_API_KEY: "${{ secrets.VITE_FIREBASE_API_KEY }}"
+          VITE_FIREBASE_AUTH_DOMAIN: "${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}"
+          VITE_FIREBASE_PROJECT_ID: "${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
+          VITE_FIREBASE_STORAGE_BUCKET: "${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}"
+          VITE_FIREBASE_APP_ID: "${{ secrets.VITE_FIREBASE_APP_ID }}"
+          VITE_GEMINI_API_KEY: "${{ secrets.VITE_GEMINI_API_KEY }}"
         run: |
           echo "Checking if required secrets are set..."
           MISSING=0
@@ -40,7 +40,7 @@ jobs:
             echo "❌ VITE_FIREBASE_API_KEY is not set"
             MISSING=1
           else
-            echo "✅ VITE_FIREBASE_API_KEY is set (length: ${#VITE_FIREBASE_API_KEY}, starts with: ${VITE_FIREBASE_API_KEY:0:4})"
+            echo "✅ VITE_FIREBASE_API_KEY is set (length: ${#VITE_FIREBASE_API_KEY})"
           fi
           
           if [ -z "$VITE_FIREBASE_AUTH_DOMAIN" ]; then
@@ -82,7 +82,7 @@ jobs:
             echo "❌ VITE_GEMINI_API_KEY is not set"
             MISSING=1
           else
-            echo "✅ VITE_GEMINI_API_KEY is set"
+            echo "✅ VITE_GEMINI_API_KEY is set (length: ${#VITE_GEMINI_API_KEY})"
           fi
           
           if [ $MISSING -eq 1 ]; then
@@ -97,23 +97,26 @@ jobs:
 
       - name: Build project
         env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
-        run: npm run build
+          VITE_FIREBASE_API_KEY: "${{ secrets.VITE_FIREBASE_API_KEY }}"
+          VITE_FIREBASE_AUTH_DOMAIN: "${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}"
+          VITE_FIREBASE_PROJECT_ID: "${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
+          VITE_FIREBASE_STORAGE_BUCKET: "${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}"
+          VITE_FIREBASE_APP_ID: "${{ secrets.VITE_FIREBASE_APP_ID }}"
+          VITE_GEMINI_API_KEY: "${{ secrets.VITE_GEMINI_API_KEY }}"
+        run: |
+          node -e "const k=process.env.VITE_FIREBASE_API_KEY||''; const ok=k.startsWith('AIza'); console.log('🔎 Firebase key starts with AIza?', ok); console.log('🔎 Firebase key length:', k.length);"
+          node -e "const k=process.env.VITE_GEMINI_API_KEY||''; console.log('🔎 Gemini key length:', k.length);"
+          npm run build
 
       - name: Test Firebase connection
         env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_API_KEY: "${{ secrets.VITE_FIREBASE_API_KEY }}"
+          VITE_FIREBASE_AUTH_DOMAIN: "${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}"
+          VITE_FIREBASE_PROJECT_ID: "${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
+          VITE_FIREBASE_STORAGE_BUCKET: "${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}"
+          VITE_FIREBASE_APP_ID: "${{ secrets.VITE_FIREBASE_APP_ID }}"
         run: |
           node firebase-test.js || echo "⚠️ Firebase test failed, continuing deployment..."
 
