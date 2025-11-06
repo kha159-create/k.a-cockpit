@@ -5,7 +5,16 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '')
+  // Load env vars from .env files AND process.env (for GitHub Actions)
+  // process.env takes precedence for CI/CD environments
+  const env = {
+    ...loadEnv(mode, '.', ''),
+    ...Object.fromEntries(
+      Object.entries(process.env)
+        .filter(([key]) => key.startsWith('VITE_'))
+        .map(([key, value]) => [key, value || ''])
+    ),
+  };
   
   // Debug: Log environment variables during build (without exposing full values)
   if (mode === 'production') {
@@ -20,8 +29,9 @@ export default defineConfig(({ mode }) => {
     ];
     
     console.log('🔍 Checking environment variables during build...');
+    console.log('Source: process.env (GitHub Actions) + .env files');
     requiredVars.forEach(varName => {
-      const value = env[varName] || process.env[varName];
+      const value = env[varName];
       if (value) {
         const preview = varName.includes('KEY') 
           ? `${value.substring(0, 10)}...` 
@@ -29,6 +39,7 @@ export default defineConfig(({ mode }) => {
         console.log(`✅ ${varName}: ${preview}`);
       } else {
         console.error(`❌ ${varName}: MISSING`);
+        console.error(`   Checked process.env.${varName}: ${process.env[varName] ? 'EXISTS' : 'NOT FOUND'}`);
       }
     });
   }
@@ -47,9 +58,8 @@ export default defineConfig(({ mode }) => {
         }
       }
     },
-    define: {
-      // Environment variables are loaded automatically by Vite
-    },
+    // Vite automatically injects process.env.VITE_* into import.meta.env during build
+    // No need for explicit define - Vite handles this automatically
     envPrefix: 'VITE_',
     resolve: {
       alias: {
