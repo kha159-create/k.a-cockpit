@@ -173,8 +173,11 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       'Medium Value (495-695)': 0,
       'High Value (795-999)': 0,
     };
-    const duvetProducts = productSummary.filter(p => {
+    const duvetProducts = filteredProducts.filter(p => {
       const category = getCategory(p);
+      if (filters.category === 'Duvets' || filters.category === 'Duvets Full') {
+        return category === filters.category;
+      }
       return category === 'Duvets' || category === 'Duvets Full';
     });
 
@@ -208,7 +211,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         breakdown: duvetBreakdown,
       },
     };
-  }, [allDateData, allStores, areaStoreFilter, dateFilter, filteredProducts, productSummary]);
+  }, [allDateData, allStores, areaStoreFilter, dateFilter, filteredProducts, filters.category]);
 
   // ===== Cross-Selling (Frequently Sold Together) =====
   type PairKey = string;
