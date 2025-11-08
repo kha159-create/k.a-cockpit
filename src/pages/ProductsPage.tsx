@@ -163,9 +163,52 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     });
     const categoryShare = Array.from(categoryMap.entries()).map(([name, value]) => ({ name, value }));
 
+    const duvetLabels: Array<'Low Value (199-399)' | 'Medium Value (495-695)' | 'High Value (795-999)'> = [
+      'Low Value (199-399)',
+      'Medium Value (495-695)',
+      'High Value (795-999)',
+    ];
+    const duvetBuckets: Record<typeof duvetLabels[number], number> = {
+      'Low Value (199-399)': 0,
+      'Medium Value (495-695)': 0,
+      'High Value (795-999)': 0,
+    };
+    const isDuvetSale = (sale: any) => {
+      const alias = String(sale['Item Alias'] || '').toUpperCase();
+      const name = String(sale['Item Name'] || '').toUpperCase();
+      return alias.startsWith('4') || name.includes('COMFORTER') || name.includes('DUVET');
+    };
+    const getDuvetBand = (rate: number): typeof duvetLabels[number] | null => {
+      if (rate >= 199 && rate <= 399) return 'Low Value (199-399)';
+      if (rate >= 495 && rate <= 695) return 'Medium Value (495-695)';
+      if (rate >= 795 && rate <= 999) return 'High Value (795-999)';
+      return null;
+    };
+
+    let totalDuvetUnits = 0;
+    currentMonth.forEach(sale => {
+      if (!isDuvetSale(sale)) return;
+      const rate = Number(sale['Item Rate'] || 0);
+      const category = getDuvetBand(rate);
+      if (!category) return;
+      const qty = Number(sale['Sold Qty'] || 0);
+      duvetBuckets[category] += qty;
+      totalDuvetUnits += qty;
+    });
+
+    const duvetBreakdown = duvetLabels.map(label => ({
+      name: label,
+      units: duvetBuckets[label],
+      percentage: totalDuvetUnits > 0 ? (duvetBuckets[label] / totalDuvetUnits) * 100 : 0,
+    }));
+
     return {
       totalQty, totalValue, best, weak, avgDaily, monthlyGrowth,
       charts: { top10, monthlyTrend, categoryShare },
+      duvetAnalysis: {
+        totalUnits: totalDuvetUnits,
+        breakdown: duvetBreakdown,
+      },
     };
   }, [allDateData, allStores, areaStoreFilter, dateFilter, filteredProducts]);
 
@@ -337,52 +380,77 @@ Use short sentences. Output in Arabic.` }]}
       </div>
       
       {/* Summary Dashboard (below Products Overview table) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <div className="text-xs text-zinc-500 mb-1">Total Products Sold (MTD)</div>
-          <div className="text-2xl font-bold">{summary.totalQty.toLocaleString('en-US')}</div>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <div className="text-xs text-zinc-500 mb-1">Total Sales Value (MTD)</div>
-          <div className="text-2xl font-bold">{summary.totalValue.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <div className="text-xs text-zinc-500 mb-1">Best Performing Product</div>
-          <div className="text-sm font-semibold truncate" title={summary.best?.name || ''}>{summary.best?.name || '-'}</div>
-          <div className="text-green-600 text-xs">{summary.best ? `${summary.best.growth.toFixed(1)}%` : '-'}</div>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <div className="text-xs text-zinc-500 mb-1">Weakest Performing Product</div>
-          <div className="text-sm font-semibold truncate" title={summary.weak?.name || ''}>{summary.weak?.name || '-'}</div>
-          <div className="text-red-600 text-xs">{summary.weak ? `${summary.weak.growth.toFixed(1)}%` : '-'}</div>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <div className="text-xs text-zinc-500 mb-1">Average Daily Sales</div>
-          <div className="text-2xl font-bold">{summary.avgDaily.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Total Products Sold (MTD)</div>
+            <div className="text-2xl font-bold">{summary.totalQty.toLocaleString('en-US')}</div>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Total Sales Value (MTD)</div>
+            <div className="text-2xl font-bold">{summary.totalValue.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Best Performing Product</div>
+            <div className="text-sm font-semibold truncate" title={summary.best?.name || ''}>{summary.best?.name || '-'}</div>
+            <div className="text-green-600 text-xs">{summary.best ? `${summary.best.growth.toFixed(1)}%` : '-'}</div>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Weakest Performing Product</div>
+            <div className="text-sm font-semibold truncate" title={summary.weak?.name || ''}>{summary.weak?.name || '-'}</div>
+            <div className="text-red-600 text-xs">{summary.weak ? `${summary.weak.growth.toFixed(1)}%` : '-'}</div>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border">
+            <div className="text-xs text-zinc-500 mb-1">Average Daily Sales</div>
+            <div className="text-2xl font-bold">{summary.avgDaily.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</div>
+          </div>
         <div className={`bg-white p-4 rounded-xl shadow-sm border`}>
-          <div className="text-xs text-zinc-500 mb-1">Monthly Growth Rate</div>
-          <div className={`text-2xl font-bold ${summary.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{`${summary.monthlyGrowth.toFixed(1)}%`}</div>
+            <div className="text-xs text-zinc-500 mb-1">Monthly Growth Rate</div>
+            <div className={`text-2xl font-bold ${summary.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{`${summary.monthlyGrowth.toFixed(1)}%`}</div>
+          </div>
         </div>
-      </div>
 
       {/* Charts (below Products Overview table) */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-1">
-          <ChartCard title="Top 10 Selling Products">
-            <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
-          </ChartCard>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-1">
+            <ChartCard title="Top 10 Selling Products">
+              <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
+            </ChartCard>
+          </div>
+          <div className="xl:col-span-1">
+            <ChartCard title="Category Share">
+              <PieChart data={summary.charts.categoryShare} />
+            </ChartCard>
+          </div>
+          <div className="xl:col-span-1">
+            <ChartCard title="Monthly Sales Trend">
+              <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
+            </ChartCard>
+          </div>
         </div>
-        <div className="xl:col-span-1">
-          <ChartCard title="Category Share">
-            <PieChart data={summary.charts.categoryShare} />
-          </ChartCard>
+      <div>
+        <ChartCard title="Duvet Sales Analysis by Value">
+          <div className="space-y-3 p-1">
+            {summary.duvetAnalysis.totalUnits > 0 ? (
+              summary.duvetAnalysis.breakdown.map(item => (
+                <div key={item.name}>
+                  <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
+                    <span>{item.name}</span>
+                    <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
         </div>
-        <div className="xl:col-span-1">
-          <ChartCard title="Monthly Sales Trend">
-            <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
-          </ChartCard>
-        </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
+              </div>
+              </div>
+              ))
+            ) : (
+              <p className="text-center text-zinc-500 text-sm">No duvet sales data for this period.</p>
+            )}
+            <div className="pt-2 border-t border-gray-200 text-xs flex justify-between">
+              <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
+              <span className="font-bold text-zinc-900">{summary.duvetAnalysis.totalUnits}</span>
+            </div>
+          </div>
+        </ChartCard>
       </div>
 
       {/* Cross-Selling Analytics */}
