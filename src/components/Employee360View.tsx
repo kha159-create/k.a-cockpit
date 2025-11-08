@@ -34,16 +34,32 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
             const itemTimestamp = 'date' in item ? item.date : item['Bill Dt.'];
             if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
             const itemDate = itemTimestamp.toDate();
-
-            const yearMatch = dateFilter.year === 'all' || itemDate.getUTCFullYear() === dateFilter.year;
-            const monthMatch = dateFilter.month === 'all' || itemDate.getUTCMonth() === dateFilter.month;
-            if (!yearMatch || !monthMatch) return yearMatch && monthMatch;
+            const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
 
             const mode = dateFilter.mode ?? 'single';
+            const parseIsoDate = (value?: string | null) => {
+                if (!value) return null;
+                const [y, mValue, d] = value.split('-').map(Number);
+                if ([y, mValue, d].some(num => Number.isNaN(num))) return null;
+                return new Date(Date.UTC(y, (mValue || 1) - 1, d || 1));
+            };
+
+            if (mode === 'custom') {
+                const start = parseIsoDate(dateFilter.customStartDate);
+                const end = parseIsoDate(dateFilter.customEndDate);
+                if (start && normalizedDate < start) return false;
+                if (end && normalizedDate > end) return false;
+                return true;
+            }
+
+            const yearMatch = dateFilter.year === 'all' || normalizedDate.getUTCFullYear() === dateFilter.year;
+            const monthMatch = dateFilter.month === 'all' || normalizedDate.getUTCMonth() === dateFilter.month;
+            if (!yearMatch || !monthMatch) return yearMatch && monthMatch;
+
             if (mode === 'range' && dateFilter.month !== 'all' && dateFilter.year !== 'all') {
                 const from = dateFilter.dayFrom === undefined ? 'all' : dateFilter.dayFrom;
                 const to = dateFilter.dayTo === undefined ? 'all' : dateFilter.dayTo;
-                const d = itemDate.getUTCDate();
+                const d = normalizedDate.getUTCDate();
                 if (from === 'all' && to === 'all') return true;
                 if (from === 'all' && typeof to === 'number') return d <= to;
                 if (typeof from === 'number' && to === 'all') return d >= from;
@@ -55,7 +71,7 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
                 return true;
             }
 
-            const dayMatch = dateFilter.day === 'all' || itemDate.getUTCDate() === dateFilter.day;
+            const dayMatch = dateFilter.day === 'all' || normalizedDate.getUTCDate() === dateFilter.day;
             return yearMatch && monthMatch && dayMatch;
         };
 

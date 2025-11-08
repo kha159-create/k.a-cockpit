@@ -112,18 +112,33 @@ export const useDataProcessing = ({
         const itemTimestamp = 'date' in item ? item.date : item['Bill Dt.'];
         if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false; // Check if it's a valid Timestamp
         const itemDate = itemTimestamp.toDate();
+        const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
 
-        const yearMatch = dateFilter.year === 'all' || itemDate.getUTCFullYear() === dateFilter.year;
-        const monthMatch = dateFilter.month === 'all' || itemDate.getUTCMonth() === dateFilter.month;
-
-        // Range-aware day matching
         const mode = dateFilter.mode ?? 'single';
+        const parseIsoDate = (value?: string | null) => {
+            if (!value) return null;
+            const [y, m, d] = value.split('-').map(Number);
+            if ([y, m, d].some(num => Number.isNaN(num))) return null;
+            return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+        };
+
+        if (mode === 'custom') {
+            const start = parseIsoDate(dateFilter.customStartDate);
+            const end = parseIsoDate(dateFilter.customEndDate);
+            if (start && normalizedDate < start) return false;
+            if (end && normalizedDate > end) return false;
+            return true;
+        }
+
+        const yearMatch = dateFilter.year === 'all' || normalizedDate.getUTCFullYear() === dateFilter.year;
+        const monthMatch = dateFilter.month === 'all' || normalizedDate.getUTCMonth() === dateFilter.month;
+
         if (!yearMatch || !monthMatch) return yearMatch && monthMatch; // early exit
 
         if (mode === 'range' && dateFilter.month !== 'all' && dateFilter.year !== 'all') {
             const from = dateFilter.dayFrom === undefined ? 'all' : dateFilter.dayFrom;
             const to = dateFilter.dayTo === undefined ? 'all' : dateFilter.dayTo;
-            const itemDay = itemDate.getUTCDate();
+            const itemDay = normalizedDate.getUTCDate();
             if (from === 'all' && to === 'all') return true;
             if (from === 'all' && typeof to === 'number') return itemDay <= to;
             if (typeof from === 'number' && to === 'all') return itemDay >= from;
@@ -133,10 +148,10 @@ export const useDataProcessing = ({
                 return itemDay >= min && itemDay <= max;
             }
             return true;
-        } else {
-            const dayMatch = dateFilter.day === 'all' || itemDate.getUTCDate() === dateFilter.day;
-            return yearMatch && monthMatch && dayMatch;
         }
+
+        const dayMatch = dateFilter.day === 'all' || normalizedDate.getUTCDate() === dateFilter.day;
+        return yearMatch && monthMatch && dayMatch;
     };
     const combinedSales = [...roleFilteredData.salesTransactions, ...roleFilteredData.kingDuvetSales];
     const filteredCombinedSales = combinedSales.filter(filterByDate);

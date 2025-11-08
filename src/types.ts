@@ -73,9 +73,11 @@ export interface DateFilter {
   month: number | 'all';
   day: number | 'all';
   // Optional enhanced range controls
-  mode?: 'single' | 'range';
+  mode?: 'single' | 'range' | 'custom';
   dayFrom?: number | 'all';
   dayTo?: number | 'all';
+  customStartDate?: string | null; // YYYY-MM-DD
+  customEndDate?: string | null;   // YYYY-MM-DD
 }
 
 export interface AreaStoreFilterState {
