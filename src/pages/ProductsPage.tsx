@@ -173,11 +173,11 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       'Medium Value (495-695)': 0,
       'High Value (795-999)': 0,
     };
-    const isDuvetSale = (sale: any) => {
-      const alias = String(sale['Item Alias'] || '').toUpperCase();
-      const name = String(sale['Item Name'] || '').toUpperCase();
-      return alias.startsWith('4') || name.includes('COMFORTER') || name.includes('DUVET');
-    };
+    const duvetProducts = productSummary.filter(p => {
+      const category = getCategory(p);
+      return category === 'Duvets' || category === 'Duvets Full';
+    });
+
     const getDuvetBand = (rate: number): typeof duvetLabels[number] | null => {
       if (rate >= 199 && rate <= 399) return 'Low Value (199-399)';
       if (rate >= 495 && rate <= 695) return 'Medium Value (495-695)';
@@ -186,12 +186,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     };
 
     let totalDuvetUnits = 0;
-    currentMonth.forEach(sale => {
-      if (!isDuvetSale(sale)) return;
-      const rate = Number(sale['Item Rate'] || 0);
-      const category = getDuvetBand(rate);
+    duvetProducts.forEach(product => {
+      const category = getDuvetBand(product.price || 0);
       if (!category) return;
-      const qty = Number(sale['Sold Qty'] || 0);
+      const qty = product.soldQty || 0;
       duvetBuckets[category] += qty;
       totalDuvetUnits += qty;
     });
@@ -210,7 +208,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         breakdown: duvetBreakdown,
       },
     };
-  }, [allDateData, allStores, areaStoreFilter, dateFilter, filteredProducts]);
+  }, [allDateData, allStores, areaStoreFilter, dateFilter, filteredProducts, productSummary]);
 
   // ===== Cross-Selling (Frequently Sold Together) =====
   type PairKey = string;
