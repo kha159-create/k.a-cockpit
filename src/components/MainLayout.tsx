@@ -744,6 +744,7 @@ const handleNotificationClick = (notificationId: string) => {
            employeeSummaries={Object.values(processedData.employeeSummary).flat()}
            storeSummaries={processedData.storeSummary}
            duvetSummary={processedData.duvetSummary}
+          employeeDuvetSales={processedData.employeeDuvetSales}
            employees={employees}
            dateFilter={dateFilter}
          />

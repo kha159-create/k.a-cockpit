@@ -316,6 +316,21 @@ export const useDataProcessing = ({
       }, {} as DuvetSummary);
   }, [areaFilteredData.duvetSales]);
   
+  const employeeDuvetSales = useMemo(() => {
+      return areaFilteredData.duvetSales.reduce<{ byEmployeeId: Record<string, number>; byEmployeeName: Record<string, number> }>((acc, sale) => {
+          const qty = Number(sale['Sold Qty'] || 0);
+          const empId = sale.employeeId;
+          const empName = sale['SalesMan Name'];
+          if (empId) {
+              acc.byEmployeeId[empId] = (acc.byEmployeeId[empId] || 0) + qty;
+          }
+          if (empName) {
+              acc.byEmployeeName[empName] = (acc.byEmployeeName[empName] || 0) + qty;
+          }
+          return acc;
+      }, { byEmployeeId: {}, byEmployeeName: {} });
+  }, [areaFilteredData.duvetSales]);
+  
   const commissionData = useMemo((): CommissionStoreData[] => {
       const data: { [key: string]: CommissionStoreData } = {};
       // FIX: Cast the result of flat() to EmployeeSummary[] to resolve type inference issue.
@@ -415,5 +430,5 @@ export const useDataProcessing = ({
     }));
 }, [areaFilteredData.metrics, areaFilteredData.stores, dateFilter]);
 
-  return { kpiData, storeSummary, employeeSummary, productSummary, duvetSummary, commissionData, salesPerformance };
+  return { kpiData, storeSummary, employeeSummary, productSummary, duvetSummary, employeeDuvetSales, commissionData, salesPerformance };
 };

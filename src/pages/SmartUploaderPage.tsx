@@ -12,6 +12,7 @@ interface SmartUploaderPageProps {
   employeeSummaries: EmployeeSummary[];
   storeSummaries: StoreSummary[];
   duvetSummary: DuvetSummary;
+  employeeDuvetSales: { byEmployeeId: Record<string, number>; byEmployeeName: Record<string, number> };
   employees: Employee[];
   dateFilter: DateFilter;
 }
@@ -34,6 +35,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
   employeeSummaries,
   storeSummaries,
   duvetSummary,
+  employeeDuvetSales,
   employees,
   dateFilter
 }) => {
@@ -105,20 +107,47 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     return map;
   }, [employees, allowedStoreNames, dateFilter]);
 
+  const employeeLookup = useMemo(() => {
+    const byId = new Map<string, Employee>();
+    const byEmployeeId = new Map<string, Employee>();
+    const byName = new Map<string, Employee>();
+    employees.forEach(emp => {
+      if (emp.id) byId.set(emp.id, emp);
+      if (emp.employeeId) byEmployeeId.set(emp.employeeId, emp);
+      if (emp.name) byName.set(emp.name, emp);
+    });
+    return { byId, byEmployeeId, byName };
+  }, [employees]);
+
   const sortedEmployeeRows = useMemo(() => {
-    const rows = employeeSummaries.map((emp, index) => ({
-      idx: index + 1,
-      name: emp.name,
-      store: emp.store || '-',
-      salesTarget: emp.effectiveTarget || 0,
-      salesAchieved: emp.totalSales || 0,
-      achievementPercent: (emp.achievement || 0) / 100,
-    }));
+    const rows = employeeSummaries.map((emp, index) => {
+      const sourceEmployee =
+        employeeLookup.byId.get(emp.id) ||
+        (emp.employeeId ? employeeLookup.byEmployeeId.get(emp.employeeId) : undefined) ||
+        employeeLookup.byName.get(emp.name);
+
+      const duvetTarget = extractTargetForPeriod(sourceEmployee?.duvetTargets);
+      const duvetUnitsById = emp.employeeId ? employeeDuvetSales.byEmployeeId[emp.employeeId] : undefined;
+      const duvetUnits = (duvetUnitsById ?? employeeDuvetSales.byEmployeeName[emp.name] ?? 0);
+      const duvetAchievementPercent = duvetTarget > 0 ? duvetUnits / duvetTarget : 0;
+
+      return {
+        idx: index + 1,
+        name: emp.name,
+        store: emp.store || '-',
+        salesTarget: emp.effectiveTarget || 0,
+        salesAchieved: emp.totalSales || 0,
+        achievementPercent: (emp.achievement || 0) / 100,
+        duvetTarget,
+        duvetUnits,
+        duvetAchievementPercent,
+      };
+    });
     return rows.sort((a, b) => {
       if (a.store === b.store) return a.name.localeCompare(b.name);
       return a.store.localeCompare(b.store);
     });
-  }, [employeeSummaries]);
+  }, [employeeSummaries, employeeLookup, employeeDuvetSales, dateFilter]);
 
   const storeReportRows = useMemo(() => {
     return storeSummaries.map((store, index) => {
@@ -204,7 +233,17 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     }
 
     const { headerStyle, titleStyle, subtitleStyle, totalStyle } = buildWorkbookStyles();
-    const header = ['#', 'Employee', 'Store', 'Sales Target (SAR)', 'Sales Achieved (SAR)', 'Target Achievement %'];
+    const header = [
+      '#',
+      'Employee',
+      'Store',
+      'Sales Target (SAR)',
+      'Sales Achieved (SAR)',
+      'Target Achievement %',
+      'Duvet Target (Units)',
+      'Duvet Sales (Units)',
+      'Duvet Achievement %',
+    ];
 
     const data: (string | number | null)[][] = [
       ['Employee Performance Report'],
@@ -221,6 +260,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         row.salesTarget,
         row.salesAchieved,
         row.achievementPercent,
+        row.duvetTarget,
+        row.duvetUnits,
+        row.duvetAchievementPercent,
       ]);
     });
 
@@ -228,7 +270,10 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     const totalTarget = sortedEmployeeRows.reduce((sum, row) => sum + row.salesTarget, 0);
     const totalSales = sortedEmployeeRows.reduce((sum, row) => sum + row.salesAchieved, 0);
     const totalAchievement = totalTarget > 0 ? totalSales / totalTarget : 0;
-    data.push(['Totals', null, null, totalTarget, totalSales, totalAchievement]);
+    const totalDuvetTarget = sortedEmployeeRows.reduce((sum, row) => sum + row.duvetTarget, 0);
+    const totalDuvetUnits = sortedEmployeeRows.reduce((sum, row) => sum + row.duvetUnits, 0);
+    const totalDuvetAchievement = totalDuvetTarget > 0 ? totalDuvetUnits / totalDuvetTarget : 0;
+    data.push(['Totals', null, null, totalTarget, totalSales, totalAchievement, totalDuvetTarget, totalDuvetUnits, totalDuvetAchievement]);
 
     const ws = XLSX.utils.aoa_to_sheet(data);
     ws['!cols'] = [
@@ -238,10 +283,13 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { wch: 18 },
       { wch: 18 },
       { wch: 18 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 18 },
     ];
     ws['!merges'] = [
-      XLSX.utils.decode_range('A1:F1'),
-      XLSX.utils.decode_range('A2:F2'),
+      XLSX.utils.decode_range('A1:I1'),
+      XLSX.utils.decode_range('A2:I2'),
     ];
 
     if (ws['A1']) ws['A1'].s = titleStyle;
@@ -255,6 +303,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 3, format: '#,##0.00' },
       { index: 4, format: '#,##0.00' },
       { index: 5, format: '0.0%' },
+      { index: 6, format: '#,##0' },
+      { index: 7, format: '#,##0' },
+      { index: 8, format: '0.0%' },
     ]);
 
     const totalsRowIndex = dataStartRow + sortedEmployeeRows.length + 1;
@@ -262,6 +313,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 3, format: '#,##0.00' },
       { index: 4, format: '#,##0.00' },
       { index: 5, format: '0.0%' },
+      { index: 6, format: '#,##0' },
+      { index: 7, format: '#,##0' },
+      { index: 8, format: '0.0%' },
     ]);
     for (let c = 0; c < header.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c });
@@ -462,7 +516,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
           </button>
         </div>
         <div className="text-xs text-sky-600">
-          <p>يتضمن تقرير الموظفين: التارجت، المبيعات والتحصيل لكل موظف.</p>
+          <p>يتضمن تقرير الموظفين: التارجت، المبيعات، تحصيل التارجت، إضافة إلى تارجت الألحفة ومبيعاتها ونسبة تحقيقها.</p>
           <p>يتضمن تقرير المعارض: التارجت، المبيعات، تحصيل التارجت، إضافة إلى تفصيل مبيعات الألحفة مقابل أهدافها.</p>
         </div>
       </div>
