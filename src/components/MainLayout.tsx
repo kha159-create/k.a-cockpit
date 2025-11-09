@@ -760,6 +760,8 @@ const handleNotificationClick = (notificationId: string) => {
           employeeDuvetSales={processedData.employeeDuvetSales}
            employees={employees}
            dateFilter={dateFilter}
+           setDateFilter={pageProps.setDateFilter}
+           allData={allDateData}
          />
        );
      case 'lfl':

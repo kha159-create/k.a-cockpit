@@ -277,7 +277,7 @@ export const useDataProcessing = ({
           extras[store.name] = {
               avgTicket: currentTransactions > 0 ? currentSales / currentTransactions : 0,
               transactions: currentTransactions,
-              conversionRate: currentVisitors > 0 ? (currentTransactions / currentVisitors) * 100 : 0,
+              conversionRate: currentVisitors > 0 ? currentTransactions / currentVisitors : 0,
               salesPerVisitor: currentVisitors > 0 ? currentSales / currentVisitors : 0,
               visitors: currentVisitors,
               visitorGrowth,

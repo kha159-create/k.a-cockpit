@@ -1,6 +1,8 @@
 
 import React, { useMemo, useState } from 'react';
-import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary } from '../types';
+import MonthYearFilter from '../components/MonthYearFilter';
+import { useLocale } from '../context/LocaleContext';
+import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary, FilterableData } from '../types';
 
 declare var XLSX: any;
 
@@ -12,9 +14,11 @@ interface SmartUploaderPageProps {
   employeeSummaries: EmployeeSummary[];
   storeSummaries: StoreSummary[];
   storePerformanceExtras: Record<string, {
-    salesShare: number;
     avgTicket: number;
     transactions: number;
+    conversionRate: number;
+    salesPerVisitor: number;
+    visitors: number;
     visitorGrowth: number | null;
     salesGrowth: number | null;
   }>;
@@ -22,6 +26,8 @@ interface SmartUploaderPageProps {
   employeeDuvetSales: { byEmployeeId: Record<string, number>; byEmployeeName: Record<string, number> };
   employees: Employee[];
   dateFilter: DateFilter;
+  setDateFilter: React.Dispatch<React.SetStateAction<DateFilter>>;
+  allData: FilterableData[];
 }
 
 const downloadTemplate = (fileName: string, headers: string[]) => {
@@ -45,10 +51,37 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
   duvetSummary,
   employeeDuvetSales,
   employees,
-  dateFilter
+  dateFilter,
+  setDateFilter,
+  allData
 }) => {
     const [file, setFile] = useState<File | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
+  const { locale } = useLocale();
+  const copy = useMemo(() => {
+    if (locale === 'ar') {
+      return {
+        filterTitle: 'مرشحات التقارير',
+        filterHint: 'اختر الفترة الزمنية للتقارير قبل التنزيل.',
+        downloadsTitle: 'تقارير جاهزة للتنزيل',
+        downloadsDescription: 'حمّل ملفات Excel منسقة للموظفين والمعارض بناءً على مرشحات التاريخ الحالية.',
+        employeeButton: '📊 تحميل تقرير الموظفين',
+        storeButton: '🏬 تحميل تقرير المعارض',
+        employeeNote: 'يتضمن تقرير الموظفين: التارجت، المبيعات، تحصيل التارجت، إضافة إلى تارجت الألحفة ومبيعاتها ونسبة تحقيقها.',
+        storeNote: 'يتضمن تقرير المعارض: التارجت، المبيعات، تحصيل التارجت، إضافة إلى تفصيل مبيعات الألحفة مقابل أهدافها.',
+      };
+    }
+    return {
+      filterTitle: 'Report Filters',
+      filterHint: 'Choose the time period for the exports before downloading.',
+      downloadsTitle: 'Ready-to-Download Reports',
+      downloadsDescription: 'Download formatted Excel reports for employees and stores using the current date filters.',
+      employeeButton: '📊 Download Employees Report',
+      storeButton: '🏬 Download Stores Report',
+      employeeNote: 'Employee report includes targets, sales, achievement, and duvet targets vs sales.',
+      storeNote: 'Store report includes targets, sales, achievement, plus duvet performance against goals.',
+    };
+  }, [locale]);
 
   const ensureWorkbookLib = () => {
     if (typeof XLSX === 'undefined') {
@@ -168,7 +201,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       const extras = storePerformanceExtras[store.name] || {
         avgTicket: store.atv || 0,
         transactions: store.transactionCount || 0,
-        conversionRate: store.visitors > 0 ? (store.transactionCount / store.visitors) * 100 : 0,
+        conversionRate: store.visitors > 0 ? (store.transactionCount / store.visitors) : 0,
         salesPerVisitor: store.visitors > 0 ? (store.totalSales || 0) / store.visitors : 0,
         visitors: store.visitors || 0,
         visitorGrowth: null,
@@ -418,7 +451,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     const totalTransactions = storeReportRows.reduce((sum, row) => sum + row.transactions, 0);
     const overallAvgTicket = totalTransactions > 0 ? totalSalesAchieved / totalTransactions : 0;
     const totalVisitors = storeReportRows.reduce((sum, row) => sum + (row.visitors || 0), 0);
-    const overallConversionRate = totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0;
+    const overallConversionRate = totalVisitors > 0 ? totalTransactions / totalVisitors : 0;
     const overallSalesPerVisitor = totalVisitors > 0 ? totalSalesAchieved / totalVisitors : 0;
     const totalDuvetTarget = storeReportRows.reduce((sum, row) => sum + row.duvetTarget, 0);
     const totalDuvetUnits = storeReportRows.reduce((sum, row) => sum + row.duvetUnits, 0);
@@ -561,28 +594,34 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
                 <p className="text-sm text-zinc-500 mt-1">Upload an XLSX file. The system will automatically detect the file type and import the data.</p>
             </div>
 
+      <div className="p-4 border border-indigo-100 rounded-lg bg-indigo-50/70">
+        <h4 className="font-semibold text-indigo-900 mb-3">{copy.filterTitle}</h4>
+        <p className="text-xs text-indigo-700 mb-4">{copy.filterHint}</p>
+        <MonthYearFilter dateFilter={dateFilter} setDateFilter={setDateFilter} allData={allData} />
+      </div>
+
       <div className="p-5 rounded-xl border border-blue-100 bg-sky-50/70 space-y-3">
         <div>
-          <h4 className="text-lg font-semibold text-sky-900">تقارير جاهزة للتنزيل</h4>
-          <p className="text-sm text-sky-700 mt-1">حمّل ملفات Excel منسقة للموظفين والمعارض بناءً على فلاتر التاريخ الحالية.</p>
+          <h4 className="text-lg font-semibold text-sky-900">{copy.downloadsTitle}</h4>
+          <p className="text-sm text-sky-700 mt-1">{copy.downloadsDescription}</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={downloadEmployeeReport}
             className="btn-primary w-full text-sm flex items-center justify-center gap-2"
           >
-            📊 تحميل تقرير الموظفين
+            {copy.employeeButton}
           </button>
           <button
             onClick={downloadStoreReport}
             className="btn-secondary w-full text-sm flex items-center justify-center gap-2 border-sky-400 text-sky-900 hover:bg-sky-100"
           >
-            🏬 تحميل تقرير المعارض
+            {copy.storeButton}
           </button>
         </div>
         <div className="text-xs text-sky-600">
-          <p>يتضمن تقرير الموظفين: التارجت، المبيعات، تحصيل التارجت، إضافة إلى تارجت الألحفة ومبيعاتها ونسبة تحقيقها.</p>
-          <p>يتضمن تقرير المعارض: التارجت، المبيعات، تحصيل التارجت، إضافة إلى تفصيل مبيعات الألحفة مقابل أهدافها.</p>
+          <p>{copy.employeeNote}</p>
+          <p>{copy.storeNote}</p>
         </div>
       </div>
             
