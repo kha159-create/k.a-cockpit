@@ -12,7 +12,6 @@ import Dashboard from '@/pages/Dashboard';
 import StoresPage from '@/pages/StoresPage';
 import EmployeesPage from '@/pages/EmployeesPage';
 import ProductsPage from '@/pages/ProductsPage';
-import DuvetsPage from '@/pages/DuvetsPage';
 import CommissionsPage from '@/pages/CommissionsPage';
 import SmartUploaderPage from '@/pages/SmartUploaderPage';
 import LFLPage from '@/pages/LFLPage';
@@ -36,7 +35,7 @@ import type { User, UserProfile, Store, Employee, DailyMetric, SalesTransaction,
 
 import {
   HomeIcon, OfficeBuildingIcon, UserGroupIcon, CubeIcon,
-  UploadIcon, ChartBarIcon, DuvetIcon, CalculatorIcon, CogIcon,
+  UploadIcon, ChartBarIcon, CalculatorIcon, CogIcon,
   MenuIcon, LogoutIcon, SunIcon, MoonIcon, GlobeIcon, ChevronDownIcon, BellIcon
 } from '@/components/Icons';
 
@@ -663,7 +662,6 @@ const handleNotificationClick = (notificationId: string) => {
           { icon: <UserGroupIcon />, label: t('employees'), name: "employees", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
           { icon: <CalculatorIcon />, label: t('commissions'), name: "commissions", roles: ['admin', 'general_manager', 'area_manager', 'store_manager'] as UserRole[] },
           { icon: <CubeIcon />, label: t('products'), name: "products", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
-          { icon: <DuvetIcon />, label: t('duvets'), name: "duvets", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
           { icon: <UploadIcon />, label: t('smart_upload'), name: "uploads", roles: ['admin', 'general_manager', 'area_manager'] as UserRole[] },
           { icon: <CogIcon />, label: t('settings'), name: "settings", roles: ['admin', 'general_manager'] as UserRole[] },
           { icon: <span>⏳</span>, label: t('pending_approvals'), name: "pendingApprovals", roles: ['admin'] as UserRole[] },
@@ -734,8 +732,6 @@ const handleNotificationClick = (notificationId: string) => {
           />;
      case 'products':
        return <ProductsPage {...processedData} {...pageProps} />;
-     case 'duvets':
-        return <DuvetsPage {...processedData} {...pageProps} />;
      case 'commissions':
         return <CommissionsPage {...processedData} {...pageProps} />;
      case 'uploads':
