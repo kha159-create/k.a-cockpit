@@ -21,9 +21,11 @@ interface CustomBusinessRulesProps {
 const parseStoreRules = (rules: BusinessRule[]) => {
     const map = new Map<string, { id: string; values: StoreRuleValues }>();
     rules.forEach(rule => {
-        const markerIndex = rule.rule.indexOf(STORE_RULE_MARKER);
+        const text = rule?.rule ?? '';
+        if (!text) return;
+        const markerIndex = text.indexOf(STORE_RULE_MARKER);
         if (markerIndex === -1) return;
-        const jsonString = rule.rule.slice(markerIndex + STORE_RULE_MARKER.length).trim();
+        const jsonString = text.slice(markerIndex + STORE_RULE_MARKER.length).trim();
         try {
             const parsed = JSON.parse(jsonString);
             if (parsed && typeof parsed === 'object' && parsed.store) {
@@ -61,7 +63,10 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
     const [newRule, setNewRule] = useState('');
 
     const storeRulesMap = useMemo(() => parseStoreRules(rules), [rules]);
-    const generalRules = useMemo(() => rules.filter(rule => !rule.rule.includes(STORE_RULE_MARKER)), [rules]);
+    const generalRules = useMemo(
+        () => rules.filter(rule => !(rule?.rule ?? '').includes(STORE_RULE_MARKER)),
+        [rules]
+    );
 
     const initialStoreState = useMemo(() => {
         const base: Record<string, StoreRuleValues> = {};
