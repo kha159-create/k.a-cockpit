@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { StoreSummary, BusinessRule, UserProfile } from '../types.js';
-import CustomBusinessRules from '../components/CustomBusinessRules.js';
+import type { StoreSummary, UserProfile } from '../types.js';
 import { useLocale } from '../context/LocaleContext.js';
 import { updateAllEmployeesWithLinkedAccount } from '../utils/updateEmployees.js';
 import { fixUnknownEmployeesAndMetrics } from '../utils/fixUnknownEmployees.js';
@@ -139,15 +138,12 @@ interface SettingsPageProps {
     onDeleteAllData: () => void;
     onSelectiveDelete: (dataType: 'visitors' | 'sales', year: number, month: number) => void;
     isProcessing: boolean;
-    businessRules: BusinessRule[];
-    onSaveRule: (rule: string, existingId?: string) => void;
-    onDeleteRule: (id: string) => void;
     profile: UserProfile | null;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({
     storeSummary, onAddMonthlyData, onDeleteAllData, onSelectiveDelete, isProcessing,
-    businessRules, onSaveRule, onDeleteRule, profile
+    profile
 }) => {
     const isAdmin = profile?.role === 'admin';
     const isGM = profile?.role === 'general_manager';
@@ -162,17 +158,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
             )}
             
-            {isAdmin && (
-                <CustomBusinessRules
-                    rules={businessRules}
-                    stores={storeSummary}
-                    onSave={onSaveRule}
-                    onDelete={onDeleteRule}
-                    isProcessing={isProcessing}
-                />
-            )}
-
-
             {isAdmin && (
                 <EmployeeUpdateSection />
             )}

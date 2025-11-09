@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { TrashIcon } from './Icons';
 import type { BusinessRule, StoreSummary } from '../types';
+import { useLocale } from '../context/LocaleContext';
 
 const STORE_RULE_MARKER = 'STORE_RULE_JSON=';
 
@@ -12,10 +13,11 @@ type StoreRuleValues = {
 
 interface CustomBusinessRulesProps {
     rules: BusinessRule[];
-    stores: StoreSummary[];
+    stores?: StoreSummary[];
     onSave: (rule: string, existingId?: string) => void;
     onDelete: (id: string) => void;
     isProcessing: boolean;
+    showGeneralRules?: boolean;
 }
 
 const parseStoreRules = (rules: BusinessRule[]) => {
@@ -45,11 +47,14 @@ const parseStoreRules = (rules: BusinessRule[]) => {
     return map;
 };
 
-const buildStoreRuleString = (storeName: string, values: StoreRuleValues) => {
+const buildStoreRuleString = (storeName: string, values: StoreRuleValues, locale: string) => {
     const atv = Number(values.atvTarget) || 0;
     const conversion = Number(values.conversionRate) || 0;
     const spv = Number(values.salesPerVisitor) || 0;
-    const friendlyText = `متجر ${storeName}: متوسط الفاتورة المستهدف ${atv.toFixed(2)} ريال، معدل التحويل المطلوب ${conversion.toFixed(2)}٪، والمبيعات لكل زائر ${spv.toFixed(2)} ريال. التزم بهذه الحدود عند تقديم التوصيات.`;
+    const friendlyText =
+        locale === 'ar'
+            ? `متجر ${storeName}: متوسط الفاتورة المستهدف ${atv.toFixed(2)} ريال، معدل التحويل المطلوب ${conversion.toFixed(2)}٪، والمبيعات لكل زائر ${spv.toFixed(2)} ريال. التزم بهذه الحدود عند تقديم التوصيات.`
+            : `Store ${storeName}: target ATV ${atv.toFixed(2)} SAR, required conversion ${conversion.toFixed(2)}%, and sales per visitor ${spv.toFixed(2)} SAR. Follow these limits in all insights.`;
     const metadata = JSON.stringify({
         store: storeName,
         atvTarget: atv,
@@ -59,13 +64,72 @@ const buildStoreRuleString = (storeName: string, values: StoreRuleValues) => {
     return `${friendlyText} || ${STORE_RULE_MARKER}${metadata}`;
 };
 
-const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores, onSave, onDelete, isProcessing }) => {
+const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({
+    rules,
+    stores = [],
+    onSave,
+    onDelete,
+    isProcessing,
+    showGeneralRules = true,
+}) => {
     const [newRule, setNewRule] = useState('');
+    const { locale } = useLocale();
+
+    const strings = useMemo(() => {
+        if (locale === 'ar') {
+            return {
+                cardTitle: 'قواعد الأعمال المخصصة',
+                cardSubtitle: 'حدّد أهداف كل معرض ليستخدمها المساعد حسن تلقائياً، ويمكنك إضافة قواعد عامة لتوجيه التحليلات.',
+                storeSectionTitle: 'أهداف هذا المعرض (تُستخدم فوراً بواسطة حسن)',
+                storeSectionEmpty: 'لم يتم العثور على قائمة المعارض. تأكد من تحميل بياناتها أولاً.',
+                storeHint: 'حدّد الأهداف الأساسية لهذا المعرض (ريال سعودي / نسب مئوية).',
+                saveStore: 'حفظ الأهداف',
+                saving: 'جاري الحفظ...',
+                resetStore: 'إعادة التعيين',
+                atvLabel: 'ATV Avg (ريال)',
+                conversionLabel: 'Conversion Rate (%)',
+                spvLabel: 'Sales per Visitor (ريال)',
+                atvPlaceholder: 'مثال: 350',
+                conversionPlaceholder: 'مثال: 18',
+                spvPlaceholder: 'مثال: 95',
+                generalTitle: 'قواعد عامة إضافية',
+                generalHint: 'أضف تعليمات عامة يريد حسن الالتزام بها دائمًا (مثال: “ركز على المنتجات الموسمية”).',
+                generalPlaceholder: 'أدخل قاعدة جديدة...',
+                addRule: 'إضافة قاعدة',
+                savingRule: 'جاري الحفظ...',
+                noGeneralRules: 'لا توجد قواعد عامة محفوظة.',
+            } as const;
+        }
+        return {
+            cardTitle: 'Custom Business Rules',
+            cardSubtitle:
+                'Set store-level targets Hassan will follow automatically. You can still add global reminders for future analyses.',
+            storeSectionTitle: 'Store Targets (Hassan follows these instantly)',
+            storeSectionEmpty: 'No stores found. Please upload store data first.',
+            storeHint: 'Define the key targets for this store (SAR / percentages).',
+            saveStore: 'Save Targets',
+            saving: 'Saving...',
+            resetStore: 'Reset',
+            atvLabel: 'ATV Avg (SAR)',
+            conversionLabel: 'Conversion Rate (%)',
+            spvLabel: 'Sales per Visitor (SAR)',
+            atvPlaceholder: 'e.g. 350',
+            conversionPlaceholder: 'e.g. 18',
+            spvPlaceholder: 'e.g. 95',
+            generalTitle: 'Additional Global Rules',
+            generalHint:
+                'Add global instructions Hassan should always follow (e.g. “Highlight premium bundles during December”).',
+            generalPlaceholder: 'Enter a new rule...',
+            addRule: 'Add Rule',
+            savingRule: 'Saving...',
+            noGeneralRules: 'No general rules saved yet.',
+        } as const;
+    }, [locale]);
 
     const storeRulesMap = useMemo(() => parseStoreRules(rules), [rules]);
     const generalRules = useMemo(
-        () => rules.filter(rule => !(rule?.rule ?? '').includes(STORE_RULE_MARKER)),
-        [rules]
+        () => (showGeneralRules ? rules.filter(rule => !(rule?.rule ?? '').includes(STORE_RULE_MARKER)) : []),
+        [rules, showGeneralRules]
     );
 
     const initialStoreState = useMemo(() => {
@@ -105,7 +169,7 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
             }
             return;
         }
-        const ruleString = buildStoreRuleString(storeName, values);
+        const ruleString = buildStoreRuleString(storeName, values, locale);
         onSave(ruleString, existing?.id);
     };
 
@@ -128,14 +192,12 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="text-xl font-semibold text-zinc-700 mb-2">Custom Business Rules</h3>
-            <p className="text-sm text-zinc-500 mb-6">
-                حدّد الأهداف الذكية لكل معرض ليستخدمها المساعد حسن تلقائياً، ويمكنك إضافة قواعد عامة أيضاً لتوجيه التحليلات المستقبلية.
-            </p>
+            <h3 className="text-xl font-semibold text-zinc-700 mb-2">{strings.cardTitle}</h3>
+            <p className="text-sm text-zinc-500 mb-6">{strings.cardSubtitle}</p>
 
             <div className="space-y-5">
                 <section>
-                    <h4 className="font-semibold text-zinc-700 mb-3">أهداف كل معرض (تقرأها الذكاء لحظة التحليل)</h4>
+                    <h4 className="font-semibold text-zinc-700 mb-3">{strings.storeSectionTitle}</h4>
                     <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
                         {stores.map(store => {
                             const formValues = storeForm[store.name] || { atvTarget: '', conversionRate: '', salesPerVisitor: '' };
@@ -145,9 +207,7 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
                                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                         <div>
                                             <h5 className="font-semibold text-zinc-800 text-lg">{store.name}</h5>
-                                            <p className="text-xs text-zinc-500">
-                                                حدّد أهداف هذا المعرض ليتم تطبيقها في استنتاجات حسن (ريال سعودي / نسب مئوية).
-                                            </p>
+                                            <p className="text-xs text-zinc-500">{strings.storeHint}</p>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
@@ -155,7 +215,7 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
                                                 disabled={isProcessing}
                                                 className="btn-primary text-sm"
                                             >
-                                                {isProcessing ? 'جاري الحفظ...' : 'حفظ الأهداف'}
+                                                {isProcessing ? strings.saving : strings.saveStore}
                                             </button>
                                             {hasExistingRule && (
                                                 <button
@@ -163,7 +223,7 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
                                                     disabled={isProcessing}
                                                     className="btn-secondary text-sm"
                                                 >
-                                                    إعادة التعيين
+                                                    {strings.resetStore}
                                                 </button>
                                             )}
                                         </div>
@@ -171,7 +231,7 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
                                     <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
                                             <label className="label text-xs uppercase tracking-wide text-zinc-500">
-                                                ATV Target (SAR)
+                                                {strings.atvLabel}
                                             </label>
                                             <input
                                                 type="number"
@@ -180,12 +240,12 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
                                                 value={formValues.atvTarget}
                                                 onChange={e => handleStoreFieldChange(store.name, 'atvTarget', e.target.value)}
                                                 className="input"
-                                                placeholder="مثال: 350"
+                                                placeholder={strings.atvPlaceholder}
                                             />
                                         </div>
                                         <div>
                                             <label className="label text-xs uppercase tracking-wide text-zinc-500">
-                                                Conversion Rate (%)
+                                                {strings.conversionLabel}
                                             </label>
                                             <input
                                                 type="number"
@@ -194,12 +254,12 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
                                                 value={formValues.conversionRate}
                                                 onChange={e => handleStoreFieldChange(store.name, 'conversionRate', e.target.value)}
                                                 className="input"
-                                                placeholder="مثال: 18"
+                                                placeholder={strings.conversionPlaceholder}
                                             />
                                         </div>
                                         <div>
                                             <label className="label text-xs uppercase tracking-wide text-zinc-500">
-                                                Sales per Visitor (SAR)
+                                                {strings.spvLabel}
                                             </label>
                                             <input
                                                 type="number"
@@ -208,7 +268,7 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
                                                 value={formValues.salesPerVisitor}
                                                 onChange={e => handleStoreFieldChange(store.name, 'salesPerVisitor', e.target.value)}
                                                 className="input"
-                                                placeholder="مثال: 95"
+                                                placeholder={strings.spvPlaceholder}
                                             />
                                         </div>
                                     </div>
@@ -216,46 +276,46 @@ const CustomBusinessRules: React.FC<CustomBusinessRulesProps> = ({ rules, stores
                             );
                         })}
                         {stores.length === 0 && (
-                            <p className="text-sm text-zinc-500">لم يتم العثور على قائمة المعارض. تأكد من تحميل بياناتها أولاً.</p>
+                            <p className="text-sm text-zinc-500">{strings.storeSectionEmpty}</p>
                         )}
                     </div>
                 </section>
 
-                <section className="pt-4 border-t border-zinc-200">
-                    <h4 className="font-semibold text-zinc-700 mb-3">قواعد عامة إضافية</h4>
-                    <p className="text-xs text-zinc-500 mb-2">
-                        استخدم هذه المساحة لإضافة تعليمات عامة يريد حسن اتباعها دائماً (مثال: “الترويج للألحفة الفاخرة له أولوية في ديسمبر”).
-                    </p>
-                    <div className="flex gap-2 mb-4">
-                        <input
-                            type="text"
-                            value={newRule}
-                            onChange={(e) => setNewRule(e.target.value)}
-                            placeholder="أدخل قاعدة جديدة..."
-                            className="input flex-grow"
-                        />
-                        <button onClick={handleSaveGeneralRule} disabled={isProcessing} className="btn-primary">
-                            {isProcessing ? 'جاري الحفظ...' : 'إضافة قاعدة'}
-                        </button>
-                    </div>
+                {showGeneralRules && (
+                    <section className="pt-4 border-t border-zinc-200">
+                        <h4 className="font-semibold text-zinc-700 mb-3">{strings.generalTitle}</h4>
+                        <p className="text-xs text-zinc-500 mb-2">{strings.generalHint}</p>
+                        <div className="flex gap-2 mb-4">
+                            <input
+                                type="text"
+                                value={newRule}
+                                onChange={(e) => setNewRule(e.target.value)}
+                                placeholder={strings.generalPlaceholder}
+                                className="input flex-grow"
+                            />
+                            <button onClick={handleSaveGeneralRule} disabled={isProcessing} className="btn-primary">
+                                {isProcessing ? strings.savingRule : strings.addRule}
+                            </button>
+                        </div>
 
-                    <div className="space-y-2">
-                        {generalRules.length === 0 ? (
-                            <p className="text-sm text-zinc-400">لا توجد قواعد عامة محفوظة.</p>
-                        ) : (
-                            <ul className="divide-y divide-gray-200">
-                                {generalRules.map(rule => (
-                                    <li key={rule.id} className="py-2 flex justify-between items-center">
-                                        <span className="text-sm text-zinc-800">{rule.rule}</span>
-                                        <button onClick={() => onDelete(rule.id)} className="text-red-500 hover:text-red-700">
-                                            <TrashIcon />
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                </section>
+                        <div className="space-y-2">
+                            {generalRules.length === 0 ? (
+                                <p className="text-sm text-zinc-400">{strings.noGeneralRules}</p>
+                            ) : (
+                                <ul className="divide-y divide-gray-200">
+                                    {generalRules.map(rule => (
+                                        <li key={rule.id} className="py-2 flex justify-between items-center">
+                                            <span className="text-sm text-zinc-800">{rule.rule}</span>
+                                            <button onClick={() => onDelete(rule.id)} className="text-red-500 hover:text-red-700">
+                                                <TrashIcon />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </section>
+                )}
             </div>
         </div>
     );

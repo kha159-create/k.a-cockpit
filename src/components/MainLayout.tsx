@@ -706,6 +706,10 @@ const handleNotificationClick = (notificationId: string) => {
           setModalState={setModalState}
           allDateData={allDateData}
           profile={profile}
+          businessRules={businessRules}
+          onSaveRule={handleSaveBusinessRule}
+          onDeleteRule={(id) => handleDelete('businessRules', id, 'this rule')}
+          isProcessing={isProcessing}
       />;
   }
   
@@ -767,9 +771,6 @@ const handleNotificationClick = (notificationId: string) => {
                   onDeleteAllData={handleDeleteAllData}
                   onSelectiveDelete={handleSelectiveDelete}
                   isProcessing={isProcessing}
-                  businessRules={businessRules}
-                  onSaveRule={handleSaveBusinessRule}
-                  onDeleteRule={(id) => handleDelete('businessRules', id, 'this rule')}
                   profile={profile}
                />;
      case 'pendingApprovals':

@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { SparklesIcon, ArrowLeftIcon } from '../components/Icons';
 import { KPICard } from '../components/DashboardComponents';
 import MonthYearFilter from '../components/MonthYearFilter';
-import type { StoreSummary, DailyMetric, ModalState, DateFilter, FilterableData, UserProfile } from '../types';
+import CustomBusinessRules from '../components/CustomBusinessRules';
+import type { StoreSummary, DailyMetric, ModalState, DateFilter, FilterableData, UserProfile, BusinessRule } from '../types';
 import { calculateEffectiveTarget } from '../utils/calculator';
 import { generateText } from '../services/geminiService';
 import { useLocale } from '../context/LocaleContext';
@@ -15,9 +16,25 @@ interface StoreDetailPageProps {
     setModalState: React.Dispatch<React.SetStateAction<ModalState>>;
     allDateData: FilterableData[];
     profile: UserProfile | null;
+    businessRules: BusinessRule[];
+    onSaveRule: (rule: string, existingId?: string) => void;
+    onDeleteRule: (id: string) => void;
+    isProcessing: boolean;
 }
 
-const StoreDetailPage: React.FC<StoreDetailPageProps> = ({ store, allMetrics, onBack, allStores, setModalState, allDateData, profile }) => {
+const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
+    store,
+    allMetrics,
+    onBack,
+    allStores,
+    setModalState,
+    allDateData,
+    profile,
+    businessRules,
+    onSaveRule,
+    onDeleteRule,
+    isProcessing,
+}) => {
     const { t, locale } = useLocale();
     const [aiAnalysis, setAiAnalysis] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -187,6 +204,15 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({ store, allMetrics, on
                      </div>
                  </div>
             </div>
+
+            <CustomBusinessRules
+                rules={businessRules}
+                stores={[store]}
+                onSave={onSaveRule}
+                onDelete={onDeleteRule}
+                isProcessing={isProcessing}
+                showGeneralRules={false}
+            />
         </div>
     );
 };
