@@ -734,8 +734,20 @@ const handleNotificationClick = (notificationId: string) => {
        return <ProductsPage {...processedData} {...pageProps} />;
      case 'commissions':
         return <CommissionsPage {...processedData} {...pageProps} />;
-     case 'uploads':
-        return <SmartUploaderPage onUpload={handleSmartUpload} isProcessing={isProcessing} uploadResult={uploadResult} onClearResult={clearUploadResult} />;
+    case 'uploads':
+       return (
+         <SmartUploaderPage
+           onUpload={handleSmartUpload}
+           isProcessing={isProcessing}
+           uploadResult={uploadResult}
+           onClearResult={clearUploadResult}
+           employeeSummaries={Object.values(processedData.employeeSummary).flat()}
+           storeSummaries={processedData.storeSummary}
+           duvetSummary={processedData.duvetSummary}
+           employees={employees}
+           dateFilter={dateFilter}
+         />
+       );
      case 'lfl':
         return <LFLPage allStores={stores} allMetrics={dailyMetrics} profile={profile}/>;
      case 'settings':

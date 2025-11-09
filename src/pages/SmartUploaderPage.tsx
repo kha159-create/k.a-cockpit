@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import type { useSmartUploader } from '../hooks/useSmartUploader';
+import React, { useMemo, useState } from 'react';
+import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary } from '../types';
 
 declare var XLSX: any;
 
@@ -9,6 +9,11 @@ interface SmartUploaderPageProps {
   isProcessing: boolean;
   uploadResult: { successful: any[], skipped: number } | null;
   onClearResult: () => void;
+  employeeSummaries: EmployeeSummary[];
+  storeSummaries: StoreSummary[];
+  duvetSummary: DuvetSummary;
+  employees: Employee[];
+  dateFilter: DateFilter;
 }
 
 const downloadTemplate = (fileName: string, headers: string[]) => {
@@ -19,9 +24,390 @@ const downloadTemplate = (fileName: string, headers: string[]) => {
     XLSX.writeFile(wb, `${fileName}.xlsx`);
 };
 
-const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({ onUpload, isProcessing, uploadResult, onClearResult }) => {
+const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
+  onUpload,
+  isProcessing,
+  uploadResult,
+  onClearResult,
+  employeeSummaries,
+  storeSummaries,
+  duvetSummary,
+  employees,
+  dateFilter
+}) => {
     const [file, setFile] = useState<File | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
+
+  const ensureWorkbookLib = () => {
+    if (typeof XLSX === 'undefined') {
+      alert('مكتبة إنشاء الملفات لم تجهز بعد، حاول بعد لحظات.');
+      return false;
+    }
+    return true;
+  };
+
+  const periodLabel = useMemo(() => {
+    if (dateFilter.mode === 'custom' && dateFilter.customStartDate && dateFilter.customEndDate) {
+      return `${dateFilter.customStartDate} → ${dateFilter.customEndDate}`;
+    }
+    if (dateFilter.year === 'all') {
+      return 'All Periods';
+    }
+    if (dateFilter.month === 'all') {
+      return `${dateFilter.year}`;
+    }
+    if (typeof dateFilter.month === 'number') {
+      return `${monthNames[dateFilter.month]} ${dateFilter.year}`;
+    }
+    return `${dateFilter.year}`;
+  }, [dateFilter]);
+
+  const allowedStoreNames = useMemo(() => new Set(storeSummaries.map(s => s.name)), [storeSummaries]);
+
+  const getEmployeeStoreForPeriod = (employee: Employee) => {
+    if (
+      employee.assignments &&
+      dateFilter.year !== 'all' &&
+      dateFilter.month !== 'all'
+    ) {
+      const key = `${dateFilter.year}-${String((dateFilter.month as number) + 1).padStart(2, '0')}`;
+      if (employee.assignments[key]) {
+        return employee.assignments[key];
+      }
+    }
+    return employee.currentStore;
+  };
+
+  const extractTargetForPeriod = (targets?: { [year: string]: { [month: string]: number } }) => {
+    if (!targets || dateFilter.year === 'all') return 0;
+    const yearData = targets[String(dateFilter.year)];
+    if (!yearData) return 0;
+    if (dateFilter.month === 'all') {
+      return Object.values(yearData).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    }
+    if (typeof dateFilter.month === 'number') {
+      const monthKey = String(dateFilter.month + 1);
+      return Number(yearData[monthKey]) || 0;
+    }
+    return 0;
+  };
+
+  const storeDuvetTargets = useMemo(() => {
+    const map = new Map<string, number>();
+    employees.forEach(emp => {
+      const storeName = getEmployeeStoreForPeriod(emp);
+      if (!storeName || !allowedStoreNames.has(storeName)) return;
+      const current = map.get(storeName) || 0;
+      map.set(storeName, current + extractTargetForPeriod(emp.duvetTargets));
+    });
+    return map;
+  }, [employees, allowedStoreNames, dateFilter]);
+
+  const sortedEmployeeRows = useMemo(() => {
+    const rows = employeeSummaries.map((emp, index) => ({
+      idx: index + 1,
+      name: emp.name,
+      store: emp.store || '-',
+      salesTarget: emp.effectiveTarget || 0,
+      salesAchieved: emp.totalSales || 0,
+      achievementPercent: (emp.achievement || 0) / 100,
+    }));
+    return rows.sort((a, b) => {
+      if (a.store === b.store) return a.name.localeCompare(b.name);
+      return a.store.localeCompare(b.store);
+    });
+  }, [employeeSummaries]);
+
+  const storeReportRows = useMemo(() => {
+    return storeSummaries.map((store, index) => {
+      const duvetData = duvetSummary[store.name];
+      const low = duvetData?.['Low Value (199-399)'] ?? 0;
+      const medium = duvetData?.['Medium Value (495-695)'] ?? 0;
+      const high = duvetData?.['High Value (795-999)'] ?? 0;
+      const totalDuvetUnits = duvetData?.total ?? 0;
+      const duvetTarget = storeDuvetTargets.get(store.name) || 0;
+
+      return {
+        idx: index + 1,
+        name: store.name,
+        areaManager: store.areaManager || '-',
+        salesTarget: store.effectiveTarget || 0,
+        salesAchieved: store.totalSales || 0,
+        achievementPercent: (store.targetAchievement || 0) / 100,
+        duvetTarget,
+        duvetUnits: totalDuvetUnits,
+        duvetAchievementPercent: duvetTarget > 0 ? (totalDuvetUnits / duvetTarget) : 0,
+        duvetLow: low,
+        duvetMedium: medium,
+        duvetHigh: high,
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [storeSummaries, duvetSummary, storeDuvetTargets]);
+
+  const buildWorkbookStyles = () => {
+    const headerStyle = {
+      font: { bold: true, color: { rgb: 'FFFFFFFF' } },
+      fill: { fgColor: { rgb: 'FF1F2937' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'FFE5E7EB' } },
+        bottom: { style: 'thin', color: { rgb: 'FFE5E7EB' } },
+      },
+    };
+    const titleStyle = {
+      font: { bold: true, sz: 14, color: { rgb: 'FF1F2937' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+    const subtitleStyle = {
+      font: { italic: true, color: { rgb: 'FF4B5563' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+    const totalStyle = {
+      font: { bold: true, color: { rgb: 'FF111827' } },
+      fill: { fgColor: { rgb: 'FFF3F4F6' } },
+      border: {
+        top: { style: 'thin', color: { rgb: 'FFD1D5DB' } },
+      },
+    };
+    return { headerStyle, titleStyle, subtitleStyle, totalStyle };
+  };
+
+  const applyHeaderStyles = (ws: any, headerRowIndex: number, cols: number, headerStyle: any) => {
+    for (let c = 0; c < cols; c++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: headerRowIndex, c });
+      if (ws[cellAddress]) {
+        ws[cellAddress].s = { ...(ws[cellAddress].s || {}), ...headerStyle };
+      }
+    }
+  };
+
+  const applyNumberFormats = (ws: any, startRow: number, rows: number, columns: { index: number; format: string }[]) => {
+    for (let r = startRow; r < startRow + rows; r++) {
+      columns.forEach(({ index, format }) => {
+        const address = XLSX.utils.encode_cell({ r, c: index });
+        const cell = ws[address];
+        if (cell) {
+          cell.t = 'n';
+          cell.z = format;
+        }
+      });
+    }
+  };
+
+  const downloadEmployeeReport = () => {
+    if (!ensureWorkbookLib()) return;
+    if (sortedEmployeeRows.length === 0) {
+      alert('لا توجد بيانات موظفين ضمن النطاق الحالي.');
+      return;
+    }
+
+    const { headerStyle, titleStyle, subtitleStyle, totalStyle } = buildWorkbookStyles();
+    const header = ['#', 'Employee', 'Store', 'Sales Target (SAR)', 'Sales Achieved (SAR)', 'Target Achievement %'];
+
+    const data: (string | number | null)[][] = [
+      ['Employee Performance Report'],
+      [`Period: ${periodLabel}`],
+      [],
+      header,
+    ];
+
+    sortedEmployeeRows.forEach((row, idx) => {
+      data.push([
+        idx + 1,
+        row.name,
+        row.store,
+        row.salesTarget,
+        row.salesAchieved,
+        row.achievementPercent,
+      ]);
+    });
+
+    data.push([]);
+    const totalTarget = sortedEmployeeRows.reduce((sum, row) => sum + row.salesTarget, 0);
+    const totalSales = sortedEmployeeRows.reduce((sum, row) => sum + row.salesAchieved, 0);
+    const totalAchievement = totalTarget > 0 ? totalSales / totalTarget : 0;
+    data.push(['Totals', null, null, totalTarget, totalSales, totalAchievement]);
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 6 },
+      { wch: 28 },
+      { wch: 24 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+    ];
+    ws['!merges'] = [
+      XLSX.utils.decode_range('A1:F1'),
+      XLSX.utils.decode_range('A2:F2'),
+    ];
+
+    if (ws['A1']) ws['A1'].s = titleStyle;
+    if (ws['A2']) ws['A2'].s = subtitleStyle;
+
+    const headerRowIndex = 3;
+    applyHeaderStyles(ws, headerRowIndex, header.length, headerStyle);
+
+    const dataStartRow = headerRowIndex + 1;
+    applyNumberFormats(ws, dataStartRow, sortedEmployeeRows.length, [
+      { index: 3, format: '#,##0.00' },
+      { index: 4, format: '#,##0.00' },
+      { index: 5, format: '0.0%' },
+    ]);
+
+    const totalsRowIndex = dataStartRow + sortedEmployeeRows.length + 1;
+    applyNumberFormats(ws, totalsRowIndex, 1, [
+      { index: 3, format: '#,##0.00' },
+      { index: 4, format: '#,##0.00' },
+      { index: 5, format: '0.0%' },
+    ]);
+    for (let c = 0; c < header.length; c++) {
+      const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c });
+      if (ws[addr]) ws[addr].s = { ...(ws[addr].s || {}), ...totalStyle };
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+    const fileName = `Employees_Report_${periodLabel.replace(/[^\w]+/g, '_')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
+  const downloadStoreReport = () => {
+    if (!ensureWorkbookLib()) return;
+    if (storeReportRows.length === 0) {
+      alert('لا توجد بيانات معارض ضمن النطاق الحالي.');
+      return;
+    }
+
+    const { headerStyle, titleStyle, subtitleStyle, totalStyle } = buildWorkbookStyles();
+    const header = [
+      '#',
+      'Store',
+      'Area Manager',
+      'Sales Target (SAR)',
+      'Sales Achieved (SAR)',
+      'Target Achievement %',
+      'Duvet Target (Units)',
+      'Duvet Sales (Units)',
+      'Duvet Achievement %',
+      'Low Value Units',
+      'Medium Value Units',
+      'High Value Units',
+    ];
+
+    const data: (string | number | null)[][] = [
+      ['Store Performance Report'],
+      [`Period: ${periodLabel}`],
+      [],
+      header,
+    ];
+
+    storeReportRows.forEach((row, idx) => {
+      data.push([
+        idx + 1,
+        row.name,
+        row.areaManager,
+        row.salesTarget,
+        row.salesAchieved,
+        row.achievementPercent,
+        row.duvetTarget,
+        row.duvetUnits,
+        row.duvetAchievementPercent,
+        row.duvetLow,
+        row.duvetMedium,
+        row.duvetHigh,
+      ]);
+    });
+
+    data.push([]);
+    const totalSalesTarget = storeReportRows.reduce((sum, row) => sum + row.salesTarget, 0);
+    const totalSalesAchieved = storeReportRows.reduce((sum, row) => sum + row.salesAchieved, 0);
+    const totalSalesAchievement = totalSalesTarget > 0 ? totalSalesAchieved / totalSalesTarget : 0;
+    const totalDuvetTarget = storeReportRows.reduce((sum, row) => sum + row.duvetTarget, 0);
+    const totalDuvetUnits = storeReportRows.reduce((sum, row) => sum + row.duvetUnits, 0);
+    const totalDuvetAchievement = totalDuvetTarget > 0 ? totalDuvetUnits / totalDuvetTarget : 0;
+    const totalLow = storeReportRows.reduce((sum, row) => sum + row.duvetLow, 0);
+    const totalMedium = storeReportRows.reduce((sum, row) => sum + row.duvetMedium, 0);
+    const totalHigh = storeReportRows.reduce((sum, row) => sum + row.duvetHigh, 0);
+
+    data.push([
+      'Totals',
+      null,
+      null,
+      totalSalesTarget,
+      totalSalesAchieved,
+      totalSalesAchievement,
+      totalDuvetTarget,
+      totalDuvetUnits,
+      totalDuvetAchievement,
+      totalLow,
+      totalMedium,
+      totalHigh,
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 6 },
+      { wch: 26 },
+      { wch: 26 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+    ];
+    ws['!merges'] = [
+      XLSX.utils.decode_range('A1:L1'),
+      XLSX.utils.decode_range('A2:L2'),
+    ];
+
+    if (ws['A1']) ws['A1'].s = titleStyle;
+    if (ws['A2']) ws['A2'].s = subtitleStyle;
+
+    const headerRowIndex = 3;
+    applyHeaderStyles(ws, headerRowIndex, header.length, headerStyle);
+
+    const dataStartRow = headerRowIndex + 1;
+    applyNumberFormats(ws, dataStartRow, storeReportRows.length, [
+      { index: 3, format: '#,##0.00' },
+      { index: 4, format: '#,##0.00' },
+      { index: 5, format: '0.0%' },
+      { index: 6, format: '#,##0' },
+      { index: 7, format: '#,##0' },
+      { index: 8, format: '0.0%' },
+      { index: 9, format: '#,##0' },
+      { index: 10, format: '#,##0' },
+      { index: 11, format: '#,##0' },
+    ]);
+
+    const totalsRowIndex = dataStartRow + storeReportRows.length + 1;
+    applyNumberFormats(ws, totalsRowIndex, 1, [
+      { index: 3, format: '#,##0.00' },
+      { index: 4, format: '#,##0.00' },
+      { index: 5, format: '0.0%' },
+      { index: 6, format: '#,##0' },
+      { index: 7, format: '#,##0' },
+      { index: 8, format: '0.0%' },
+      { index: 9, format: '#,##0' },
+      { index: 10, format: '#,##0' },
+      { index: 11, format: '#,##0' },
+    ]);
+    for (let c = 0; c < header.length; c++) {
+      const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c });
+      if (ws[addr]) ws[addr].s = { ...(ws[addr].s || {}), ...totalStyle };
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stores');
+    const fileName = `Stores_Report_${periodLabel.replace(/[^\w]+/g, '_')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -55,6 +441,31 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({ onUpload, isProce
                 <h3 className="text-xl font-semibold text-zinc-700">Smart Data Uploader</h3>
                 <p className="text-sm text-zinc-500 mt-1">Upload an XLSX file. The system will automatically detect the file type and import the data.</p>
             </div>
+
+      <div className="p-5 rounded-xl border border-blue-100 bg-sky-50/70 space-y-3">
+        <div>
+          <h4 className="text-lg font-semibold text-sky-900">تقارير جاهزة للتنزيل</h4>
+          <p className="text-sm text-sky-700 mt-1">حمّل ملفات Excel منسقة للموظفين والمعارض بناءً على فلاتر التاريخ الحالية.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            onClick={downloadEmployeeReport}
+            className="btn-primary w-full text-sm flex items-center justify-center gap-2"
+          >
+            📊 تحميل تقرير الموظفين
+          </button>
+          <button
+            onClick={downloadStoreReport}
+            className="btn-secondary w-full text-sm flex items-center justify-center gap-2 border-sky-400 text-sky-900 hover:bg-sky-100"
+          >
+            🏬 تحميل تقرير المعارض
+          </button>
+        </div>
+        <div className="text-xs text-sky-600">
+          <p>يتضمن تقرير الموظفين: التارجت، المبيعات والتحصيل لكل موظف.</p>
+          <p>يتضمن تقرير المعارض: التارجت، المبيعات، تحصيل التارجت، إضافة إلى تفصيل مبيعات الألحفة مقابل أهدافها.</p>
+        </div>
+      </div>
             
             <div className="p-4 bg-gray-50 rounded-lg border">
                 <h4 className="font-semibold text-zinc-600 mb-2">Download Templates</h4>
