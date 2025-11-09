@@ -6,9 +6,10 @@ interface MonthYearFilterProps {
   dateFilter: DateFilter;
   setDateFilter: React.Dispatch<React.SetStateAction<DateFilter>>;
   allData: FilterableData[];
+  forceRangeOnly?: boolean;
 }
 
-const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFilter, allData }) => {
+const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFilter, allData, forceRangeOnly = false }) => {
   const { t, locale } = useLocale();
   const years = useMemo(() => {
     const yearSet = new Set<number>();
@@ -26,8 +27,9 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
     const currentYear = new Date().getFullYear();
     yearSet.add(currentYear);
     const validYears = Array.from(yearSet).filter(y => !isNaN(y));
-    return ['all', ...validYears.sort((a, b) => b - a)];
-  }, [allData]);
+    const sorted = validYears.sort((a, b) => b - a);
+    return forceRangeOnly ? sorted : ['all', ...sorted];
+  }, [allData, forceRangeOnly]);
 
   const months = useMemo(() => {
     if (locale === 'ar') {
@@ -37,9 +39,10 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
   }, [locale]);
   
   const days = ['all', ...Array.from({ length: 31 }, (_, i) => i + 1)];
-  const mode = dateFilter.mode ?? 'single';
-  const dayFrom = (dateFilter.dayFrom ?? (typeof dateFilter.day === 'number' ? dateFilter.day : 'all')) as number | 'all';
-  const dayTo = (dateFilter.dayTo ?? (typeof dateFilter.day === 'number' ? dateFilter.day : 'all')) as number | 'all';
+  const rawMode = dateFilter.mode ?? 'single';
+  const effectiveMode = forceRangeOnly ? 'range' : rawMode;
+  const dayFromValue = typeof dateFilter.dayFrom === 'number' ? dateFilter.dayFrom : 'all';
+  const dayToValue = typeof dateFilter.dayTo === 'number' ? dateFilter.dayTo : 'all';
 
   const { minDate, maxDate } = useMemo(() => {
     let earliest: Date | null = null;
@@ -66,27 +69,59 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
   });
 
   useEffect(() => {
-    if (mode !== 'custom' && typeof dateFilter.year === 'number' && typeof dateFilter.month === 'number') {
+    if (effectiveMode !== 'custom' && typeof dateFilter.year === 'number' && typeof dateFilter.month === 'number') {
       lastStandardSelectionRef.current = {
         year: dateFilter.year,
         month: dateFilter.month,
       };
     }
-  }, [mode, dateFilter.year, dateFilter.month]);
+  }, [effectiveMode, dateFilter.year, dateFilter.month]);
+
+  useEffect(() => {
+    if (!forceRangeOnly) return;
+    const needsUpdate =
+      dateFilter.mode !== 'range' ||
+      dateFilter.day !== 'all' ||
+      dateFilter.dayFrom === undefined ||
+      dateFilter.dayTo === undefined ||
+      typeof dateFilter.year !== 'number' ||
+      typeof dateFilter.month !== 'number';
+    if (!needsUpdate) return;
+    const now = new Date();
+    setDateFilter(prev => ({
+      ...prev,
+      mode: 'range',
+      day: 'all',
+      year: typeof prev.year === 'number' ? prev.year : now.getUTCFullYear(),
+      month: typeof prev.month === 'number' ? prev.month : now.getUTCMonth(),
+      dayFrom: prev.dayFrom !== undefined ? prev.dayFrom : 'all',
+      dayTo: prev.dayTo !== undefined ? prev.dayTo : 'all',
+    }));
+  }, [forceRangeOnly, dateFilter.mode, dateFilter.day, dateFilter.dayFrom, dateFilter.dayTo, dateFilter.year, dateFilter.month, setDateFilter]);
 
   const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const year = e.target.value === 'all' ? 'all' : Number(e.target.value);
-    // Reset month and day when year changes for a better UX
-    setDateFilter({ year, month: 'all', day: 'all' });
+    setDateFilter(prev => {
+      const now = new Date();
+      const resolvedMonth = typeof prev.month === 'number' ? prev.month : now.getUTCMonth();
+      return {
+        ...prev,
+        year,
+        month: forceRangeOnly ? resolvedMonth : 'all',
+        day: 'all',
+        dayFrom: forceRangeOnly ? 'all' : prev.dayFrom,
+        dayTo: forceRangeOnly ? 'all' : prev.dayTo,
+      };
+    });
   };
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const month = e.target.value === 'all' ? 'all' : Number(e.target.value);
-    // Reset day when month changes
-    setDateFilter(prev => ({ ...prev, month, day: 'all' }));
+    setDateFilter(prev => ({ ...prev, month, day: 'all', dayFrom: forceRangeOnly ? 'all' : prev.dayFrom, dayTo: forceRangeOnly ? 'all' : prev.dayTo }));
   };
 
   const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (forceRangeOnly) return;
     const nextMode = e.target.value as 'single' | 'range' | 'custom';
     if (nextMode === 'custom') {
       const todayIso = new Date().toISOString().split('T')[0];
@@ -136,12 +171,20 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
 
   const handleDayFromChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value === 'all' ? 'all' : Number(e.target.value);
-    setDateFilter(prev => ({ ...prev, mode: 'range', dayFrom: val }));
+    setDateFilter(prev => {
+      let nextTo = prev.dayTo;
+      if (typeof val === 'number' && typeof nextTo === 'number' && nextTo < val) nextTo = val;
+      return { ...prev, mode: 'range', day: 'all', dayFrom: val, dayTo: nextTo };
+    });
   };
 
   const handleDayToChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value === 'all' ? 'all' : Number(e.target.value);
-    setDateFilter(prev => ({ ...prev, mode: 'range', dayTo: val }));
+    setDateFilter(prev => {
+      let nextFrom = prev.dayFrom;
+      if (typeof val === 'number' && typeof nextFrom === 'number' && nextFrom > val) nextFrom = val;
+      return { ...prev, mode: 'range', day: 'all', dayTo: val, dayFrom: nextFrom };
+    });
   };
 
   const handleCustomStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -159,7 +202,7 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex items-center gap-2 flex-1 min-w-[150px]">
             <span className="font-semibold text-zinc-600">{t('year')}:</span>
-            <select value={dateFilter.year} onChange={handleYearChange} className="input w-full" disabled={mode === 'custom'}>
+            <select value={dateFilter.year} onChange={handleYearChange} className="input w-full" disabled={effectiveMode === 'custom'}>
               {years.map(y => <option key={y} value={y}>{y === 'all' ? t('all_years') : y}</option>)}
             </select>
           </div>
@@ -169,43 +212,45 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
               value={dateFilter.month}
               onChange={handleMonthChange}
               className="input w-full"
-              disabled={mode === 'custom' || dateFilter.year === 'all'}>
-              <option value="all">{t('all_months')}</option>
+              disabled={effectiveMode === 'custom' || dateFilter.year === 'all'}>
+              {!forceRangeOnly && <option value="all">{t('all_months')}</option>}
               {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
             </select>
           </div>
-          <div className="flex items-center gap-2 flex-1 min-w-[150px]">
-            <span className="font-semibold text-zinc-600">{t('filter_mode')}:</span>
-            <select
-              value={mode}
-              onChange={handleModeChange}
-              className="input w-full"
-              disabled={mode !== 'custom' && (dateFilter.month === 'all' || dateFilter.year === 'all')}>
-              <option value="single">{t('single_day')}</option>
-              <option value="range">{t('day_range')}</option>
-              <option value="custom">{t('custom_range')}</option>
-            </select>
-          </div>
+          {!forceRangeOnly && (
+            <div className="flex items-center gap-2 flex-1 min-w-[150px]">
+              <span className="font-semibold text-zinc-600">{t('filter_mode')}:</span>
+              <select
+                value={effectiveMode}
+                onChange={handleModeChange}
+                className="input w-full"
+                disabled={effectiveMode !== 'custom' && (dateFilter.month === 'all' || dateFilter.year === 'all')}>
+                <option value="single">{t('single_day')}</option>
+                <option value="range">{t('day_range')}</option>
+                <option value="custom">{t('custom_range')}</option>
+              </select>
+            </div>
+          )}
         </div>
 
-        {mode === 'single' ? (
+        {(!forceRangeOnly && effectiveMode === 'single') ? (
           <div className="flex items-center gap-2">
             <span className="font-semibold text-zinc-600">{t('day')}:</span>
             <select value={dateFilter.day} onChange={handleDayChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
               {days.map(d => <option key={d} value={d}>{d === 'all' ? t('all_days') : d}</option>)}
             </select>
           </div>
-        ) : mode === 'range' ? (
+        ) : effectiveMode === 'range' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-zinc-600">{t('from_day')}:</span>
-              <select value={dayFrom} onChange={handleDayFromChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
+              <span className="font-semibold text-zinc-600">{t('day_from')}:</span>
+              <select value={dayFromValue} onChange={handleDayFromChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
                 {days.map(d => <option key={d} value={d}>{d === 'all' ? t('all_days') : d}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-zinc-600">{t('to_day')}:</span>
-              <select value={dayTo} onChange={handleDayToChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
+              <span className="font-semibold text-zinc-600">{t('day_to')}:</span>
+              <select value={dayToValue} onChange={handleDayToChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
                 {days.map(d => <option key={d} value={d}>{d === 'all' ? t('all_days') : d}</option>)}
               </select>
             </div>

@@ -39,6 +39,51 @@ const getEmployeeStoreForPeriod = (employee: Employee, dateFilter: DateFilter): 
     return employee.currentStore;
 };
 
+const getRangeBounds = (
+    year: number,
+    month: number,
+    dayFrom: DateFilter['dayFrom'],
+    dayTo: DateFilter['dayTo']
+) => {
+    if (!Number.isFinite(year) || !Number.isFinite(month)) {
+        return { from: 1, to: 31 };
+    }
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    let from = typeof dayFrom === 'number' ? dayFrom : 1;
+    let to = typeof dayTo === 'number' ? dayTo : lastDay;
+    from = Math.max(1, Math.min(from, lastDay));
+    to = Math.max(1, Math.min(to, lastDay));
+    if (to < from) to = from;
+    return { from, to };
+};
+
+const aggregateRangeForStores = (
+    metrics: DailyMetric[],
+    year: number,
+    month: number,
+    bounds: { from: number; to: number },
+    allowedStores: Set<string>
+) => {
+    const result = new Map<string, { sales: number; visitors: number; transactions: number }>();
+    if (!Number.isFinite(year) || !Number.isFinite(month)) {
+        return result;
+    }
+    metrics.forEach(metric => {
+        if (!metric.date || typeof metric.date.toDate !== 'function') return;
+        const dateObj = metric.date.toDate();
+        if (dateObj.getUTCFullYear() !== year || dateObj.getUTCMonth() !== month) return;
+        const day = dateObj.getUTCDate();
+        if (day < bounds.from || day > bounds.to) return;
+        if (!allowedStores.has(metric.store)) return;
+        const existing = result.get(metric.store) || { sales: 0, visitors: 0, transactions: 0 };
+        existing.sales += metric.totalSales || 0;
+        existing.visitors += metric.visitors || 0;
+        existing.transactions += metric.transactionCount || 0;
+        result.set(metric.store, existing);
+    });
+    return result;
+};
+
 export const useDataProcessing = ({
   stores,
   employees,
@@ -221,40 +266,29 @@ export const useDataProcessing = ({
 
   const storeNamesSet = useMemo(() => new Set(areaFilteredData.stores.map(store => store.name)), [areaFilteredData.stores]);
 
-  const computeMonthlyAggregates = (
-      metrics: DailyMetric[],
-      year: number,
-      month: number,
-      allowedStores: Set<string>
-  ) => {
-      const aggregates = new Map<string, { sales: number; visitors: number; transactions: number }>();
-      metrics.forEach(metric => {
-          if (!metric.date || typeof metric.date.toDate !== 'function') return;
-          const metricDate = metric.date.toDate();
-          if (metricDate.getUTCFullYear() !== year || metricDate.getUTCMonth() !== month) return;
-          if (!allowedStores.has(metric.store)) return;
-          const entry = aggregates.get(metric.store) || { sales: 0, visitors: 0, transactions: 0 };
-          entry.sales += metric.totalSales || 0;
-          entry.visitors += metric.visitors || 0;
-          entry.transactions += metric.transactionCount || 0;
-          aggregates.set(metric.store, entry);
-      });
-      return aggregates;
-  };
-
-  const monthlyAggregates = useMemo(() => {
-      if (dateFilter.year === 'all' || dateFilter.month === 'all' || typeof dateFilter.month !== 'number') {
-          return { current: new Map<string, { sales: number; visitors: number; transactions: number }>(), prev: new Map<string, { sales: number; visitors: number; transactions: number }>() };
-      }
-      const year = dateFilter.year as number;
-      const month = dateFilter.month as number;
-      const current = computeMonthlyAggregates(roleFilteredData.dailyMetrics, year, month, storeNamesSet);
-      const prevDate = new Date(Date.UTC(year, month - 1, 1));
-      const prev = computeMonthlyAggregates(roleFilteredData.dailyMetrics, prevDate.getUTCFullYear(), prevDate.getUTCMonth(), storeNamesSet);
-      return { current, prev };
-  }, [roleFilteredData.dailyMetrics, dateFilter, storeNamesSet]);
-
   const storePerformanceExtras = useMemo(() => {
+      const now = new Date();
+      const resolvedYear = typeof dateFilter.year === 'number' ? dateFilter.year : now.getUTCFullYear();
+      const resolvedMonth = typeof dateFilter.month === 'number' ? dateFilter.month : now.getUTCMonth();
+      const comparisonYear = resolvedYear - 1;
+      const currentBounds = getRangeBounds(resolvedYear, resolvedMonth, dateFilter.dayFrom, dateFilter.dayTo);
+      const comparisonBounds = getRangeBounds(comparisonYear, resolvedMonth, dateFilter.dayFrom, dateFilter.dayTo);
+
+      const currentAggregates = aggregateRangeForStores(
+          roleFilteredData.dailyMetrics,
+          resolvedYear,
+          resolvedMonth,
+          currentBounds,
+          storeNamesSet
+      );
+      const comparisonAggregates = aggregateRangeForStores(
+          roleFilteredData.dailyMetrics,
+          comparisonYear,
+          resolvedMonth,
+          comparisonBounds,
+          storeNamesSet
+      );
+
       const extras: Record<string, {
           avgTicket: number;
           transactions: number;
@@ -265,27 +299,26 @@ export const useDataProcessing = ({
           salesGrowth: number | null;
       }> = {};
       storeSummary.forEach(store => {
-          const currentAgg = monthlyAggregates.current.get(store.name);
-          const prevAgg = monthlyAggregates.prev.get(store.name);
-          const currentSales = currentAgg?.sales ?? store.totalSales ?? 0;
-          const currentVisitors = currentAgg?.visitors ?? store.visitors ?? 0;
-          const currentTransactions = currentAgg?.transactions ?? store.transactionCount ?? 0;
-          const prevSales = prevAgg?.sales ?? 0;
-          const prevVisitors = prevAgg?.visitors ?? 0;
-          const salesGrowth = prevSales > 0 ? (currentSales - prevSales) / prevSales : null;
-          const visitorGrowth = prevVisitors > 0 ? (currentVisitors - prevVisitors) / prevVisitors : null;
+          const current = currentAggregates.get(store.name) ?? {
+              sales: store.totalSales ?? 0,
+              visitors: store.visitors ?? 0,
+              transactions: store.transactionCount ?? 0,
+          };
+          const previous = comparisonAggregates.get(store.name) ?? { sales: 0, visitors: 0, transactions: 0 };
+          const salesGrowth = previous.sales > 0 ? (current.sales - previous.sales) / previous.sales : null;
+          const visitorGrowth = previous.visitors > 0 ? (current.visitors - previous.visitors) / previous.visitors : null;
           extras[store.name] = {
-              avgTicket: currentTransactions > 0 ? currentSales / currentTransactions : 0,
-              transactions: currentTransactions,
-              conversionRate: currentVisitors > 0 ? currentTransactions / currentVisitors : 0,
-              salesPerVisitor: currentVisitors > 0 ? currentSales / currentVisitors : 0,
-              visitors: currentVisitors,
+              avgTicket: current.transactions > 0 ? current.sales / current.transactions : 0,
+              transactions: current.transactions,
+              conversionRate: current.visitors > 0 ? current.transactions / current.visitors : 0,
+              salesPerVisitor: current.visitors > 0 ? current.sales / current.visitors : 0,
+              visitors: current.visitors,
               visitorGrowth,
               salesGrowth,
           };
       });
       return extras;
-  }, [storeSummary, monthlyAggregates]);
+  }, [storeSummary, roleFilteredData.dailyMetrics, storeNamesSet, dateFilter]);
 
   const employeeSummary = useMemo(() => {
       const summary: { [storeName: string]: EmployeeSummary[] } = {};

@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import MonthYearFilter from '../components/MonthYearFilter';
 import { useLocale } from '../context/LocaleContext';
 import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary, FilterableData } from '../types';
@@ -83,6 +83,21 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     };
   }, [locale]);
 
+  useEffect(() => {
+    setDateFilter(prev => {
+      const now = new Date();
+      let changed = false;
+      const next: DateFilter = { ...prev };
+      if (prev.mode !== 'range') { next.mode = 'range'; changed = true; }
+      if (prev.day !== 'all') { next.day = 'all'; changed = true; }
+      if (prev.dayFrom === undefined) { next.dayFrom = 'all'; changed = true; }
+      if (prev.dayTo === undefined) { next.dayTo = 'all'; changed = true; }
+      if (typeof prev.year !== 'number') { next.year = now.getUTCFullYear(); changed = true; }
+      if (typeof prev.month !== 'number') { next.month = now.getUTCMonth(); changed = true; }
+      return changed ? next : prev;
+    });
+  }, [setDateFilter]);
+
   const ensureWorkbookLib = () => {
     if (typeof XLSX === 'undefined') {
       alert('مكتبة إنشاء الملفات لم تجهز بعد، حاول بعد لحظات.');
@@ -95,16 +110,22 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     if (dateFilter.mode === 'custom' && dateFilter.customStartDate && dateFilter.customEndDate) {
       return `${dateFilter.customStartDate} → ${dateFilter.customEndDate}`;
     }
-    if (dateFilter.year === 'all') {
-      return 'All Periods';
-    }
+    const now = new Date();
+    const resolvedYear = typeof dateFilter.year === 'number' ? dateFilter.year : now.getUTCFullYear();
     if (dateFilter.month === 'all') {
-      return `${dateFilter.year}`;
+      return `${resolvedYear}`;
     }
     if (typeof dateFilter.month === 'number') {
-      return `${monthNames[dateFilter.month]} ${dateFilter.year}`;
+      const monthName = monthNames[dateFilter.month];
+      const lastDay = new Date(Date.UTC(resolvedYear, dateFilter.month + 1, 0)).getUTCDate();
+      const fromDay = typeof dateFilter.dayFrom === 'number' ? dateFilter.dayFrom : 1;
+      const toDay = typeof dateFilter.dayTo === 'number' ? dateFilter.dayTo : lastDay;
+      const displayRange = typeof dateFilter.dayFrom === 'number' || typeof dateFilter.dayTo === 'number';
+      return displayRange
+        ? `${monthName} ${resolvedYear} (${fromDay}-${toDay})`
+        : `${monthName} ${resolvedYear}`;
     }
-    return `${dateFilter.year}`;
+    return `${resolvedYear}`;
   }, [dateFilter]);
 
   const allowedStoreNames = useMemo(() => new Set(storeSummaries.map(s => s.name)), [storeSummaries]);
@@ -201,7 +222,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       const extras = storePerformanceExtras[store.name] || {
         avgTicket: store.atv || 0,
         transactions: store.transactionCount || 0,
-        conversionRate: store.visitors > 0 ? (store.transactionCount / store.visitors) : 0,
+        conversionRate: store.visitors > 0 ? store.transactionCount / store.visitors : 0,
         salesPerVisitor: store.visitors > 0 ? (store.totalSales || 0) / store.visitors : 0,
         visitors: store.visitors || 0,
         visitorGrowth: null,
@@ -217,8 +238,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         achievementPercent: (store.targetAchievement || 0) / 100,
         transactions: extras.transactions ?? store.transactionCount ?? 0,
         avgTicket: extras.avgTicket ?? (store.transactionCount > 0 ? store.totalSales / store.transactionCount : 0),
-        conversionRate: extras.conversionRate ?? 0,
-        salesPerVisitor: extras.salesPerVisitor ?? (store.visitors > 0 ? (store.totalSales || 0) / store.visitors : 0),
+        conversionRate: extras.conversionRate ?? ((store.visitorRate ?? 0) / 100),
+        salesPerVisitor: extras.salesPerVisitor ?? (store.salesPerVisitor ?? ((store.totalSales || 0) / Math.max(store.visitors || 1, 1))),
         visitors: extras.visitors ?? store.visitors ?? 0,
         duvetTarget,
         duvetUnits: totalDuvetUnits,
@@ -597,7 +618,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       <div className="p-4 border border-indigo-100 rounded-lg bg-indigo-50/70">
         <h4 className="font-semibold text-indigo-900 mb-3">{copy.filterTitle}</h4>
         <p className="text-xs text-indigo-700 mb-4">{copy.filterHint}</p>
-        <MonthYearFilter dateFilter={dateFilter} setDateFilter={setDateFilter} allData={allData} />
+        <MonthYearFilter dateFilter={dateFilter} setDateFilter={setDateFilter} allData={allData} forceRangeOnly />
       </div>
 
       <div className="p-5 rounded-xl border border-blue-100 bg-sky-50/70 space-y-3">
