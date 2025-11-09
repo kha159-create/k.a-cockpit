@@ -166,9 +166,11 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       const totalDuvetUnits = duvetData?.total ?? 0;
       const duvetTarget = storeDuvetTargets.get(store.name) || 0;
       const extras = storePerformanceExtras[store.name] || {
-        salesShare: 0,
         avgTicket: store.atv || 0,
         transactions: store.transactionCount || 0,
+        conversionRate: store.visitors > 0 ? (store.transactionCount / store.visitors) * 100 : 0,
+        salesPerVisitor: store.visitors > 0 ? (store.totalSales || 0) / store.visitors : 0,
+        visitors: store.visitors || 0,
         visitorGrowth: null,
         salesGrowth: null,
       };
@@ -182,7 +184,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         achievementPercent: (store.targetAchievement || 0) / 100,
         transactions: extras.transactions ?? store.transactionCount ?? 0,
         avgTicket: extras.avgTicket ?? (store.transactionCount > 0 ? store.totalSales / store.transactionCount : 0),
-        salesShare: extras.salesShare ?? 0,
+        conversionRate: extras.conversionRate ?? 0,
+        salesPerVisitor: extras.salesPerVisitor ?? (store.visitors > 0 ? (store.totalSales || 0) / store.visitors : 0),
+        visitors: extras.visitors ?? store.visitors ?? 0,
         duvetTarget,
         duvetUnits: totalDuvetUnits,
         duvetAchievementPercent: duvetTarget > 0 ? (totalDuvetUnits / duvetTarget) : 0,
@@ -364,8 +368,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       'Sales Achieved (SAR)',
       'Target Achievement %',
       'Transactions',
-      'Avg Ticket (SAR)',
-      'Sales Share %',
+      'ATV Avg (SAR)',
+      'Conversion Rate %',
+      'Sales per Visitor (SAR)',
       'Duvet Target (Units)',
       'Duvet Sales (Units)',
       'Duvet Achievement %',
@@ -393,7 +398,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         row.achievementPercent,
         row.transactions,
         row.avgTicket,
-        row.salesShare,
+        row.conversionRate,
+        row.salesPerVisitor,
         row.duvetTarget,
         row.duvetUnits,
         row.duvetAchievementPercent,
@@ -411,7 +417,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     const totalSalesAchievement = totalSalesTarget > 0 ? totalSalesAchieved / totalSalesTarget : 0;
     const totalTransactions = storeReportRows.reduce((sum, row) => sum + row.transactions, 0);
     const overallAvgTicket = totalTransactions > 0 ? totalSalesAchieved / totalTransactions : 0;
-    const totalSalesShare = storeReportRows.reduce((sum, row) => sum + row.salesShare, 0);
+    const totalVisitors = storeReportRows.reduce((sum, row) => sum + (row.visitors || 0), 0);
+    const overallConversionRate = totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0;
+    const overallSalesPerVisitor = totalVisitors > 0 ? totalSalesAchieved / totalVisitors : 0;
     const totalDuvetTarget = storeReportRows.reduce((sum, row) => sum + row.duvetTarget, 0);
     const totalDuvetUnits = storeReportRows.reduce((sum, row) => sum + row.duvetUnits, 0);
     const totalDuvetAchievement = totalDuvetTarget > 0 ? totalDuvetUnits / totalDuvetTarget : 0;
@@ -428,7 +436,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       totalSalesAchievement,
       totalTransactions,
       overallAvgTicket,
-      totalSalesShare,
+      overallConversionRate,
+      overallSalesPerVisitor,
       totalDuvetTarget,
       totalDuvetUnits,
       totalDuvetAchievement,
@@ -449,17 +458,20 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { wch: 18 },
       { wch: 16 },
       { wch: 18 },
+      { wch: 20 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 20 },
       { wch: 18 },
-      { wch: 20 },
-      { wch: 20 },
+      { wch: 18 },
       { wch: 18 },
       { wch: 18 },
       { wch: 18 },
       { wch: 18 },
     ];
     ws['!merges'] = [
-      XLSX.utils.decode_range('A1:Q1'),
-      XLSX.utils.decode_range('A2:Q2'),
+      XLSX.utils.decode_range('A1:R1'),
+      XLSX.utils.decode_range('A2:R2'),
     ];
 
     if (ws['A1']) ws['A1'].s = titleStyle;
@@ -476,14 +488,15 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 6, format: '#,##0' },
       { index: 7, format: '#,##0.00' },
       { index: 8, format: '0.0%' },
-      { index: 9, format: '#,##0' },
+      { index: 9, format: '#,##0.00' },
       { index: 10, format: '#,##0' },
-      { index: 11, format: '0.0%' },
+      { index: 11, format: '#,##0' },
       { index: 12, format: '0.0%' },
       { index: 13, format: '0.0%' },
-      { index: 14, format: '#,##0' },
+      { index: 14, format: '0.0%' },
       { index: 15, format: '#,##0' },
       { index: 16, format: '#,##0' },
+      { index: 17, format: '#,##0' },
     ]);
 
     const totalsRowIndex = dataStartRow + storeReportRows.length + 1;
@@ -494,14 +507,15 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 6, format: '#,##0' },
       { index: 7, format: '#,##0.00' },
       { index: 8, format: '0.0%' },
-      { index: 9, format: '#,##0' },
+      { index: 9, format: '#,##0.00' },
       { index: 10, format: '#,##0' },
-      { index: 11, format: '0.0%' },
+      { index: 11, format: '#,##0' },
       { index: 12, format: '0.0%' },
       { index: 13, format: '0.0%' },
       { index: 14, format: '#,##0' },
       { index: 15, format: '#,##0' },
       { index: 16, format: '#,##0' },
+      { index: 17, format: '#,##0' },
     ]);
     for (let c = 0; c < header.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c });

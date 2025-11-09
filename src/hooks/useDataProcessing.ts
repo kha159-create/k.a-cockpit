@@ -255,11 +255,12 @@ export const useDataProcessing = ({
   }, [roleFilteredData.dailyMetrics, dateFilter, storeNamesSet]);
 
   const storePerformanceExtras = useMemo(() => {
-      const totalSalesAllStores = storeSummary.reduce((sum, store) => sum + (store.totalSales || 0), 0);
       const extras: Record<string, {
-          salesShare: number;
           avgTicket: number;
           transactions: number;
+          conversionRate: number;
+          salesPerVisitor: number;
+          visitors: number;
           visitorGrowth: number | null;
           salesGrowth: number | null;
       }> = {};
@@ -274,9 +275,11 @@ export const useDataProcessing = ({
           const salesGrowth = prevSales > 0 ? (currentSales - prevSales) / prevSales : null;
           const visitorGrowth = prevVisitors > 0 ? (currentVisitors - prevVisitors) / prevVisitors : null;
           extras[store.name] = {
-              salesShare: totalSalesAllStores > 0 ? currentSales / totalSalesAllStores : 0,
               avgTicket: currentTransactions > 0 ? currentSales / currentTransactions : 0,
               transactions: currentTransactions,
+              conversionRate: currentVisitors > 0 ? (currentTransactions / currentVisitors) * 100 : 0,
+              salesPerVisitor: currentVisitors > 0 ? currentSales / currentVisitors : 0,
+              visitors: currentVisitors,
               visitorGrowth,
               salesGrowth,
           };
