@@ -564,12 +564,20 @@ const handleNotificationClick = (notificationId: string) => {
         });
     };
 
-    const handleSaveBusinessRule = async (rule: string) => {
-        if (!rule.trim()) return;
+    const handleSaveBusinessRule = async (rule: string, existingRuleId?: string) => {
+        if (!rule.trim() && !existingRuleId) return;
         setIsProcessing(true);
         try {
-            await db.collection('businessRules').add({ rule });
-            setAppMessage({ isOpen: true, text: t('rule_saved_success'), type: 'alert' });
+            if (existingRuleId && !rule.trim()) {
+                await db.collection('businessRules').doc(existingRuleId).delete();
+                setAppMessage({ isOpen: true, text: 'تم حذف القاعدة بنجاح', type: 'alert' });
+            } else if (existingRuleId) {
+                await db.collection('businessRules').doc(existingRuleId).set({ rule });
+                setAppMessage({ isOpen: true, text: t('rule_saved_success'), type: 'alert' });
+            } else {
+                await db.collection('businessRules').add({ rule });
+                setAppMessage({ isOpen: true, text: t('rule_saved_success'), type: 'alert' });
+            }
         } catch (error: any) {
              setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
         } finally {
@@ -754,9 +762,7 @@ const handleNotificationClick = (notificationId: string) => {
         return <LFLPage allStores={stores} allMetrics={dailyMetrics} profile={profile}/>;
      case 'settings':
         return <SettingsPage
-                  employeeSummary={Object.values(processedData.employeeSummary).flat()}
                   storeSummary={processedData.storeSummary}
-                  kingDuvetSales={kingDuvetSales}
                   onAddMonthlyData={() => setModalState({type: 'monthlyStoreMetric'})}
                   onDeleteAllData={handleDeleteAllData}
                   onSelectiveDelete={handleSelectiveDelete}

@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { EmployeeSummary, StoreSummary, SalesTransaction, BusinessRule, UserProfile } from '../types.js';
-import DataExporter from '../components/DataExporter.js';
+import type { StoreSummary, BusinessRule, UserProfile } from '../types.js';
 import CustomBusinessRules from '../components/CustomBusinessRules.js';
 import { useLocale } from '../context/LocaleContext.js';
 import { updateAllEmployeesWithLinkedAccount } from '../utils/updateEmployees.js';
@@ -135,21 +134,19 @@ const EmployeeUpdateSection: React.FC = () => {
 };
 
 interface SettingsPageProps {
-    employeeSummary: EmployeeSummary[];
     storeSummary: StoreSummary[];
-    kingDuvetSales: SalesTransaction[];
     onAddMonthlyData: () => void;
     onDeleteAllData: () => void;
     onSelectiveDelete: (dataType: 'visitors' | 'sales', year: number, month: number) => void;
     isProcessing: boolean;
     businessRules: BusinessRule[];
-    onSaveRule: (rule: Omit<BusinessRule, 'id'>) => void;
+    onSaveRule: (rule: string, existingId?: string) => void;
     onDeleteRule: (id: string) => void;
     profile: UserProfile | null;
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({
-    employeeSummary, storeSummary, kingDuvetSales, onAddMonthlyData, onDeleteAllData, onSelectiveDelete, isProcessing,
+    storeSummary, onAddMonthlyData, onDeleteAllData, onSelectiveDelete, isProcessing,
     businessRules, onSaveRule, onDeleteRule, profile
 }) => {
     const isAdmin = profile?.role === 'admin';
@@ -168,6 +165,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             {isAdmin && (
                 <CustomBusinessRules
                     rules={businessRules}
+                    stores={storeSummary}
                     onSave={onSaveRule}
                     onDelete={onDeleteRule}
                     isProcessing={isProcessing}
@@ -185,14 +183,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <p className="text-sm text-zinc-500 mb-4">Extract numeric IDs from names like "Unknown 2792" and backfill missing employeeId in employees and dailyMetrics.</p>
                     <FixUnknownEmployeesButton />
                 </div>
-            )}
-
-            {(isAdmin || isGM) && (
-                <DataExporter 
-                    employeeSummary={employeeSummary} 
-                    storeSummary={storeSummary} 
-                    kingDuvetSales={kingDuvetSales}
-                />
             )}
 
             {isAdmin && (
