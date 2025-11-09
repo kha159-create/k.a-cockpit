@@ -743,6 +743,7 @@ const handleNotificationClick = (notificationId: string) => {
            onClearResult={clearUploadResult}
            employeeSummaries={Object.values(processedData.employeeSummary).flat()}
            storeSummaries={processedData.storeSummary}
+           storePerformanceExtras={processedData.storePerformanceExtras}
            duvetSummary={processedData.duvetSummary}
           employeeDuvetSales={processedData.employeeDuvetSales}
            employees={employees}

@@ -11,6 +11,13 @@ interface SmartUploaderPageProps {
   onClearResult: () => void;
   employeeSummaries: EmployeeSummary[];
   storeSummaries: StoreSummary[];
+  storePerformanceExtras: Record<string, {
+    salesShare: number;
+    avgTicket: number;
+    transactions: number;
+    visitorGrowth: number | null;
+    salesGrowth: number | null;
+  }>;
   duvetSummary: DuvetSummary;
   employeeDuvetSales: { byEmployeeId: Record<string, number>; byEmployeeName: Record<string, number> };
   employees: Employee[];
@@ -34,6 +41,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
   onClearResult,
   employeeSummaries,
   storeSummaries,
+  storePerformanceExtras,
   duvetSummary,
   employeeDuvetSales,
   employees,
@@ -157,6 +165,13 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       const high = duvetData?.['High Value (795-999)'] ?? 0;
       const totalDuvetUnits = duvetData?.total ?? 0;
       const duvetTarget = storeDuvetTargets.get(store.name) || 0;
+      const extras = storePerformanceExtras[store.name] || {
+        salesShare: 0,
+        avgTicket: store.atv || 0,
+        transactions: store.transactionCount || 0,
+        visitorGrowth: null,
+        salesGrowth: null,
+      };
 
       return {
         idx: index + 1,
@@ -165,15 +180,20 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         salesTarget: store.effectiveTarget || 0,
         salesAchieved: store.totalSales || 0,
         achievementPercent: (store.targetAchievement || 0) / 100,
+        transactions: extras.transactions ?? store.transactionCount ?? 0,
+        avgTicket: extras.avgTicket ?? (store.transactionCount > 0 ? store.totalSales / store.transactionCount : 0),
+        salesShare: extras.salesShare ?? 0,
         duvetTarget,
         duvetUnits: totalDuvetUnits,
         duvetAchievementPercent: duvetTarget > 0 ? (totalDuvetUnits / duvetTarget) : 0,
+        visitorGrowth: extras.visitorGrowth ?? null,
+        salesGrowth: extras.salesGrowth ?? null,
         duvetLow: low,
         duvetMedium: medium,
         duvetHigh: high,
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [storeSummaries, duvetSummary, storeDuvetTargets]);
+  }, [storeSummaries, storePerformanceExtras, duvetSummary, storeDuvetTargets]);
 
   const buildWorkbookStyles = () => {
     const headerStyle = {
@@ -343,9 +363,14 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       'Sales Target (SAR)',
       'Sales Achieved (SAR)',
       'Target Achievement %',
+      'Transactions',
+      'Avg Ticket (SAR)',
+      'Sales Share %',
       'Duvet Target (Units)',
       'Duvet Sales (Units)',
       'Duvet Achievement %',
+      'Visitor Growth %',
+      'Store Sales Growth %',
       'Low Value Units',
       'Medium Value Units',
       'High Value Units',
@@ -366,9 +391,14 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         row.salesTarget,
         row.salesAchieved,
         row.achievementPercent,
+        row.transactions,
+        row.avgTicket,
+        row.salesShare,
         row.duvetTarget,
         row.duvetUnits,
         row.duvetAchievementPercent,
+        row.visitorGrowth,
+        row.salesGrowth,
         row.duvetLow,
         row.duvetMedium,
         row.duvetHigh,
@@ -379,6 +409,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     const totalSalesTarget = storeReportRows.reduce((sum, row) => sum + row.salesTarget, 0);
     const totalSalesAchieved = storeReportRows.reduce((sum, row) => sum + row.salesAchieved, 0);
     const totalSalesAchievement = totalSalesTarget > 0 ? totalSalesAchieved / totalSalesTarget : 0;
+    const totalTransactions = storeReportRows.reduce((sum, row) => sum + row.transactions, 0);
+    const overallAvgTicket = totalTransactions > 0 ? totalSalesAchieved / totalTransactions : 0;
+    const totalSalesShare = storeReportRows.reduce((sum, row) => sum + row.salesShare, 0);
     const totalDuvetTarget = storeReportRows.reduce((sum, row) => sum + row.duvetTarget, 0);
     const totalDuvetUnits = storeReportRows.reduce((sum, row) => sum + row.duvetUnits, 0);
     const totalDuvetAchievement = totalDuvetTarget > 0 ? totalDuvetUnits / totalDuvetTarget : 0;
@@ -393,9 +426,14 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       totalSalesTarget,
       totalSalesAchieved,
       totalSalesAchievement,
+      totalTransactions,
+      overallAvgTicket,
+      totalSalesShare,
       totalDuvetTarget,
       totalDuvetUnits,
       totalDuvetAchievement,
+      null,
+      null,
       totalLow,
       totalMedium,
       totalHigh,
@@ -409,6 +447,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { wch: 18 },
       { wch: 18 },
       { wch: 18 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 18 },
       { wch: 20 },
       { wch: 20 },
       { wch: 18 },
@@ -417,8 +458,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { wch: 18 },
     ];
     ws['!merges'] = [
-      XLSX.utils.decode_range('A1:L1'),
-      XLSX.utils.decode_range('A2:L2'),
+      XLSX.utils.decode_range('A1:Q1'),
+      XLSX.utils.decode_range('A2:Q2'),
     ];
 
     if (ws['A1']) ws['A1'].s = titleStyle;
@@ -433,11 +474,16 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 4, format: '#,##0.00' },
       { index: 5, format: '0.0%' },
       { index: 6, format: '#,##0' },
-      { index: 7, format: '#,##0' },
+      { index: 7, format: '#,##0.00' },
       { index: 8, format: '0.0%' },
       { index: 9, format: '#,##0' },
       { index: 10, format: '#,##0' },
-      { index: 11, format: '#,##0' },
+      { index: 11, format: '0.0%' },
+      { index: 12, format: '0.0%' },
+      { index: 13, format: '0.0%' },
+      { index: 14, format: '#,##0' },
+      { index: 15, format: '#,##0' },
+      { index: 16, format: '#,##0' },
     ]);
 
     const totalsRowIndex = dataStartRow + storeReportRows.length + 1;
@@ -446,11 +492,16 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 4, format: '#,##0.00' },
       { index: 5, format: '0.0%' },
       { index: 6, format: '#,##0' },
-      { index: 7, format: '#,##0' },
+      { index: 7, format: '#,##0.00' },
       { index: 8, format: '0.0%' },
       { index: 9, format: '#,##0' },
       { index: 10, format: '#,##0' },
-      { index: 11, format: '#,##0' },
+      { index: 11, format: '0.0%' },
+      { index: 12, format: '0.0%' },
+      { index: 13, format: '0.0%' },
+      { index: 14, format: '#,##0' },
+      { index: 15, format: '#,##0' },
+      { index: 16, format: '#,##0' },
     ]);
     for (let c = 0; c < header.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c });

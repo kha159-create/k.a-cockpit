@@ -219,6 +219,71 @@ export const useDataProcessing = ({
     });
   }, [areaFilteredData.stores, areaFilteredData.metrics, dateFilter]);
 
+  const storeNamesSet = useMemo(() => new Set(areaFilteredData.stores.map(store => store.name)), [areaFilteredData.stores]);
+
+  const computeMonthlyAggregates = (
+      metrics: DailyMetric[],
+      year: number,
+      month: number,
+      allowedStores: Set<string>
+  ) => {
+      const aggregates = new Map<string, { sales: number; visitors: number; transactions: number }>();
+      metrics.forEach(metric => {
+          if (!metric.date || typeof metric.date.toDate !== 'function') return;
+          const metricDate = metric.date.toDate();
+          if (metricDate.getUTCFullYear() !== year || metricDate.getUTCMonth() !== month) return;
+          if (!allowedStores.has(metric.store)) return;
+          const entry = aggregates.get(metric.store) || { sales: 0, visitors: 0, transactions: 0 };
+          entry.sales += metric.totalSales || 0;
+          entry.visitors += metric.visitors || 0;
+          entry.transactions += metric.transactionCount || 0;
+          aggregates.set(metric.store, entry);
+      });
+      return aggregates;
+  };
+
+  const monthlyAggregates = useMemo(() => {
+      if (dateFilter.year === 'all' || dateFilter.month === 'all' || typeof dateFilter.month !== 'number') {
+          return { current: new Map<string, { sales: number; visitors: number; transactions: number }>(), prev: new Map<string, { sales: number; visitors: number; transactions: number }>() };
+      }
+      const year = dateFilter.year as number;
+      const month = dateFilter.month as number;
+      const current = computeMonthlyAggregates(roleFilteredData.dailyMetrics, year, month, storeNamesSet);
+      const prevDate = new Date(Date.UTC(year, month - 1, 1));
+      const prev = computeMonthlyAggregates(roleFilteredData.dailyMetrics, prevDate.getUTCFullYear(), prevDate.getUTCMonth(), storeNamesSet);
+      return { current, prev };
+  }, [roleFilteredData.dailyMetrics, dateFilter, storeNamesSet]);
+
+  const storePerformanceExtras = useMemo(() => {
+      const totalSalesAllStores = storeSummary.reduce((sum, store) => sum + (store.totalSales || 0), 0);
+      const extras: Record<string, {
+          salesShare: number;
+          avgTicket: number;
+          transactions: number;
+          visitorGrowth: number | null;
+          salesGrowth: number | null;
+      }> = {};
+      storeSummary.forEach(store => {
+          const currentAgg = monthlyAggregates.current.get(store.name);
+          const prevAgg = monthlyAggregates.prev.get(store.name);
+          const currentSales = currentAgg?.sales ?? store.totalSales ?? 0;
+          const currentVisitors = currentAgg?.visitors ?? store.visitors ?? 0;
+          const currentTransactions = currentAgg?.transactions ?? store.transactionCount ?? 0;
+          const prevSales = prevAgg?.sales ?? 0;
+          const prevVisitors = prevAgg?.visitors ?? 0;
+          const salesGrowth = prevSales > 0 ? (currentSales - prevSales) / prevSales : null;
+          const visitorGrowth = prevVisitors > 0 ? (currentVisitors - prevVisitors) / prevVisitors : null;
+          extras[store.name] = {
+              salesShare: totalSalesAllStores > 0 ? currentSales / totalSalesAllStores : 0,
+              avgTicket: currentTransactions > 0 ? currentSales / currentTransactions : 0,
+              transactions: currentTransactions,
+              visitorGrowth,
+              salesGrowth,
+          };
+      });
+      return extras;
+  }, [storeSummary, monthlyAggregates]);
+
   const employeeSummary = useMemo(() => {
       const summary: { [storeName: string]: EmployeeSummary[] } = {};
       
@@ -430,5 +495,5 @@ export const useDataProcessing = ({
     }));
 }, [areaFilteredData.metrics, areaFilteredData.stores, dateFilter]);
 
-  return { kpiData, storeSummary, employeeSummary, productSummary, duvetSummary, employeeDuvetSales, commissionData, salesPerformance };
+  return { kpiData, storeSummary, storePerformanceExtras, employeeSummary, productSummary, duvetSummary, employeeDuvetSales, commissionData, salesPerformance };
 };
