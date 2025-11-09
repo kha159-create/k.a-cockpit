@@ -173,6 +173,17 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       'Medium Value (495-695)': 0,
       'High Value (795-999)': 0,
     };
+    const resolveUnitPrice = (product: ProductSummary) => {
+      if (product.price && product.price > 0) {
+        return product.price;
+      }
+      if (product.soldQty && product.totalValue) {
+        const inferred = product.totalValue / product.soldQty;
+        return Number.isFinite(inferred) ? inferred : 0;
+      }
+      return 0;
+    };
+
     const duvetProducts = filteredProducts.filter(p => {
       const category = getCategory(p);
       if (filters.category === 'Duvets' || filters.category === 'Duvets Full') {
@@ -190,7 +201,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
 
     let totalDuvetUnits = 0;
     duvetProducts.forEach(product => {
-      const category = getDuvetBand(product.price || 0);
+      const category = getDuvetBand(resolveUnitPrice(product));
       if (!category) return;
       const qty = product.soldQty || 0;
       duvetBuckets[category] += qty;
@@ -380,7 +391,8 @@ Use short sentences. Output in Arabic.` }]}
         )}
       </div>
       
-      {/* Summary Dashboard (below Products Overview table) */}
+      {/* Summary Dashboard & Analytics */}
+      <section className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="bg-white p-4 rounded-xl shadow-sm border">
             <div className="text-xs text-zinc-500 mb-1">Total Products Sold (MTD)</div>
@@ -410,49 +422,42 @@ Use short sentences. Output in Arabic.` }]}
           </div>
         </div>
 
-      {/* Charts (below Products Overview table) */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-1">
-            <ChartCard title="Top 10 Selling Products">
-              <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
-            </ChartCard>
-          </div>
-          <div className="xl:col-span-1">
-            <ChartCard title="Category Share">
-              <PieChart data={summary.charts.categoryShare} />
-            </ChartCard>
-          </div>
-          <div className="xl:col-span-1">
-            <ChartCard title="Monthly Sales Trend">
-              <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
-            </ChartCard>
-          </div>
-        </div>
-      <div>
-        <ChartCard title="Duvet Sales Analysis by Value">
-          <div className="space-y-3 p-1">
-            {summary.duvetAnalysis.totalUnits > 0 ? (
-              summary.duvetAnalysis.breakdown.map(item => (
-                <div key={item.name}>
-                  <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
-                    <span>{item.name}</span>
-                    <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
-        </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
+        {/* Charts */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-4 gap-6">
+          <ChartCard title="Top 10 Selling Products">
+            <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
+          </ChartCard>
+          <ChartCard title="Category Share">
+            <PieChart data={summary.charts.categoryShare} />
+          </ChartCard>
+          <ChartCard title="Monthly Sales Trend">
+            <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
+          </ChartCard>
+          <ChartCard title="Duvet Sales Analysis by Value">
+            <div className="space-y-3 p-1 h-full flex flex-col">
+              {summary.duvetAnalysis.totalUnits > 0 ? (
+                summary.duvetAnalysis.breakdown.map(item => (
+                  <div key={item.name}>
+                    <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
+                      <span>{item.name}</span>
+                      <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-zinc-500 text-sm">No duvet sales data for this period.</p>
+              )}
+              <div className="mt-auto pt-2 border-t border-gray-200 text-xs flex justify-between">
+                <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
+                <span className="font-bold text-zinc-900">{summary.duvetAnalysis.totalUnits}</span>
               </div>
-              </div>
-              ))
-            ) : (
-              <p className="text-center text-zinc-500 text-sm">No duvet sales data for this period.</p>
-            )}
-            <div className="pt-2 border-t border-gray-200 text-xs flex justify-between">
-              <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
-              <span className="font-bold text-zinc-900">{summary.duvetAnalysis.totalUnits}</span>
             </div>
-          </div>
-        </ChartCard>
-      </div>
+          </ChartCard>
+        </div>
+      </section>
 
       {/* Cross-Selling Analytics */}
       <div className="space-y-6">
