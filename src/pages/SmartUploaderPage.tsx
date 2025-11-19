@@ -2,7 +2,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import MonthYearFilter from '../components/MonthYearFilter';
 import { useLocale } from '../context/LocaleContext';
-import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary, FilterableData } from '../types';
+import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary, FilterableData, SalesTransaction } from '../types';
+import { getCategory } from '../utils/calculator';
 
 declare var XLSX: any;
 
@@ -181,6 +182,91 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     return { byId, byEmployeeId, byName };
   }, [employees]);
 
+  // Calculate Category Share per store
+  const storeCategoryShare = useMemo(() => {
+    const shareMap: Record<string, { Duvets: number; 'Duvets Full': number; Toppers: number; Pillows: number; Other: number; total: number }> = {};
+    
+    // Filter sales transactions by date
+    const filterByDate = (item: FilterableData) => {
+      const itemTimestamp = 'date' in item ? item.date : item['Bill Dt.'];
+      if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
+      const itemDate = itemTimestamp.toDate();
+      const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
+
+      const mode = dateFilter.mode ?? 'single';
+      const parseIsoDate = (value?: string | null) => {
+        if (!value) return null;
+        const [y, mValue, d] = value.split('-').map(Number);
+        if ([y, mValue, d].some(num => Number.isNaN(num))) return null;
+        return new Date(Date.UTC(y, (mValue || 1) - 1, d || 1));
+      };
+
+      if (mode === 'custom') {
+        const start = parseIsoDate(dateFilter.customStartDate);
+        const end = parseIsoDate(dateFilter.customEndDate);
+        if (start && normalizedDate < start) return false;
+        if (end && normalizedDate > end) return false;
+        return true;
+      }
+
+      const now = new Date();
+      const year = dateFilter.year === 'all' ? now.getUTCFullYear() : (dateFilter.year as number);
+      const month = dateFilter.month === 'all' ? now.getUTCMonth() : (dateFilter.month as number);
+      const yearMatch = normalizedDate.getUTCFullYear() === year;
+      const monthMatch = normalizedDate.getUTCMonth() === month;
+
+      if (mode === 'range') {
+        const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+        const fromDay = typeof dateFilter.dayFrom === 'number' ? dateFilter.dayFrom : 1;
+        const toDay = typeof dateFilter.dayTo === 'number' ? dateFilter.dayTo : lastDay;
+        const day = normalizedDate.getUTCDate();
+        return yearMatch && monthMatch && day >= fromDay && day <= toDay;
+      }
+
+      const day = dateFilter.day === 'all' ? true : normalizedDate.getUTCDate() === dateFilter.day;
+      return yearMatch && monthMatch && day;
+    };
+
+    const filteredSales = allData.filter((item): item is SalesTransaction => {
+      if (!filterByDate(item)) return false;
+      return 'Item Name' in item && 'Item Alias' in item && 'Outlet Name' in item;
+    });
+
+    filteredSales.forEach(sale => {
+      const storeName = sale['Outlet Name'];
+      if (!storeName) return;
+      
+      const category = getCategory({ name: sale['Item Name'], alias: sale['Item Alias'] });
+      const value = (sale['Sold Qty'] || 0) * (sale['Item Rate'] || 0);
+      
+      if (!shareMap[storeName]) {
+        shareMap[storeName] = { Duvets: 0, 'Duvets Full': 0, Toppers: 0, Pillows: 0, Other: 0, total: 0 };
+      }
+      
+      const categoryKey = category as 'Duvets' | 'Duvets Full' | 'Toppers' | 'Pillows' | 'Other';
+      if (shareMap[storeName][categoryKey] !== undefined) {
+        shareMap[storeName][categoryKey] += value;
+      }
+      shareMap[storeName].total += value;
+    });
+
+    // Calculate percentages
+    const result: Record<string, { Duvets: number; 'Duvets Full': number; Toppers: number; Pillows: number; Other: number }> = {};
+    Object.keys(shareMap).forEach(storeName => {
+      const data = shareMap[storeName];
+      const total = data.total || 1; // Avoid division by zero
+      result[storeName] = {
+        Duvets: (data.Duvets / total) * 100,
+        'Duvets Full': (data['Duvets Full'] / total) * 100,
+        Toppers: (data.Toppers / total) * 100,
+        Pillows: (data.Pillows / total) * 100,
+        Other: (data.Other / total) * 100,
+      };
+    });
+
+    return result;
+  }, [allData, dateFilter]);
+
   const sortedEmployeeRows = useMemo(() => {
     const rows = employeeSummaries.map((emp, index) => {
       const sourceEmployee =
@@ -228,6 +314,13 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         visitorGrowth: null,
         salesGrowth: null,
       };
+      const categoryShare = storeCategoryShare[store.name] || {
+        Duvets: 0,
+        'Duvets Full': 0,
+        Toppers: 0,
+        Pillows: 0,
+        Other: 0,
+      };
 
       return {
         idx: index + 1,
@@ -249,9 +342,14 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         duvetLow: low,
         duvetMedium: medium,
         duvetHigh: high,
+        categoryShareDuvets: categoryShare.Duvets,
+        categoryShareDuvetsFull: categoryShare['Duvets Full'],
+        categoryShareToppers: categoryShare.Toppers,
+        categorySharePillows: categoryShare.Pillows,
+        categoryShareOther: categoryShare.Other,
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [storeSummaries, storePerformanceExtras, duvetSummary, storeDuvetTargets]);
+  }, [storeSummaries, storePerformanceExtras, duvetSummary, storeDuvetTargets, storeCategoryShare]);
 
   const buildWorkbookStyles = () => {
     const headerStyle = {
@@ -433,6 +531,11 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       'Low Value Units',
       'Medium Value Units',
       'High Value Units',
+      'Duvets %',
+      'Duvets Full %',
+      'Toppers %',
+      'Pillows %',
+      'Other %',
     ];
 
     const data: (string | number | null)[][] = [
@@ -462,6 +565,11 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         row.duvetLow,
         row.duvetMedium,
         row.duvetHigh,
+        row.categoryShareDuvets / 100,
+        row.categoryShareDuvetsFull / 100,
+        row.categoryShareToppers / 100,
+        row.categorySharePillows / 100,
+        row.categoryShareOther / 100,
       ]);
     });
 
@@ -500,6 +608,11 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       totalLow,
       totalMedium,
       totalHigh,
+      null, // Category shares are percentages per store, no overall total
+      null,
+      null,
+      null,
+      null,
     ]);
 
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -522,10 +635,15 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { wch: 18 },
       { wch: 18 },
       { wch: 18 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
     ];
     ws['!merges'] = [
-      XLSX.utils.decode_range('A1:R1'),
-      XLSX.utils.decode_range('A2:R2'),
+      XLSX.utils.decode_range('A1:W1'),
+      XLSX.utils.decode_range('A2:W2'),
     ];
 
     if (ws['A1']) ws['A1'].s = titleStyle;
@@ -551,6 +669,11 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 15, format: '#,##0' },
       { index: 16, format: '#,##0' },
       { index: 17, format: '#,##0' },
+      { index: 18, format: '0.0%' },
+      { index: 19, format: '0.0%' },
+      { index: 20, format: '0.0%' },
+      { index: 21, format: '0.0%' },
+      { index: 22, format: '0.0%' },
     ]);
 
     const totalsRowIndex = dataStartRow + storeReportRows.length + 1;
@@ -566,10 +689,11 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 11, format: '#,##0' },
       { index: 12, format: '0.0%' },
       { index: 13, format: '0.0%' },
-      { index: 14, format: '#,##0' },
+      { index: 14, format: '0.0%' },
       { index: 15, format: '#,##0' },
       { index: 16, format: '#,##0' },
       { index: 17, format: '#,##0' },
+      // Category shares columns (18-22) are null in totals row, no format needed
     ]);
     for (let c = 0; c < header.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c });
