@@ -250,17 +250,29 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       shareMap[storeName].total += value;
     });
 
-    // Calculate percentages
-    const result: Record<string, { Duvets: number; 'Duvets Full': number; Toppers: number; Pillows: number; Other: number }> = {};
+    // Calculate percentages and values
+    const result: Record<string, {
+      values: { Duvets: number; 'Duvets Full': number; Toppers: number; Pillows: number; Other: number };
+      percentages: { Duvets: number; 'Duvets Full': number; Toppers: number; Pillows: number; Other: number };
+    }> = {};
     Object.keys(shareMap).forEach(storeName => {
       const data = shareMap[storeName];
       const total = data.total || 1; // Avoid division by zero
       result[storeName] = {
-        Duvets: (data.Duvets / total) * 100,
-        'Duvets Full': (data['Duvets Full'] / total) * 100,
-        Toppers: (data.Toppers / total) * 100,
-        Pillows: (data.Pillows / total) * 100,
-        Other: (data.Other / total) * 100,
+        values: {
+          Duvets: data.Duvets,
+          'Duvets Full': data['Duvets Full'],
+          Toppers: data.Toppers,
+          Pillows: data.Pillows,
+          Other: data.Other,
+        },
+        percentages: {
+          Duvets: (data.Duvets / total) * 100,
+          'Duvets Full': (data['Duvets Full'] / total) * 100,
+          Toppers: (data.Toppers / total) * 100,
+          Pillows: (data.Pillows / total) * 100,
+          Other: (data.Other / total) * 100,
+        },
       };
     });
 
@@ -315,11 +327,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         salesGrowth: null,
       };
       const categoryShare = storeCategoryShare[store.name] || {
-        Duvets: 0,
-        'Duvets Full': 0,
-        Toppers: 0,
-        Pillows: 0,
-        Other: 0,
+        values: { Duvets: 0, 'Duvets Full': 0, Toppers: 0, Pillows: 0, Other: 0 },
+        percentages: { Duvets: 0, 'Duvets Full': 0, Toppers: 0, Pillows: 0, Other: 0 },
       };
 
       return {
@@ -342,11 +351,16 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         duvetLow: low,
         duvetMedium: medium,
         duvetHigh: high,
-        categoryShareDuvets: categoryShare.Duvets,
-        categoryShareDuvetsFull: categoryShare['Duvets Full'],
-        categoryShareToppers: categoryShare.Toppers,
-        categorySharePillows: categoryShare.Pillows,
-        categoryShareOther: categoryShare.Other,
+        categoryShareDuvetsValue: categoryShare.values.Duvets,
+        categoryShareDuvetsFullValue: categoryShare.values['Duvets Full'],
+        categoryShareToppersValue: categoryShare.values.Toppers,
+        categorySharePillowsValue: categoryShare.values.Pillows,
+        categoryShareOtherValue: categoryShare.values.Other,
+        categoryShareDuvets: categoryShare.percentages.Duvets,
+        categoryShareDuvetsFull: categoryShare.percentages['Duvets Full'],
+        categoryShareToppers: categoryShare.percentages.Toppers,
+        categorySharePillows: categoryShare.percentages.Pillows,
+        categoryShareOther: categoryShare.percentages.Other,
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [storeSummaries, storePerformanceExtras, duvetSummary, storeDuvetTargets, storeCategoryShare]);
@@ -531,10 +545,15 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       'Low Value Units',
       'Medium Value Units',
       'High Value Units',
+      'Duvets (SAR)',
       'Duvets %',
+      'Duvets Full (SAR)',
       'Duvets Full %',
+      'Toppers (SAR)',
       'Toppers %',
+      'Pillows (SAR)',
       'Pillows %',
+      'Other (SAR)',
       'Other %',
     ];
 
@@ -565,10 +584,15 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         row.duvetLow,
         row.duvetMedium,
         row.duvetHigh,
+        row.categoryShareDuvetsValue,
         row.categoryShareDuvets / 100,
+        row.categoryShareDuvetsFullValue,
         row.categoryShareDuvetsFull / 100,
+        row.categoryShareToppersValue,
         row.categoryShareToppers / 100,
+        row.categorySharePillowsValue,
         row.categorySharePillows / 100,
+        row.categoryShareOtherValue,
         row.categoryShareOther / 100,
       ]);
     });
@@ -588,6 +612,12 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     const totalLow = storeReportRows.reduce((sum, row) => sum + row.duvetLow, 0);
     const totalMedium = storeReportRows.reduce((sum, row) => sum + row.duvetMedium, 0);
     const totalHigh = storeReportRows.reduce((sum, row) => sum + row.duvetHigh, 0);
+    const totalDuvetsValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareDuvetsValue, 0);
+    const totalDuvetsFullValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareDuvetsFullValue, 0);
+    const totalToppersValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareToppersValue, 0);
+    const totalPillowsValue = storeReportRows.reduce((sum, row) => sum + row.categorySharePillowsValue, 0);
+    const totalOtherValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareOtherValue, 0);
+    const totalCategoryValue = totalDuvetsValue + totalDuvetsFullValue + totalToppersValue + totalPillowsValue + totalOtherValue;
 
     data.push([
       'Totals',
@@ -608,11 +638,16 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       totalLow,
       totalMedium,
       totalHigh,
-      null, // Category shares are percentages per store, no overall total
-      null,
-      null,
-      null,
-      null,
+      totalDuvetsValue,
+      totalCategoryValue > 0 ? (totalDuvetsValue / totalCategoryValue) * 100 : 0,
+      totalDuvetsFullValue,
+      totalCategoryValue > 0 ? (totalDuvetsFullValue / totalCategoryValue) * 100 : 0,
+      totalToppersValue,
+      totalCategoryValue > 0 ? (totalToppersValue / totalCategoryValue) * 100 : 0,
+      totalPillowsValue,
+      totalCategoryValue > 0 ? (totalPillowsValue / totalCategoryValue) * 100 : 0,
+      totalOtherValue,
+      totalCategoryValue > 0 ? (totalOtherValue / totalCategoryValue) * 100 : 0,
     ]);
 
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -635,15 +670,20 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { wch: 18 },
       { wch: 18 },
       { wch: 18 },
+      { wch: 18 },
       { wch: 16 },
+      { wch: 18 },
       { wch: 16 },
+      { wch: 18 },
       { wch: 16 },
+      { wch: 18 },
       { wch: 16 },
+      { wch: 18 },
       { wch: 16 },
     ];
     ws['!merges'] = [
-      XLSX.utils.decode_range('A1:W1'),
-      XLSX.utils.decode_range('A2:W2'),
+      XLSX.utils.decode_range('A1:AG1'),
+      XLSX.utils.decode_range('A2:AG2'),
     ];
 
     if (ws['A1']) ws['A1'].s = titleStyle;
@@ -669,11 +709,16 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 15, format: '#,##0' },
       { index: 16, format: '#,##0' },
       { index: 17, format: '#,##0' },
-      { index: 18, format: '0.0%' },
-      { index: 19, format: '0.0%' },
-      { index: 20, format: '0.0%' },
-      { index: 21, format: '0.0%' },
-      { index: 22, format: '0.0%' },
+      { index: 18, format: '#,##0.00' }, // Duvets (SAR)
+      { index: 19, format: '0.0%' },     // Duvets %
+      { index: 20, format: '#,##0.00' }, // Duvets Full (SAR)
+      { index: 21, format: '0.0%' },     // Duvets Full %
+      { index: 22, format: '#,##0.00' }, // Toppers (SAR)
+      { index: 23, format: '0.0%' },     // Toppers %
+      { index: 24, format: '#,##0.00' }, // Pillows (SAR)
+      { index: 25, format: '0.0%' },     // Pillows %
+      { index: 26, format: '#,##0.00' }, // Other (SAR)
+      { index: 27, format: '0.0%' },     // Other %
     ]);
 
     const totalsRowIndex = dataStartRow + storeReportRows.length + 1;
@@ -693,7 +738,16 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 15, format: '#,##0' },
       { index: 16, format: '#,##0' },
       { index: 17, format: '#,##0' },
-      // Category shares columns (18-22) are null in totals row, no format needed
+      { index: 18, format: '#,##0.00' }, // Duvets (SAR)
+      { index: 19, format: '0.0%' },     // Duvets %
+      { index: 20, format: '#,##0.00' }, // Duvets Full (SAR)
+      { index: 21, format: '0.0%' },     // Duvets Full %
+      { index: 22, format: '#,##0.00' }, // Toppers (SAR)
+      { index: 23, format: '0.0%' },     // Toppers %
+      { index: 24, format: '#,##0.00' }, // Pillows (SAR)
+      { index: 25, format: '0.0%' },     // Pillows %
+      { index: 26, format: '#,##0.00' }, // Other (SAR)
+      { index: 27, format: '0.0%' },     // Other %
     ]);
     for (let c = 0; c < header.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c });
