@@ -46,6 +46,74 @@ export const getCategory = (product: { name?: string, alias?: string }): string 
     return 'Other';
 };
 
+/**
+ * Smart duvet price categorization - divides duvet prices into 3 equal categories
+ * based on actual data distribution
+ */
+export const getSmartDuvetCategories = (prices: number[]): { 
+    low: { min: number; max: number; label: string };
+    medium: { min: number; max: number; label: string };
+    high: { min: number; max: number; label: string };
+} => {
+    // Filter out invalid prices
+    const validPrices = prices.filter(p => p > 0 && isFinite(p)).sort((a, b) => a - b);
+    
+    if (validPrices.length === 0) {
+        // Default fallback ranges
+        return {
+            low: { min: 0, max: 400, label: 'Low Value' },
+            medium: { min: 400, max: 700, label: 'Medium Value' },
+            high: { min: 700, max: Infinity, label: 'High Value' }
+        };
+    }
+    
+    const minPrice = validPrices[0];
+    const maxPrice = validPrices[validPrices.length - 1];
+    const range = maxPrice - minPrice;
+    
+    // Divide into 3 equal ranges
+    const lowMax = minPrice + (range / 3);
+    const mediumMax = minPrice + (range * 2 / 3);
+    
+    // Round to nice numbers
+    const roundToNice = (num: number) => {
+        if (num < 100) return Math.round(num / 10) * 10;
+        if (num < 1000) return Math.round(num / 50) * 50;
+        return Math.round(num / 100) * 100;
+    };
+    
+    const lowMaxRounded = roundToNice(lowMax);
+    const mediumMaxRounded = roundToNice(mediumMax);
+    
+    return {
+        low: { 
+            min: Math.floor(minPrice), 
+            max: lowMaxRounded, 
+            label: `Low Value (${Math.floor(minPrice)}-${lowMaxRounded})` 
+        },
+        medium: { 
+            min: lowMaxRounded + 1, 
+            max: mediumMaxRounded, 
+            label: `Medium Value (${lowMaxRounded + 1}-${mediumMaxRounded})` 
+        },
+        high: { 
+            min: mediumMaxRounded + 1, 
+            max: Math.ceil(maxPrice), 
+            label: `High Value (${mediumMaxRounded + 1}+)` 
+        }
+    };
+};
+
+/**
+ * Get duvet category based on smart price ranges
+ */
+export const getSmartDuvetCategory = (price: number, categories: ReturnType<typeof getSmartDuvetCategories>): string | null => {
+    if (price <= categories.low.max) return categories.low.label;
+    if (price <= categories.medium.max) return categories.medium.label;
+    if (price >= categories.high.min) return categories.high.label;
+    return null;
+};
+
 
 export const calculateEffectiveTarget = (
     targetsMap: { [year: string]: { [month: string]: number } } | undefined,

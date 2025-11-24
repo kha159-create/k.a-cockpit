@@ -5,7 +5,7 @@ import { Table, Column } from '../components/Table';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import { SparklesIcon } from '../components/Icons';
 import { StoreName } from '@/components/Names';
-import { getCategory } from '../utils/calculator';
+import { getCategory, getSmartDuvetCategories, getSmartDuvetCategory } from '../utils/calculator';
 import type { ProductSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile } from '../types';
 import { ChartCard, BarChart, LineChart, PieChart } from '../components/DashboardComponents';
 import { generateText } from '../services/geminiService';
@@ -163,16 +163,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     });
     const categoryShare = Array.from(categoryMap.entries()).map(([name, value]) => ({ name, value }));
 
-    const duvetLabels: Array<'Low Value (199-399)' | 'Medium Value (495-695)' | 'High Value (795-999)'> = [
-      'Low Value (199-399)',
-      'Medium Value (495-695)',
-      'High Value (795-999)',
-    ];
-    const duvetBuckets: Record<typeof duvetLabels[number], number> = {
-      'Low Value (199-399)': 0,
-      'Medium Value (495-695)': 0,
-      'High Value (795-999)': 0,
-    };
     const resolveUnitPrice = (product: ProductSummary) => {
       if (product.price && product.price > 0) {
         return product.price;
@@ -192,16 +182,21 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       return category === 'Duvets' || category === 'Duvets Full';
     });
 
-    const getDuvetBand = (rate: number): typeof duvetLabels[number] | null => {
-      if (rate >= 199 && rate <= 399) return 'Low Value (199-399)';
-      if (rate >= 495 && rate <= 695) return 'Medium Value (495-695)';
-      if (rate >= 795 && rate <= 999) return 'High Value (795-999)';
-      return null;
+    // Smart categorization: collect all prices first, then create categories
+    const duvetPrices = duvetProducts.map(p => resolveUnitPrice(p)).filter(p => p > 0);
+    const smartCategories = getSmartDuvetCategories(duvetPrices);
+    
+    const duvetLabels = [smartCategories.low.label, smartCategories.medium.label, smartCategories.high.label];
+    const duvetBuckets: Record<string, number> = {
+      [smartCategories.low.label]: 0,
+      [smartCategories.medium.label]: 0,
+      [smartCategories.high.label]: 0,
     };
 
     let totalDuvetUnits = 0;
     duvetProducts.forEach(product => {
-      const category = getDuvetBand(resolveUnitPrice(product));
+      const price = resolveUnitPrice(product);
+      const category = getSmartDuvetCategory(price, smartCategories);
       if (!category) return;
       const qty = product.soldQty || 0;
       duvetBuckets[category] += qty;
@@ -210,8 +205,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
 
     const duvetBreakdown = duvetLabels.map(label => ({
       name: label,
-      units: duvetBuckets[label],
-      percentage: totalDuvetUnits > 0 ? (duvetBuckets[label] / totalDuvetUnits) * 100 : 0,
+      units: duvetBuckets[label] || 0,
+      percentage: totalDuvetUnits > 0 ? ((duvetBuckets[label] || 0) / totalDuvetUnits) * 100 : 0,
     }));
 
     return {

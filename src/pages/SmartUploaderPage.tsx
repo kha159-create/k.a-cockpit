@@ -311,11 +311,26 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
   }, [employeeSummaries, employeeLookup, employeeDuvetSales, dateFilter]);
 
   const storeReportRows = useMemo(() => {
+    // Get smart category labels from first store that has duvet data
+    const getCategoryKeys = (duvetData: any) => {
+      if (!duvetData) return { low: 'Low Value', medium: 'Medium Value', high: 'High Value' };
+      const keys = Object.keys(duvetData).filter(k => k !== 'name' && k !== 'total');
+      return {
+        low: keys.find(k => k.toLowerCase().includes('low')) || 'Low Value',
+        medium: keys.find(k => k.toLowerCase().includes('medium')) || 'Medium Value',
+        high: keys.find(k => k.toLowerCase().includes('high')) || 'High Value',
+      };
+    };
+    
+    // Find category keys from first available store
+    const firstStoreWithData = storeSummaries.find(s => duvetSummary[s.name]);
+    const categoryKeys = getCategoryKeys(duvetSummary[firstStoreWithData?.name || '']);
+    
     return storeSummaries.map((store, index) => {
       const duvetData = duvetSummary[store.name];
-      const low = duvetData?.['Low Value (199-399)'] ?? 0;
-      const medium = duvetData?.['Medium Value (495-695)'] ?? 0;
-      const high = duvetData?.['High Value (795-999)'] ?? 0;
+      const low = duvetData?.[categoryKeys.low] ?? 0;
+      const medium = duvetData?.[categoryKeys.medium] ?? 0;
+      const high = duvetData?.[categoryKeys.high] ?? 0;
       const totalDuvetUnits = duvetData?.total ?? 0;
       const duvetTarget = storeDuvetTargets.get(store.name) || 0;
       const extras = storePerformanceExtras[store.name] || {

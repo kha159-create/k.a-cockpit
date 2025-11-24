@@ -21,12 +21,6 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
     const { t } = useLocale();
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-    const getDuvetCategory = useCallback((price: number) => {
-        if (price >= 199 && price <= 399) return 'Low Value (199-399)';
-        if (price >= 495 && price <= 695) return 'Medium Value (495-695)';
-        if (price >= 795 && price <= 999) return 'High Value (795-999)';
-        return null;
-    }, []);
     
     const employeeData = useMemo(() => {
         // --- Date Filtering Logic ---
@@ -131,17 +125,22 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
 
         // --- Duvet Sales for selected period (uses filtered data) ---
         const employeeDuvetSales = filteredKingDuvetSales.filter(s => s['SalesMan Name'] === employee.name);
+        
+        // Smart categorization: collect all prices first
+        const duvetPrices = employeeDuvetSales.map(s => Number(s['Item Rate'] || 0)).filter(p => p > 0);
+        const smartCategories = getSmartDuvetCategories(duvetPrices);
+        
         // FIX: Explicitly typed the accumulator in the `reduce` function.
         const duvetSummary = employeeDuvetSales.reduce((acc: {[key: string]: number}, sale) => {
-            const category = getDuvetCategory(sale['Item Rate']);
+            const category = getSmartDuvetCategory(Number(sale['Item Rate'] || 0), smartCategories);
             if (category) acc[category] = (acc[category] || 0) + (sale['Sold Qty'] || 0);
             return acc;
-        }, { 'Low Value (199-399)': 0, 'Medium Value (495-695)': 0, 'High Value (795-999)': 0 });
+        }, { [smartCategories.low.label]: 0, [smartCategories.medium.label]: 0, [smartCategories.high.label]: 0 });
         const totalDuvets = Object.values(duvetSummary).reduce((sum, count) => sum + count, 0);
         const duvetCategories = [
-            { name: 'Low Value (199-399)', count: duvetSummary['Low Value (199-399)'] },
-            { name: 'Medium Value (495-695)', count: duvetSummary['Medium Value (495-695)'] },
-            { name: 'High Value (795-999)', count: duvetSummary['High Value (795-999)'] },
+            { name: smartCategories.low.label, count: duvetSummary[smartCategories.low.label] || 0 },
+            { name: smartCategories.medium.label, count: duvetSummary[smartCategories.medium.label] || 0 },
+            { name: smartCategories.high.label, count: duvetSummary[smartCategories.high.label] || 0 },
         ];
 
         // --- Dynamic & MTD Target Calculations (uses raw data, ignores global filter) ---

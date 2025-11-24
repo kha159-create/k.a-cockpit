@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { SparklesIcon, ArrowLeftIcon } from '../components/Icons';
-import { KPICard } from '../components/DashboardComponents';
+import { KPICard, ChartCard } from '../components/DashboardComponents';
 import MonthYearFilter from '../components/MonthYearFilter';
 import CustomBusinessRules from '../components/CustomBusinessRules';
-import type { StoreSummary, DailyMetric, ModalState, DateFilter, FilterableData, UserProfile, BusinessRule } from '../types';
-import { calculateEffectiveTarget } from '../utils/calculator';
+import type { StoreSummary, DailyMetric, ModalState, DateFilter, FilterableData, UserProfile, BusinessRule, SalesTransaction } from '../types';
+import { calculateEffectiveTarget, getCategory, getSmartDuvetCategories, getSmartDuvetCategory } from '../utils/calculator';
 import { generateText } from '../services/geminiService';
 import { useLocale } from '../context/LocaleContext';
 
@@ -99,6 +99,93 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
             salesPerVisitor: totalVisitors > 0 ? totalSales / totalVisitors : 0,
         };
     }, [filteredMetrics]);
+
+    const duvetAnalysis = useMemo(() => {
+        const isSale = (d: any): d is SalesTransaction => d && d['Bill Dt.'] && typeof d['Bill Dt.'].toDate === 'function' && d['Outlet Name'];
+        const sales = (allDateData as any[]).filter(isSale).filter(s => s['Outlet Name'] === store.name);
+        
+        // Filter by date
+        const filteredSales = sales.filter(s => {
+            if (!s['Bill Dt.'] || typeof s['Bill Dt.'].toDate !== 'function') return false;
+            const d = s['Bill Dt.'].toDate();
+            const normalizedDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+            
+            const mode = dateFilter.mode ?? 'single';
+            const parseIsoDate = (value?: string | null) => {
+                if (!value) return null;
+                const [y, mValue, d] = value.split('-').map(Number);
+                if ([y, mValue, d].some(num => Number.isNaN(num))) return null;
+                return new Date(Date.UTC(y, (mValue || 1) - 1, d || 1));
+            };
+            
+            if (mode === 'custom') {
+                const start = parseIsoDate(dateFilter.customStartDate);
+                const end = parseIsoDate(dateFilter.customEndDate);
+                if (start && normalizedDate < start) return false;
+                if (end && normalizedDate > end) return false;
+                return true;
+            }
+            
+            const yearMatch = dateFilter.year === 'all' || normalizedDate.getUTCFullYear() === dateFilter.year;
+            const monthMatch = dateFilter.month === 'all' || normalizedDate.getUTCMonth() === dateFilter.month;
+            if (!yearMatch || !monthMatch) return false;
+            
+            if (mode === 'range' && dateFilter.month !== 'all' && dateFilter.year !== 'all') {
+                const from = dateFilter.dayFrom === undefined ? 'all' : dateFilter.dayFrom;
+                const to = dateFilter.dayTo === undefined ? 'all' : dateFilter.dayTo;
+                const day = normalizedDate.getUTCDate();
+                if (from === 'all' && to === 'all') return true;
+                if (from === 'all' && typeof to === 'number') return day <= to;
+                if (typeof from === 'number' && to === 'all') return day >= from;
+                if (typeof from === 'number' && typeof to === 'number') {
+                    const min = Math.min(from, to);
+                    const max = Math.max(from, to);
+                    return day >= min && day <= max;
+                }
+                return true;
+            }
+            
+            const dayMatch = dateFilter.day === 'all' || normalizedDate.getUTCDate() === dateFilter.day;
+            return yearMatch && monthMatch && dayMatch;
+        });
+        
+        // Get duvet sales
+        const duvetSales = filteredSales.filter(sale => {
+            const alias = sale['Item Alias'] || '';
+            const name = sale['Item Name'] || '';
+            return String(alias).startsWith('4') && name.toUpperCase().includes('COMFORTER');
+        });
+        
+        // Smart categorization
+        const duvetPrices = duvetSales.map(s => Number(s['Item Rate'] || 0)).filter(p => p > 0);
+        const smartCategories = getSmartDuvetCategories(duvetPrices);
+        
+        const duvetBuckets: Record<string, number> = {
+            [smartCategories.low.label]: 0,
+            [smartCategories.medium.label]: 0,
+            [smartCategories.high.label]: 0,
+        };
+        
+        let totalDuvetUnits = 0;
+        duvetSales.forEach(sale => {
+            const price = Number(sale['Item Rate'] || 0);
+            const category = getSmartDuvetCategory(price, smartCategories);
+            if (category) {
+                const qty = Number(sale['Sold Qty'] || 0);
+                duvetBuckets[category] += qty;
+                totalDuvetUnits += qty;
+            }
+        });
+        
+        return {
+            breakdown: [
+                { name: smartCategories.low.label, units: duvetBuckets[smartCategories.low.label], percentage: totalDuvetUnits > 0 ? (duvetBuckets[smartCategories.low.label] / totalDuvetUnits) * 100 : 0 },
+                { name: smartCategories.medium.label, units: duvetBuckets[smartCategories.medium.label], percentage: totalDuvetUnits > 0 ? (duvetBuckets[smartCategories.medium.label] / totalDuvetUnits) * 100 : 0 },
+                { name: smartCategories.high.label, units: duvetBuckets[smartCategories.high.label], percentage: totalDuvetUnits > 0 ? (duvetBuckets[smartCategories.high.label] / totalDuvetUnits) * 100 : 0 },
+            ],
+            totalUnits: totalDuvetUnits
+        };
+    }, [store.name, allDateData, dateFilter]);
 
     const dynamicTargetData = useMemo(() => {
         const now = new Date();
@@ -204,6 +291,31 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
                      </div>
                  </div>
             </div>
+
+            {/* Duvet Sales Analysis */}
+            <ChartCard title="Duvet Sales Analysis by Value">
+                <div className="space-y-3 p-1 h-full flex flex-col">
+                    {duvetAnalysis.totalUnits > 0 ? (
+                        duvetAnalysis.breakdown.map(item => (
+                            <div key={item.name}>
+                                <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
+                                    <span>{item.name}</span>
+                                    <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-3">
+                                    <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-center text-zinc-500 text-sm">No duvet sales data for this period.</p>
+                    )}
+                    <div className="mt-auto pt-2 border-t border-gray-200 text-xs flex justify-between">
+                        <span className="font-semibold text-zinc-700">Total Duvet Units:</span>
+                        <span className="font-bold text-zinc-900">{duvetAnalysis.totalUnits}</span>
+                    </div>
+                </div>
+            </ChartCard>
 
             <CustomBusinessRules
                 rules={businessRules}

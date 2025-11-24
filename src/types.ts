@@ -171,9 +171,7 @@ export interface ProductSummary {
 export interface DuvetSummary {
     [storeName: string]: {
         name: string;
-        'Low Value (199-399)': number;
-        'Medium Value (495-695)': number;
-        'High Value (795-999)': number;
+        [key: string]: number | string; // Dynamic keys for smart categories
         total: number;
     };
 }

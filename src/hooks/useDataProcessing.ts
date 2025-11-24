@@ -14,12 +14,7 @@ interface UseDataProcessingProps {
   profile: UserProfile | null;
 }
 
-const getDuvetCategory = (price: number): string | null => {
-    if (price >= 199 && price <= 399) return 'Low Value (199-399)';
-    if (price >= 495 && price <= 695) return 'Medium Value (495-695)';
-    if (price >= 795 && price <= 999) return 'High Value (795-999)';
-    return null;
-};
+import { getSmartDuvetCategories, getSmartDuvetCategory } from '../utils/calculator';
 
 const getStoreCommissionRate = (achievement: number): number => {
     if (achievement >= 100) return 0.02; // 2%
@@ -405,12 +400,24 @@ export const useDataProcessing = ({
   }, [areaFilteredData.sales]);
   
   const duvetSummary = useMemo((): DuvetSummary => {
+      // Smart categorization: collect all prices first
+      const duvetPrices = areaFilteredData.duvetSales.map(s => Number(s['Item Rate'] || 0)).filter(p => p > 0);
+      const smartCategories = getSmartDuvetCategories(duvetPrices);
+      
       return areaFilteredData.duvetSales.reduce((acc, sale) => {
         const storeName = sale['Outlet Name'];
-        const category = getDuvetCategory(sale['Item Rate']);
+        const category = getSmartDuvetCategory(Number(sale['Item Rate'] || 0), smartCategories);
         if (category) {
-            if (!acc[storeName]) acc[storeName] = { name: storeName, 'Low Value (199-399)': 0, 'Medium Value (495-695)': 0, 'High Value (795-999)': 0, total: 0 };
-            acc[storeName][category] += sale['Sold Qty'];
+            if (!acc[storeName]) {
+                acc[storeName] = { 
+                    name: storeName, 
+                    [smartCategories.low.label]: 0, 
+                    [smartCategories.medium.label]: 0, 
+                    [smartCategories.high.label]: 0, 
+                    total: 0 
+                };
+            }
+            acc[storeName][category] = (acc[storeName][category] || 0) + sale['Sold Qty'];
             acc[storeName].total += sale['Sold Qty'];
         }
         return acc;
