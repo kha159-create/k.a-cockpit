@@ -226,25 +226,145 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             };
         });
 
-        const exportToCSV = () => {
-            const rows = [
+        const exportToExcel = () => {
+            if (typeof (window as any).XLSX === 'undefined') {
+                alert('Excel library is loading. Please try again in a moment.');
+                return;
+            }
+
+            const XLSX = (window as any).XLSX;
+            const workbook = XLSX.utils.book_new();
+
+            // Get date information
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.toLocaleString('en-US', { month: 'long' });
+            const currentDate = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            
+            // Prepare header information
+            const headerInfo = [
+                ['LFL Comparison Report'],
+                [''],
+                ['Report Title:', title],
+                ['Store Filter:', storeFilter],
+                ['Comparison Type:', comparisonType.toUpperCase()],
+                ['Generated Date:', currentDate],
+                ['Year:', currentYear.toString()],
+                ['Month:', currentMonth],
+                ['']
+            ];
+
+            // Prepare data with proper formatting
+            const excelData = [
+                ...headerInfo,
                 ['Metric', 'Current', 'Previous', 'Difference', 'Change %'],
                 ...tableData.map(row => [
                     row.metric,
-                    row.formattedCurrent,
-                    row.formattedPrevious,
-                    row.formattedDifference,
-                    `${row.percentageChange.toFixed(1)}%`
+                    row.current, // Use raw numbers for Excel formatting
+                    row.previous,
+                    row.difference,
+                    row.percentageChange
                 ])
             ];
-            const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `LFL_Comparison_${title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
+
+            // Create worksheet
+            const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+
+            // Set column widths
+            worksheet['!cols'] = [
+                { wch: 25 }, // Metric
+                { wch: 18 }, // Current
+                { wch: 18 }, // Previous
+                { wch: 18 }, // Difference
+                { wch: 15 }  // Change %
+            ];
+
+            // Format header row (row 10, 0-indexed)
+            const headerRow = 9;
+            ['A', 'B', 'C', 'D', 'E'].forEach(col => {
+                const cellRef = `${col}${headerRow + 1}`;
+                if (!worksheet[cellRef]) return;
+                worksheet[cellRef].s = {
+                    font: { bold: true, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: 'F97316' } },
+                    alignment: { horizontal: 'center', vertical: 'center' },
+                    border: {
+                        top: { style: 'thin', color: { rgb: '000000' } },
+                        bottom: { style: 'thin', color: { rgb: '000000' } },
+                        left: { style: 'thin', color: { rgb: '000000' } },
+                        right: { style: 'thin', color: { rgb: '000000' } }
+                    }
+                };
+            });
+
+            // Format title row
+            if (worksheet['A1']) {
+                worksheet['A1'].s = {
+                    font: { bold: true, sz: 16, color: { rgb: 'F97316' } },
+                    alignment: { horizontal: 'left' }
+                };
+            }
+
+            // Format data rows with numbers
+            tableData.forEach((row, index) => {
+                const rowNum = headerRow + 2 + index;
+                
+                // Format Current, Previous, Difference columns as numbers
+                // Check if it's a currency metric (sales, atv, salesPerVisitor)
+                const isCurrency = ['Sales', 'ATV', 'Sales per Visitor'].includes(row.metric);
+                const isPercentage = row.metric === 'Visitor Conversion Rate';
+                
+                ['B', 'C', 'D'].forEach(col => {
+                    const cellRef = `${col}${rowNum}`;
+                    if (worksheet[cellRef]) {
+                        if (isPercentage) {
+                            worksheet[cellRef].z = '0.00%';
+                            worksheet[cellRef].s = {
+                                numFmt: '0.00%',
+                                alignment: { horizontal: 'right' }
+                            };
+                        } else if (isCurrency) {
+                            worksheet[cellRef].z = '#,##0.00';
+                            worksheet[cellRef].s = {
+                                numFmt: '#,##0.00',
+                                alignment: { horizontal: 'right' }
+                            };
+                        } else {
+                            worksheet[cellRef].z = '#,##0';
+                            worksheet[cellRef].s = {
+                                numFmt: '#,##0',
+                                alignment: { horizontal: 'right' }
+                            };
+                        }
+                    }
+                });
+
+                // Format Change % column
+                const changeCellRef = `E${rowNum}`;
+                if (worksheet[changeCellRef]) {
+                    // Convert percentage to decimal for Excel (e.g., 15.5% -> 0.155)
+                    const percentageValue = row.percentageChange / 100;
+                    worksheet[changeCellRef].v = percentageValue;
+                    worksheet[changeCellRef].z = '0.0%';
+                    worksheet[changeCellRef].s = {
+                        numFmt: '0.0%',
+                        font: { 
+                            bold: true,
+                            color: { rgb: row.percentageChange >= 0 ? '008000' : 'FF0000' } 
+                        },
+                        alignment: { horizontal: 'center', vertical: 'center' }
+                    };
+                }
+            });
+
+            // Add worksheet to workbook
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Comparison');
+
+            // Generate filename with date
+            const fileName = `LFL_Comparison_${title.replace(/[^a-z0-9]/gi, '_')}_${currentYear}_${currentMonth}_${now.getDate()}.xlsx`;
+            
+            // Write file
+            XLSX.writeFile(workbook, fileName);
         };
 
         const tableColumns: Column<typeof tableData[0]>[] = [
@@ -331,13 +451,13 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-xl font-semibold text-zinc-800">Detailed Comparison Table</h3>
                         <button 
-                            onClick={exportToCSV}
+                            onClick={exportToExcel}
                             className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors duration-200 flex items-center gap-2"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            Export to CSV
+                            Export to Excel
                         </button>
                     </div>
                     <Table columns={tableColumns} data={tableData} initialSortKey="metric" />

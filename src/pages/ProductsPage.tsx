@@ -423,15 +423,12 @@ Use short sentences. Output in Arabic.` }]}
         </div>
 
         {/* Charts */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <ChartCard title="Top 10 Selling Products">
             <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
           </ChartCard>
-          <ChartCard title="Category Share">
+          <ChartCard title="Category Share" className="xl:col-span-2">
             <PieChart data={summary.charts.categoryShare} vertical={true} />
-          </ChartCard>
-          <ChartCard title="Monthly Sales Trend">
-            <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
           </ChartCard>
           <ChartCard title="Duvet Sales Analysis by Value">
             <div className="space-y-3 p-1 h-full flex flex-col">

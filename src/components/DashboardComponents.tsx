@@ -194,8 +194,8 @@ export const KPICard: React.FC<{
     );
 };
 
-export const ChartCard: React.FC<{ title: React.ReactNode; children: React.ReactNode; }> = ({ title, children }) => (
-    <div className="bg-white p-6 rounded-2xl shadow-lg border border-neutral-200 h-full flex flex-col transition-all duration-300 hover:shadow-xl hover:border-primary-200">
+export const ChartCard: React.FC<{ title: React.ReactNode; children: React.ReactNode; className?: string }> = ({ title, children, className = '' }) => (
+    <div className={`bg-white p-6 rounded-2xl shadow-lg border border-neutral-200 h-full flex flex-col transition-all duration-300 hover:shadow-xl hover:border-primary-200 ${className}`}>
         <div className="text-xl font-bold text-neutral-800 mb-6 border-b border-neutral-100 pb-3">{title}</div>
         <div className="flex-grow relative">{children}</div>
     </div>
