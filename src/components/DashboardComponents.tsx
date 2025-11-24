@@ -246,7 +246,7 @@ export const BarChart: React.FC<{ data: any[]; dataKey: string; nameKey: string;
     );
 };
 
-export const PieChart: React.FC<{ data: { name: string, value: number }[], onSliceClick?: (name: string) => void }> = ({ data, onSliceClick }) => {
+export const PieChart: React.FC<{ data: { name: string, value: number }[], onSliceClick?: (name: string) => void, vertical?: boolean }> = ({ data, onSliceClick, vertical = false }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [tooltip, setTooltip] = useState<{ content: string, x: number, y: number } | null>(null);
     if (!data || data.length === 0) return <div className="flex items-center justify-center h-full text-zinc-500">No data to display</div>;
@@ -258,6 +258,72 @@ export const PieChart: React.FC<{ data: { name: string, value: number }[], onSli
     let cumulativeAngle = 0;
 
     const getCoords = (angle: number, radius: number = 50) => [50 + radius * Math.cos(angle), 50 + radius * Math.sin(angle)];
+
+    if (vertical) {
+        return (
+            <div className="w-full h-full flex flex-col items-center gap-6" ref={containerRef}>
+                {/* الرسم البياني في الأعلى */}
+                <div className="w-64 h-64 relative flex-shrink-0">
+                    {tooltip && <Tooltip {...tooltip} />}
+                    <svg viewBox="0 0 100 100" className="w-full h-full" onMouseLeave={() => setTooltip(null)}>
+                        {data.map((item, index) => {
+                            const angle = (item.value / total) * 2 * Math.PI;
+                            const startAngle = cumulativeAngle;
+                            cumulativeAngle += angle;
+                            const endAngle = cumulativeAngle;
+                            
+                            const [startX, startY] = getCoords(startAngle, 40);
+                            const [endX, endY] = getCoords(endAngle, 40);
+                            const largeArcFlag = angle > Math.PI ? 1 : 0;
+                            
+                            const pathData = `M 50,50 L ${startX},${startY} A 40,40 0 ${largeArcFlag},1 ${endX},${endY} z`;
+                            
+                            return <path 
+                                    key={item.name} 
+                                    d={pathData} 
+                                    fill={colors[index % colors.length]} 
+                                    className={onSliceClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+                                    onClick={() => onSliceClick && onSliceClick(item.name)}
+                                    onMouseMove={(e) => {
+                                        if (!containerRef.current) return;
+                                        const containerRect = containerRef.current.getBoundingClientRect();
+                                        const x = e.clientX - containerRect.left;
+                                        const y = e.clientY - containerRect.top;
+                                        setTooltip({ content: `${item.name}: ${((item.value/total)*100).toFixed(1)}%`, x, y });
+                                    }}
+                                   />
+                        })}
+                    </svg>
+                </div>
+                {/* الأرقام والنسب في الأسفل */}
+                <div className="w-full flex-grow overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {data.slice(0, 10).map((item, index) => (
+                            <div key={item.name} className="bg-neutral-50 p-3 rounded-lg border border-neutral-200 hover:bg-neutral-100 transition-all duration-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-4 h-4 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: colors[index % colors.length] }}></div>
+                                    <span className="text-sm font-semibold text-neutral-800 truncate" title={item.name}>{item.name}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs text-neutral-600">Value:</span>
+                                    <span className="text-sm font-bold text-neutral-900">{item.value.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 mt-1">
+                                    <span className="text-xs text-neutral-600">Share:</span>
+                                    <span className="text-sm font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">{((item.value/total) * 100).toFixed(1)}%</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {data.length > 10 && (
+                        <div className="text-xs text-neutral-400 mt-3 p-2 bg-neutral-50 rounded-lg text-center">
+                            ... و {data.length - 10} عناصر أخرى
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full h-full flex flex-col md:flex-row items-center justify-between gap-4" ref={containerRef}>

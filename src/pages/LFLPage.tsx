@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Store, DailyMetric, UserProfile } from '../types';
-import { DetailedComparisonCard } from '../components/DashboardComponents';
+import { DetailedComparisonCard, ChartCard, BarChart, LineChart, PieChart } from '../components/DashboardComponents';
+import { Table, Column } from '../components/Table';
 
 interface LFLPageProps {
     allStores: Store[];
@@ -50,6 +51,7 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     const [rangeAEnd, setRangeAEnd] = useState(() => new Date().toISOString().split('T')[0]);
     const [rangeBStart, setRangeBStart] = useState('');
     const [rangeBEnd, setRangeBEnd] = useState('');
+    const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
     const visibleStores = useMemo(() => {
         if (!profile) return [];
@@ -158,19 +160,191 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     const currentYear = new Date().getFullYear();
     const previousYear = currentYear - 1;
 
-    const renderComparisonSet = (title: string, data: { current: LFLData, previous: LFLData }) => (
-        <div className="mt-6 bg-white p-6 rounded-xl shadow-sm border">
+    // Prepare trend data for line chart (Daily, MTD, YTD)
+    const trendData = useMemo(() => {
+        const periods = [
+            { name: 'Daily', data: lflData.daily },
+            { name: 'MTD', data: lflData.mtd },
+            { name: 'YTD', data: lflData.ytd },
+        ];
+
+        return {
+            sales: periods.map(p => ({ name: p.name, Current: p.data.current.totalSales, Previous: p.data.previous.totalSales })),
+            visitors: periods.map(p => ({ name: p.name, Current: p.data.current.totalVisitors, Previous: p.data.previous.totalVisitors })),
+            transactions: periods.map(p => ({ name: p.name, Current: p.data.current.totalTransactions, Previous: p.data.previous.totalTransactions })),
+            atv: periods.map(p => ({ name: p.name, Current: p.data.current.atv, Previous: p.data.previous.atv })),
+        };
+    }, [lflData]);
+
+    // Prepare pie chart data showing sales distribution across periods
+    const getDistributionData = () => {
+        const totalSales = lflData.daily.current.totalSales + lflData.mtd.current.totalSales + lflData.ytd.current.totalSales;
+        if (totalSales === 0) return [];
+        
+        return [
+            { name: 'Daily Sales', value: lflData.daily.current.totalSales },
+            { name: 'MTD Sales', value: lflData.mtd.current.totalSales },
+            { name: 'YTD Sales', value: lflData.ytd.current.totalSales },
+        ];
+    };
+
+    const renderComparisonSet = (title: string, data: { current: LFLData, previous: LFLData }) => {
+        const metrics = [
+            { key: 'sales', title: 'Sales', current: data.current.totalSales, previous: data.previous.totalSales, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
+            { key: 'visitors', title: 'Visitors', current: data.current.totalVisitors, previous: data.previous.totalVisitors, format: (v: number) => v.toLocaleString('en-US') },
+            { key: 'atv', title: 'ATV', current: data.current.atv, previous: data.previous.atv, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
+            { key: 'transactions', title: 'Transactions', current: data.current.totalTransactions, previous: data.previous.totalTransactions, format: (v: number) => v.toLocaleString('en-US') },
+            { key: 'visitorRate', title: 'Visitor Conversion Rate', current: data.current.visitorRate, previous: data.previous.visitorRate, format: (v: number) => `${v.toFixed(1)}%`, isPercentage: true },
+            { key: 'salesPerVisitor', title: 'Sales per Visitor', current: data.current.totalVisitors > 0 ? data.current.totalSales / data.current.totalVisitors : 0, previous: data.previous.totalVisitors > 0 ? data.previous.totalSales / data.previous.totalVisitors : 0, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
+        ];
+
+        const chartData = selectedMetric 
+            ? (() => {
+                const metric = metrics.find(m => m.key === selectedMetric);
+                if (!metric) return [];
+                return [
+                    { name: 'Current', value: metric.current },
+                    { name: 'Previous', value: metric.previous }
+                ];
+            })()
+            : [];
+
+        // Prepare table data
+        const tableData = metrics.map(metric => {
+            const difference = metric.current - metric.previous;
+            const percentageChange = metric.previous !== 0 ? (difference / Math.abs(metric.previous)) * 100 : metric.current > 0 ? 100 : 0;
+            return {
+                id: metric.key,
+                metric: metric.title,
+                current: metric.current,
+                previous: metric.previous,
+                difference: difference,
+                percentageChange: percentageChange,
+                formattedCurrent: metric.format(metric.current),
+                formattedPrevious: metric.format(metric.previous),
+                formattedDifference: metric.format(Math.abs(difference)),
+            };
+        });
+
+        const exportToCSV = () => {
+            const rows = [
+                ['Metric', 'Current', 'Previous', 'Difference', 'Change %'],
+                ...tableData.map(row => [
+                    row.metric,
+                    row.formattedCurrent,
+                    row.formattedPrevious,
+                    row.formattedDifference,
+                    `${row.percentageChange.toFixed(1)}%`
+                ])
+            ];
+            const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `LFL_Comparison_${title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        const tableColumns: Column<typeof tableData[0]>[] = [
+            { key: 'metric', label: 'Metric', sortable: true, render: (value) => value as string },
+            { key: 'formattedCurrent', label: 'Current', sortable: true, render: (value) => value as string },
+            { key: 'formattedPrevious', label: 'Previous', sortable: true, render: (value) => value as string },
+            { key: 'formattedDifference', label: 'Difference', sortable: true, render: (value) => value as string },
+            { 
+                key: 'percentageChange', 
+                label: 'Change %', 
+                sortable: true, 
+                render: (value, record) => {
+                    const change = record.percentageChange;
+                    const isPositive = change >= 0;
+                    return (
+                        <span className={isPositive ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                            {isPositive ? '▲' : '▼'} {Math.abs(change).toFixed(1)}%
+                        </span>
+                    );
+                }
+            },
+        ];
+
+        return (
+            <div className="mt-6 space-y-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border">
             <h3 className="text-xl font-semibold text-zinc-800 mb-4">{title}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-                <DetailedComparisonCard title="Sales" current={data.current.totalSales} previous={data.previous.totalSales} />
-                <DetailedComparisonCard title="Visitors" current={data.current.totalVisitors} previous={data.previous.totalVisitors} />
-                <DetailedComparisonCard title="ATV" current={data.current.atv} previous={data.previous.atv} />
-                <DetailedComparisonCard title="Transactions" current={data.current.totalTransactions} previous={data.previous.totalTransactions} />
-                <DetailedComparisonCard title="Visitor Conversion Rate" current={data.current.visitorRate} previous={data.previous.visitorRate} isPercentage={true} />
-                <DetailedComparisonCard title="Sales per Visitor" current={data.current.totalVisitors > 0 ? data.current.totalSales / data.current.totalVisitors : 0} previous={data.previous.totalVisitors > 0 ? data.previous.totalSales / data.previous.totalVisitors : 0} />
-            </div>
+                        {metrics.map(metric => (
+                            <div 
+                                key={metric.key}
+                                onClick={() => setSelectedMetric(selectedMetric === metric.key ? null : metric.key)}
+                                className={`cursor-pointer transition-all duration-200 ${
+                                    selectedMetric === metric.key 
+                                        ? 'transform scale-105' 
+                                        : 'hover:transform hover:scale-102'
+                                }`}
+                            >
+                                <div className={`${selectedMetric === metric.key ? 'ring-2 ring-orange-500 shadow-lg' : ''}`}>
+                                    <DetailedComparisonCard 
+                                        title={metric.title} 
+                                        current={metric.current} 
+                                        previous={metric.previous} 
+                                        isPercentage={metric.isPercentage}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                
+                {/* Dynamic Bar Chart */}
+                {selectedMetric && chartData.length > 0 && (
+                    <ChartCard title={`${metrics.find(m => m.key === selectedMetric)?.title} Comparison`}>
+                        <BarChart 
+                            data={chartData} 
+                            dataKey="value" 
+                            nameKey="name" 
+                            format={(v: number) => {
+                                const metric = metrics.find(m => m.key === selectedMetric);
+                                return metric ? metric.format(v) : v.toLocaleString('en-US');
+                            }} 
+                        />
+                    </ChartCard>
+                )}
+
+                {/* Trend Line Chart */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <ChartCard title="Sales Trend (Daily, MTD, YTD)">
+                        <LineChart data={trendData.sales} />
+                    </ChartCard>
+                    <ChartCard title="Visitors Trend (Daily, MTD, YTD)">
+                        <LineChart data={trendData.visitors} />
+                    </ChartCard>
+                </div>
+
+                {/* Distribution Pie Chart */}
+                <ChartCard title="Sales Distribution Across Periods">
+                    <PieChart data={getDistributionData()} />
+                </ChartCard>
+
+                {/* Detailed Comparison Table */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-semibold text-zinc-800">Detailed Comparison Table</h3>
+                        <button 
+                            onClick={exportToCSV}
+                            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors duration-200 flex items-center gap-2"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Export to CSV
+                        </button>
+                    </div>
+                    <Table columns={tableColumns} data={tableData} initialSortKey="metric" />
+                </div>
         </div>
     );
+    };
     
     const selectedDayForTitle = new Date(dailyDate);
 

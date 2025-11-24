@@ -428,7 +428,7 @@ Use short sentences. Output in Arabic.` }]}
             <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
           </ChartCard>
           <ChartCard title="Category Share">
-            <PieChart data={summary.charts.categoryShare} />
+            <PieChart data={summary.charts.categoryShare} vertical={true} />
           </ChartCard>
           <ChartCard title="Monthly Sales Trend">
             <LineChart data={summary.charts.monthlyTrend.map(m => ({ name: m.name, Sales: m.value, Target: 0 }))} />
