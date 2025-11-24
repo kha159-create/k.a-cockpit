@@ -160,21 +160,51 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     const currentYear = new Date().getFullYear();
     const previousYear = currentYear - 1;
 
-    // Prepare trend data for line chart (Daily, MTD, YTD)
+    // Prepare trend data for line chart (Monthly data from Jan to Dec)
     const trendData = useMemo(() => {
-        const periods = [
-            { name: 'Daily', data: lflData.daily },
-            { name: 'MTD', data: lflData.mtd },
-            { name: 'YTD', data: lflData.ytd },
-        ];
+        const currentYear = new Date().getFullYear();
+        const previousYear = currentYear - 1;
+        const dataForFilter = storeFilter === 'All' ? allMetrics : allMetrics.filter(s => s.store === storeFilter);
+
+        const processMonth = (year: number, month: number) => {
+            const startDate = new Date(Date.UTC(year, month, 1));
+            const endDate = new Date(Date.UTC(year, month + 1, 0));
+            const filtered = dataForFilter.filter(s => {
+                if (!s.date || typeof s.date.toDate !== 'function') return false;
+                const d = s.date.toDate();
+                const itemDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+                return itemDate >= startDate && itemDate <= endDate;
+            });
+            const totalSales = filtered.reduce((sum, item) => sum + (item.totalSales || 0), 0);
+            const totalVisitors = filtered.reduce((sum, item) => sum + (item.visitors || 0), 0);
+            const totalTransactions = filtered.reduce((sum, item) => sum + (item.transactionCount || 0), 0);
+            return {
+                totalSales,
+                totalVisitors,
+                totalTransactions,
+                atv: totalTransactions > 0 ? totalSales / totalTransactions : 0,
+            };
+        };
+
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        const monthlyData = monthNames.map((monthName, monthIndex) => {
+            const current = processMonth(currentYear, monthIndex);
+            const previous = processMonth(previousYear, monthIndex);
+            return {
+                name: monthName,
+                Current: current.totalSales,
+                Previous: previous.totalSales,
+                CurrentVisitors: current.totalVisitors,
+                PreviousVisitors: previous.totalVisitors,
+            };
+        });
 
         return {
-            sales: periods.map(p => ({ name: p.name, Current: p.data.current.totalSales, Previous: p.data.previous.totalSales })),
-            visitors: periods.map(p => ({ name: p.name, Current: p.data.current.totalVisitors, Previous: p.data.previous.totalVisitors })),
-            transactions: periods.map(p => ({ name: p.name, Current: p.data.current.totalTransactions, Previous: p.data.previous.totalTransactions })),
-            atv: periods.map(p => ({ name: p.name, Current: p.data.current.atv, Previous: p.data.previous.atv })),
+            sales: monthlyData.map(m => ({ name: m.name, Current: m.Current, Previous: m.Previous })),
+            visitors: monthlyData.map(m => ({ name: m.name, Current: m.CurrentVisitors, Previous: m.PreviousVisitors })),
         };
-    }, [lflData]);
+    }, [allMetrics, storeFilter]);
 
     // Prepare pie chart data showing sales distribution across periods
     const getDistributionData = () => {

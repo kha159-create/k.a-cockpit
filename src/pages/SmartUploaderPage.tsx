@@ -298,6 +298,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         salesTarget: emp.effectiveTarget || 0,
         salesAchieved: emp.totalSales || 0,
         achievementPercent: (emp.achievement || 0) / 100,
+        atv: emp.atv || 0,
         duvetTarget,
         duvetUnits,
         duvetAchievementPercent,
@@ -430,6 +431,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       'Sales Target (SAR)',
       'Sales Achieved (SAR)',
       'Target Achievement %',
+      'ATV (SAR)',
       'Duvet Target (Units)',
       'Duvet Sales (Units)',
       'Duvet Achievement %',
@@ -450,6 +452,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         row.salesTarget,
         row.salesAchieved,
         row.achievementPercent,
+        row.atv,
         row.duvetTarget,
         row.duvetUnits,
         row.duvetAchievementPercent,
@@ -460,10 +463,13 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     const totalTarget = sortedEmployeeRows.reduce((sum, row) => sum + row.salesTarget, 0);
     const totalSales = sortedEmployeeRows.reduce((sum, row) => sum + row.salesAchieved, 0);
     const totalAchievement = totalTarget > 0 ? totalSales / totalTarget : 0;
+    const totalATV = sortedEmployeeRows.length > 0 
+      ? sortedEmployeeRows.reduce((sum, row) => sum + row.atv, 0) / sortedEmployeeRows.length 
+      : 0;
     const totalDuvetTarget = sortedEmployeeRows.reduce((sum, row) => sum + row.duvetTarget, 0);
     const totalDuvetUnits = sortedEmployeeRows.reduce((sum, row) => sum + row.duvetUnits, 0);
     const totalDuvetAchievement = totalDuvetTarget > 0 ? totalDuvetUnits / totalDuvetTarget : 0;
-    data.push(['Totals', null, null, totalTarget, totalSales, totalAchievement, totalDuvetTarget, totalDuvetUnits, totalDuvetAchievement]);
+    data.push(['Totals', null, null, totalTarget, totalSales, totalAchievement, totalATV, totalDuvetTarget, totalDuvetUnits, totalDuvetAchievement]);
 
     const ws = XLSX.utils.aoa_to_sheet(data);
     ws['!cols'] = [
@@ -473,13 +479,14 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { wch: 18 },
       { wch: 18 },
       { wch: 18 },
+      { wch: 15 },
       { wch: 20 },
       { wch: 18 },
       { wch: 18 },
     ];
     ws['!merges'] = [
-      XLSX.utils.decode_range('A1:I1'),
-      XLSX.utils.decode_range('A2:I2'),
+      XLSX.utils.decode_range('A1:J1'),
+      XLSX.utils.decode_range('A2:J2'),
     ];
 
     if (ws['A1']) ws['A1'].s = titleStyle;
@@ -493,9 +500,10 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 3, format: '#,##0.00' },
       { index: 4, format: '#,##0.00' },
       { index: 5, format: '0.0%' },
-      { index: 6, format: '#,##0' },
+      { index: 6, format: '#,##0.00' },
       { index: 7, format: '#,##0' },
-      { index: 8, format: '0.0%' },
+      { index: 8, format: '#,##0' },
+      { index: 9, format: '0.0%' },
     ]);
 
     const totalsRowIndex = dataStartRow + sortedEmployeeRows.length + 1;
@@ -503,9 +511,10 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 3, format: '#,##0.00' },
       { index: 4, format: '#,##0.00' },
       { index: 5, format: '0.0%' },
-      { index: 6, format: '#,##0' },
+      { index: 6, format: '#,##0.00' },
       { index: 7, format: '#,##0' },
-      { index: 8, format: '0.0%' },
+      { index: 8, format: '#,##0' },
+      { index: 9, format: '0.0%' },
     ]);
     for (let c = 0; c < header.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c });

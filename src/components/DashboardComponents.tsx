@@ -406,7 +406,11 @@ export const LineChart: React.FC<{ data: { name: string; [key: string]: any }[] 
         Target: '#a78bfa',
         totalSales: '#f97316',
         effectiveTarget: '#3b82f6',
-        targetAchievement: '#8b5cf6'
+        targetAchievement: '#8b5cf6',
+        Current: '#f97316', // Orange for current
+        Previous: '#3b82f6', // Blue for previous
+        CurrentVisitors: '#10b981', // Green for current visitors
+        PreviousVisitors: '#6366f1', // Indigo for previous visitors
     };
     
     const width = 600;
