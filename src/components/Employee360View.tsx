@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { KPICard, ChartCard, BarChart, PieChart } from './DashboardComponents';
 import { SparklesIcon } from './Icons';
-import { calculateEffectiveTarget, getCategory } from '../utils/calculator';
+import { calculateEffectiveTarget, getCategory, getSmartDuvetCategories, getSmartDuvetCategory } from '../utils/calculator';
 import type { EmployeeSummary, DailyMetric, SalesTransaction, StoreSummary, DateFilter, ModalState } from '../types';
 import { useLocale } from '../context/LocaleContext';
 
