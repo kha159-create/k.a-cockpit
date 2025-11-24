@@ -177,7 +177,7 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
             duvetCategories, totalDuvets, dynamicTarget, duvetTargetData
         };
 
-    }, [employee, allMetrics, salesTransactions, kingDuvetSales, storeSummary, dateFilter, getDuvetCategory]);
+    }, [employee, allMetrics, salesTransactions, kingDuvetSales, storeSummary, dateFilter]);
 
     const topProductsInCategory: {name: string, soldQty: number}[] = useMemo(() => selectedCategory ? Object.entries(employeeData.productsByCategory[selectedCategory]?.products || {})
         .sort(([, qtyA], [, qtyB]) => Number(qtyB) - Number(qtyA))
