@@ -206,18 +206,6 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
         };
     }, [allMetrics, storeFilter]);
 
-    // Prepare pie chart data showing sales distribution across periods
-    const getDistributionData = () => {
-        const totalSales = lflData.daily.current.totalSales + lflData.mtd.current.totalSales + lflData.ytd.current.totalSales;
-        if (totalSales === 0) return [];
-        
-        return [
-            { name: 'Daily Sales', value: lflData.daily.current.totalSales },
-            { name: 'MTD Sales', value: lflData.mtd.current.totalSales },
-            { name: 'YTD Sales', value: lflData.ytd.current.totalSales },
-        ];
-    };
-
     const renderComparisonSet = (title: string, data: { current: LFLData, previous: LFLData }) => {
         const metrics = [
             { key: 'sales', title: 'Sales', current: data.current.totalSales, previous: data.previous.totalSales, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
@@ -470,11 +458,6 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                         <LineChart data={trendData.visitors} />
                     </ChartCard>
                 </div>
-
-                {/* Distribution Pie Chart */}
-                <ChartCard title="Sales Distribution Across Periods">
-                    <PieChart data={getDistributionData()} />
-                </ChartCard>
 
                 {/* Detailed Comparison Table */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border">
