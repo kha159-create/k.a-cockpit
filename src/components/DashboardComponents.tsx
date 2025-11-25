@@ -194,10 +194,29 @@ export const KPICard: React.FC<{
     );
 };
 
-export const ChartCard: React.FC<{ title: React.ReactNode; children: React.ReactNode; className?: string }> = ({ title, children, className = '' }) => (
-    <div className={`bg-white p-6 rounded-2xl shadow-lg border border-neutral-200 h-full flex flex-col transition-all duration-300 hover:shadow-xl hover:border-primary-200 ${className}`}>
-        <div className="text-xl font-bold text-neutral-800 mb-6 border-b border-neutral-100 pb-3">{title}</div>
-        <div className="flex-grow relative">{children}</div>
+export const ChartCard: React.FC<{ 
+    title: React.ReactNode; 
+    children: React.ReactNode; 
+    className?: string;
+    watermark?: string;
+    watermarkOpacity?: number;
+}> = ({ title, children, className = '', watermark, watermarkOpacity = 0.1 }) => (
+    <div className={`bg-white p-6 rounded-2xl shadow-lg border border-neutral-200 h-full flex flex-col transition-all duration-300 hover:shadow-xl hover:border-primary-200 relative overflow-hidden ${className}`}>
+        {watermark && (
+            <div 
+                className="absolute top-4 right-4 text-6xl font-bold text-orange-300 pointer-events-none select-none z-0"
+                style={{ opacity: watermarkOpacity }}
+            >
+                {watermark}
+            </div>
+        )}
+        <div className="text-xl font-bold text-neutral-800 mb-6 border-b border-neutral-100 pb-3 relative z-10 flex items-center justify-between">
+            <span>{title}</span>
+            {watermark && watermarkOpacity > 0.1 && (
+                <span className="text-sm font-normal text-orange-500 ml-2">{watermark}</span>
+            )}
+        </div>
+        <div className="flex-grow relative z-10">{children}</div>
     </div>
 );
 
@@ -524,7 +543,14 @@ export const LineChart: React.FC<{ data: { name: string; [key: string]: any }[] 
     );
 };
 
-export const DetailedComparisonCard: React.FC<{ title: string; current: number; previous: number; isPercentage?: boolean }> = ({ title, current, previous, isPercentage }) => {
+export const DetailedComparisonCard: React.FC<{ 
+    title: string; 
+    current: number; 
+    previous: number; 
+    isPercentage?: boolean;
+    watermark?: string;
+    watermarkOpacity?: number;
+}> = ({ title, current, previous, isPercentage, watermark, watermarkOpacity = 0.1 }) => {
     const format = (val: number) => {
         if (isPercentage) return `${val.toFixed(1)}%`;
         if (val >= 1000) {
@@ -538,14 +564,29 @@ export const DetailedComparisonCard: React.FC<{ title: string; current: number; 
     const isPositive = difference >= 0;
 
     return (
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-            <p className="text-sm font-medium text-zinc-500">{title}</p>
-            <p className="text-2xl font-bold text-zinc-900 mt-1">{format(current)}</p>
-            <div className="text-xs text-zinc-400">vs {format(previous)} last year</div>
-            <div className={`mt-2 flex items-center text-sm font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                {isPositive ? '▲' : '▼'}
-                <span className="ml-1">{format(Math.abs(difference))}</span>
-                <span className="ml-2">({Math.abs(percentageChange).toFixed(1)}%)</span>
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 relative overflow-hidden">
+            {watermark && (
+                <div 
+                    className="absolute top-2 right-2 text-3xl font-bold text-orange-300 pointer-events-none select-none z-0"
+                    style={{ opacity: watermarkOpacity }}
+                >
+                    {watermark}
+                </div>
+            )}
+            <div className="relative z-10">
+                <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium text-zinc-500">{title}</p>
+                    {watermark && watermarkOpacity > 0.1 && (
+                        <span className="text-xs font-normal text-orange-500">{watermark}</span>
+                    )}
+                </div>
+                <p className="text-2xl font-bold text-zinc-900 mt-1">{format(current)}</p>
+                <div className="text-xs text-zinc-400">vs {format(previous)} last year</div>
+                <div className={`mt-2 flex items-center text-sm font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                    {isPositive ? '▲' : '▼'}
+                    <span className="ml-1">{format(Math.abs(difference))}</span>
+                    <span className="ml-2">({Math.abs(percentageChange).toFixed(1)}%)</span>
+                </div>
             </div>
         </div>
     );

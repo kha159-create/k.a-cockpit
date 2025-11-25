@@ -427,6 +427,8 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                                         current={metric.current} 
                                         previous={metric.previous} 
                                         isPercentage={metric.isPercentage}
+                                        watermark={storeFilter !== 'All' ? storeFilter : undefined}
+                                        watermarkOpacity={storeFilter !== 'All' ? 0.15 : 0}
                                     />
                                 </div>
                             </div>
@@ -436,7 +438,11 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                 
                 {/* Dynamic Bar Chart */}
                 {selectedMetric && chartData.length > 0 && (
-                    <ChartCard title={`${metrics.find(m => m.key === selectedMetric)?.title} Comparison`}>
+                    <ChartCard 
+                        title={`${metrics.find(m => m.key === selectedMetric)?.title} Comparison`}
+                        watermark={storeFilter !== 'All' ? storeFilter : undefined}
+                        watermarkOpacity={storeFilter !== 'All' ? 0.15 : 0}
+                    >
                         <BarChart 
                             data={chartData} 
                             dataKey="value" 
@@ -451,10 +457,18 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
 
                 {/* Trend Line Chart */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <ChartCard title="Sales Trend (Daily, MTD, YTD)">
+                    <ChartCard 
+                        title="Sales Trend (Daily, MTD, YTD)"
+                        watermark={storeFilter !== 'All' ? storeFilter : undefined}
+                        watermarkOpacity={storeFilter !== 'All' ? 0.15 : 0}
+                    >
                         <LineChart data={trendData.sales} />
                     </ChartCard>
-                    <ChartCard title="Visitors Trend (Daily, MTD, YTD)">
+                    <ChartCard 
+                        title="Visitors Trend (Daily, MTD, YTD)"
+                        watermark={storeFilter !== 'All' ? storeFilter : undefined}
+                        watermarkOpacity={storeFilter !== 'All' ? 0.15 : 0}
+                    >
                         <LineChart data={trendData.visitors} />
                     </ChartCard>
                 </div>
