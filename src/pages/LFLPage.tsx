@@ -409,8 +409,13 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
         return (
             <div className="mt-6 space-y-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="text-xl font-semibold text-zinc-800 mb-4">{title}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-semibold text-zinc-800">{title}</h3>
+                        {storeFilter !== 'All' && (
+                            <span className="text-sm font-normal text-orange-500">{storeFilter}</span>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                         {metrics.map(metric => (
                             <div 
                                 key={metric.key}
@@ -427,8 +432,6 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                                         current={metric.current} 
                                         previous={metric.previous} 
                                         isPercentage={metric.isPercentage}
-                                        watermark={storeFilter !== 'All' ? storeFilter : undefined}
-                                        watermarkOpacity={storeFilter !== 'All' ? 0.15 : 0}
                                     />
                                 </div>
                             </div>
