@@ -420,21 +420,6 @@ Use short sentences. Output in Arabic.` }]}
         {/* Charts */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <ChartCard 
-            title="Top 10 Selling Products"
-            watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
-            watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
-          >
-            <BarChart data={summary.charts.top10} dataKey="value" nameKey="name" format={v => v.toLocaleString('en-US')} />
-          </ChartCard>
-          <ChartCard 
-            title="Category Share" 
-            className="xl:col-span-2"
-            watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
-            watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
-          >
-            <PieChart data={summary.charts.categoryShare} vertical={true} />
-          </ChartCard>
-          <ChartCard 
             title="Duvet Sales Analysis by Value"
             watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
             watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
@@ -460,6 +445,14 @@ Use short sentences. Output in Arabic.` }]}
                 <span className="font-bold text-zinc-900">{summary.duvetAnalysis.totalUnits}</span>
               </div>
             </div>
+          </ChartCard>
+          <ChartCard 
+            title="Category Share" 
+            className="xl:col-span-2"
+            watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
+            watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
+          >
+            <PieChart data={summary.charts.categoryShare} vertical={true} />
           </ChartCard>
         </div>
       </section>
