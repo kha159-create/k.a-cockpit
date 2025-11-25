@@ -6,10 +6,6 @@
   <p>Progressive Web App (PWA) with AI-powered analytics</p>
 </div>
 
-## ⚠️ **Security Notice**
-**All API keys are securely stored in GitHub Secrets. No sensitive keys are exposed in the codebase.**
-
-⚠️ **ملاحظة أمنية**: جميع المفاتيح محفوظة في GitHub Secrets، ولا توجد أي مفاتيح مكشوفة في الكود.
 
 ## 🎯 **Overview**
 
@@ -225,7 +221,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 **Support**
 
-For support, email support@ka-cockpit.com or create an issue in this repository.
+For support, email kha.als@outlook.com  or create an issue in this repository.
 
 ## 🙏 **Acknowledgments**
 
@@ -237,6 +233,6 @@ For support, email support@ka-cockpit.com or create an issue in this repository.
 ---
 
 <div align="center">
-  <p>Made with ❤️ by K.A Team</p>
+  <p>Made with ❤️ by khaleel alsani Team</p>
   <p>🚀 <strong>K.A COCKPIT</strong> - Your Management Dashboard Solution</p>
 </div>
