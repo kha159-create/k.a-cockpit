@@ -5,7 +5,7 @@ import { Table, Column } from '../components/Table';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import { SparklesIcon } from '../components/Icons';
 import { StoreName } from '@/components/Names';
-import { getCategory, getSmartDuvetCategories, getSmartDuvetCategory, getSmartPillowCategories, getSmartPillowCategory } from '../utils/calculator';
+import { getCategory, getSmartDuvetCategories, getSmartDuvetCategory, getSmartDuvetFullCategories, getSmartDuvetFullCategory, getSmartPillowCategories, getSmartPillowCategory } from '../utils/calculator';
 import type { ProductSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile } from '../types';
 import { ChartCard, BarChart, LineChart, PieChart } from '../components/DashboardComponents';
 import { generateText } from '../services/geminiService';
@@ -202,7 +202,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       return filters.category === 'All' && category === 'Pillows';
     });
 
-    // Helper function to calculate duvet analysis
+    // Helper function to calculate duvet analysis (for King)
     const calculateDuvetAnalysis = (products: typeof filteredProducts) => {
       const duvetPrices = products.map(p => resolveUnitPrice(p)).filter(p => p > 0);
       if (duvetPrices.length === 0) {
@@ -228,6 +228,50 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       products.forEach(product => {
         const price = resolveUnitPrice(product);
         const category = getSmartDuvetCategory(price, smartCategories);
+        if (!category) return;
+        const qty = product.soldQty || 0;
+        duvetBuckets[category] += qty;
+        totalDuvetUnits += qty;
+      });
+
+      const duvetBreakdown = duvetLabels.map(label => ({
+        name: label,
+        units: duvetBuckets[label] || 0,
+        percentage: totalDuvetUnits > 0 ? ((duvetBuckets[label] || 0) / totalDuvetUnits) * 100 : 0,
+      }));
+
+      return {
+        totalUnits: totalDuvetUnits,
+        breakdown: duvetBreakdown,
+      };
+    };
+
+    // Helper function to calculate duvet Full analysis (with 500+ high value)
+    const calculateDuvetFullAnalysis = (products: typeof filteredProducts) => {
+      const duvetPrices = products.map(p => resolveUnitPrice(p)).filter(p => p > 0);
+      if (duvetPrices.length === 0) {
+        return {
+          totalUnits: 0,
+          breakdown: [
+            { name: 'Low Value (99-300)', units: 0, percentage: 0 },
+            { name: 'Medium Value (301-499)', units: 0, percentage: 0 },
+            { name: 'High Value (500+)', units: 0, percentage: 0 },
+          ],
+        };
+      }
+
+      const smartCategories = getSmartDuvetFullCategories(duvetPrices);
+      const duvetLabels = [smartCategories.low.label, smartCategories.medium.label, smartCategories.high.label];
+      const duvetBuckets: Record<string, number> = {
+        [smartCategories.low.label]: 0,
+        [smartCategories.medium.label]: 0,
+        [smartCategories.high.label]: 0,
+      };
+
+      let totalDuvetUnits = 0;
+      products.forEach(product => {
+        const price = resolveUnitPrice(product);
+        const category = getSmartDuvetFullCategory(price, smartCategories);
         if (!category) return;
         const qty = product.soldQty || 0;
         duvetBuckets[category] += qty;
@@ -291,7 +335,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     };
 
     const duvetKingAnalysis = calculateDuvetAnalysis(duvetKingProducts);
-    const duvetFullAnalysis = calculateDuvetAnalysis(duvetFullProducts);
+    const duvetFullAnalysis = calculateDuvetFullAnalysis(duvetFullProducts);
     const pillowAnalysis = calculatePillowAnalysis(pillowProducts);
 
     return {

@@ -47,14 +47,14 @@ export const getCategory = (product: { name?: string, alias?: string }): string 
 };
 
 /**
- * Duvet price categorization - fixed price ranges
+ * Duvet price categorization - fixed price ranges (for King)
  */
 export const getSmartDuvetCategories = (prices: number[]): { 
     low: { min: number; max: number; label: string };
     medium: { min: number; max: number; label: string };
     high: { min: number; max: number; label: string };
 } => {
-    // Fixed price ranges
+    // Fixed price ranges for King
     return {
         low: { 
             min: 99, 
@@ -75,9 +75,47 @@ export const getSmartDuvetCategories = (prices: number[]): {
 };
 
 /**
+ * Duvet Full price categorization - fixed price ranges (for Full)
+ */
+export const getSmartDuvetFullCategories = (prices: number[]): { 
+    low: { min: number; max: number; label: string };
+    medium: { min: number; max: number; label: string };
+    high: { min: number; max: number; label: string };
+} => {
+    // Fixed price ranges for Full - high value starts at 500+
+    return {
+        low: { 
+            min: 99, 
+            max: 300, 
+            label: 'Low Value (99-300)' 
+        },
+        medium: { 
+            min: 301, 
+            max: 499, 
+            label: 'Medium Value (301-499)' 
+        },
+        high: { 
+            min: 500, 
+            max: Infinity, 
+            label: 'High Value (500+)' 
+        }
+    };
+};
+
+/**
  * Get duvet category based on fixed price ranges
  */
 export const getSmartDuvetCategory = (price: number, categories: ReturnType<typeof getSmartDuvetCategories>): string | null => {
+    if (price >= categories.low.min && price <= categories.low.max) return categories.low.label;
+    if (price >= categories.medium.min && price <= categories.medium.max) return categories.medium.label;
+    if (price >= categories.high.min) return categories.high.label;
+    return null;
+};
+
+/**
+ * Get duvet Full category based on fixed price ranges
+ */
+export const getSmartDuvetFullCategory = (price: number, categories: ReturnType<typeof getSmartDuvetFullCategories>): string | null => {
     if (price >= categories.low.min && price <= categories.low.max) return categories.low.label;
     if (price >= categories.medium.min && price <= categories.medium.max) return categories.medium.label;
     if (price >= categories.high.min) return categories.high.label;
