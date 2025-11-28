@@ -129,14 +129,14 @@ const StoresPage: React.FC<StoresPageProps> = ({
                 areaSummaries.sort((a, b) => a.managerName.localeCompare(b.managerName)).map(areaSummary => {
                     const { managerName, stores, totalSales, totalTarget, targetAchievement, storesCount } = areaSummary;
                     return (
-                        <div key={managerName} className="space-y-4">
-                            {/* Area Summary Card */}
+                        <div key={managerName} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            {/* Area Summary Card - Inside Stores Card */}
                             {onSelectArea && (
                                 <div 
                                     onClick={() => onSelectArea(managerName, stores)}
-                                    className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow-sm border-2 border-blue-200 cursor-pointer hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all"
+                                    className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg shadow-sm border-2 border-blue-200 cursor-pointer hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all mb-6"
                                 >
-                                    <div className="flex justify-between items-start mb-4">
+                                    <div className="flex justify-between items-start mb-3">
                                         <div>
                                             <h4 className="text-xl font-bold text-blue-900 mb-2">{managerName}</h4>
                                             <p className="text-sm text-blue-700">{t('stores_count')}: {storesCount}</p>
@@ -146,7 +146,7 @@ const StoresPage: React.FC<StoresPageProps> = ({
                                             <p className="text-sm text-blue-700">{t('achievement')}</p>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <p className="text-sm text-blue-600 mb-1">{t('total_sales')}</p>
                                             <p className="text-lg font-semibold text-blue-900">{totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
@@ -159,10 +159,7 @@ const StoresPage: React.FC<StoresPageProps> = ({
                                 </div>
                             )}
                             {/* Stores Table */}
-                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                                <h4 className="text-lg font-bold text-zinc-700 mb-4">{managerName}</h4>
-                                <Table columns={columns} data={stores} initialSortKey="totalSales" rowClassName={getRowClassName} />
-                            </div>
+                            <Table columns={columns} data={stores} initialSortKey="totalSales" rowClassName={getRowClassName} />
                         </div>
                     );
                 })
