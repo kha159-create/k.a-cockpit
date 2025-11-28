@@ -156,12 +156,15 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     });
 
     // Category share using current filtered products
-    const categoryMap = new Map<string, number>();
+    const categoryMap = new Map<string, { value: number; count: number }>();
     filteredProducts.forEach(p => {
       const cat = getCategory(p) || 'Other';
-      categoryMap.set(cat, (categoryMap.get(cat) || 0) + (p.totalValue || 0));
+      const existing = categoryMap.get(cat) || { value: 0, count: 0 };
+      existing.value += (p.totalValue || 0);
+      existing.count += (p.soldQty || 0);
+      categoryMap.set(cat, existing);
     });
-    const categoryShare = Array.from(categoryMap.entries()).map(([name, value]) => ({ name, value }));
+    const categoryShare = Array.from(categoryMap.entries()).map(([name, data]) => ({ name, value: data.value, count: data.count }));
 
     const resolveUnitPrice = (product: ProductSummary) => {
       if (product.price && product.price > 0) {

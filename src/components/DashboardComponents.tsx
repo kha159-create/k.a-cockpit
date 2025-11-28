@@ -257,7 +257,7 @@ export const BarChart: React.FC<{ data: any[]; dataKey: string; nameKey: string;
     );
 };
 
-export const PieChart: React.FC<{ data: { name: string, value: number }[], onSliceClick?: (name: string) => void, vertical?: boolean }> = ({ data, onSliceClick, vertical = false }) => {
+export const PieChart: React.FC<{ data: { name: string, value: number, count?: number }[], onSliceClick?: (name: string) => void, vertical?: boolean }> = ({ data, onSliceClick, vertical = false }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [tooltip, setTooltip] = useState<{ content: string, x: number, y: number } | null>(null);
     if (!data || data.length === 0) return <div className="flex items-center justify-center h-full text-zinc-500">No data to display</div>;
@@ -323,6 +323,12 @@ export const PieChart: React.FC<{ data: { name: string, value: number }[], onSli
                                     <span className="text-xs text-neutral-600">Share:</span>
                                     <span className="text-sm font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">{((item.value/total) * 100).toFixed(1)}%</span>
                                 </div>
+                                {item.count !== undefined && (
+                                    <div className="flex items-center justify-between gap-2 mt-1">
+                                        <span className="text-xs text-neutral-600">Count:</span>
+                                        <span className="text-sm font-bold text-neutral-900">{item.count.toLocaleString('en-US')}</span>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
