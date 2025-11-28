@@ -8,6 +8,7 @@ import type { StoreSummary, Store, DateFilter, AreaStoreFilterState, FilterableD
 import { useLocale } from '../context/LocaleContext';
 import { AchievementBar } from '../components/DashboardComponents';
 import { StoreName } from '@/components/Names';
+import { calculateEffectiveTarget } from '../utils/calculator';
 
 interface StoresPageProps {
   storeSummary: StoreSummary[];
@@ -21,13 +22,14 @@ interface StoresPageProps {
   onEdit: (store: StoreSummary) => void;
   onDelete: (id: string, name: string) => void;
   onSelectStore: (store: StoreSummary) => void;
+  onSelectArea?: (areaManager: string, stores: StoreSummary[]) => void;
   isRecalculating: boolean;
   profile: UserProfile | null;
   allMetrics: DailyMetric[];
 }
 
 const StoresPage: React.FC<StoresPageProps> = ({ 
-    storeSummary, allStores, allDateData, dateFilter, setDateFilter, areaStoreFilter, setAreaStoreFilter, setModalState, onEdit, onDelete, onSelectStore, isRecalculating, profile
+    storeSummary, allStores, allDateData, dateFilter, setDateFilter, areaStoreFilter, setAreaStoreFilter, setModalState, onEdit, onDelete, onSelectStore, onSelectArea, isRecalculating, profile
 }) => {
   const { t } = useLocale();
 
@@ -75,6 +77,23 @@ const StoresPage: React.FC<StoresPageProps> = ({
     return grouped;
   }, [storeSummary, t]);
 
+  const areaSummaries = useMemo(() => {
+    return Object.keys(storesByAreaManager).map(managerName => {
+      const stores = storesByAreaManager[managerName];
+      const totalSales = stores.reduce((sum, s) => sum + (s.totalSales || 0), 0);
+      const totalTarget = stores.reduce((sum, s) => sum + calculateEffectiveTarget(s.targets, dateFilter), 0);
+      const targetAchievement = totalTarget > 0 ? (totalSales / totalTarget) * 100 : 0;
+      return {
+        managerName,
+        stores,
+        totalSales,
+        totalTarget,
+        targetAchievement,
+        storesCount: stores.length,
+      };
+    });
+  }, [storesByAreaManager, dateFilter]);
+
   // Debug: Log storesByAreaManager after it's defined (removed to prevent infinite re-render)
   // console.log('StoresPage - storesByAreaManager:', storesByAreaManager);
 
@@ -107,12 +126,43 @@ const StoresPage: React.FC<StoresPageProps> = ({
         </div>
         <div className="space-y-6">
             {isRecalculating ? <TableSkeleton /> : (
-                Object.keys(storesByAreaManager).sort((a, b) => a.localeCompare(b)).map(managerName => {
-                    const stores = storesByAreaManager[managerName];
+                areaSummaries.sort((a, b) => a.managerName.localeCompare(b.managerName)).map(areaSummary => {
+                    const { managerName, stores, totalSales, totalTarget, targetAchievement, storesCount } = areaSummary;
                     return (
-                        <div key={managerName} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <h4 className="text-lg font-bold text-zinc-700 mb-4">{managerName}</h4>
-                            <Table columns={columns} data={stores} initialSortKey="totalSales" rowClassName={getRowClassName} />
+                        <div key={managerName} className="space-y-4">
+                            {/* Area Summary Card */}
+                            {onSelectArea && (
+                                <div 
+                                    onClick={() => onSelectArea(managerName, stores)}
+                                    className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow-sm border-2 border-blue-200 cursor-pointer hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all"
+                                >
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h4 className="text-xl font-bold text-blue-900 mb-2">{managerName}</h4>
+                                            <p className="text-sm text-blue-700">{t('stores_count')}: {storesCount}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-2xl font-bold text-blue-900">{targetAchievement.toFixed(1)}%</p>
+                                            <p className="text-sm text-blue-700">{t('achievement')}</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 mt-4">
+                                        <div>
+                                            <p className="text-sm text-blue-600 mb-1">{t('total_sales')}</p>
+                                            <p className="text-lg font-semibold text-blue-900">{totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-blue-600 mb-1">{t('area_target')}</p>
+                                            <p className="text-lg font-semibold text-blue-900">{totalTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {/* Stores Table */}
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                <h4 className="text-lg font-bold text-zinc-700 mb-4">{managerName}</h4>
+                                <Table columns={columns} data={stores} initialSortKey="totalSales" rowClassName={getRowClassName} />
+                            </div>
                         </div>
                     );
                 })

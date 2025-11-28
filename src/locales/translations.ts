@@ -149,7 +149,10 @@ export const translations = {
     "create_your_account": "Create Your Account",
     "confirm_password": "Confirm Password",
     "already_have_account": "Already have an account?",
-    "passwords_do_not_match": "Passwords do not match"
+    "passwords_do_not_match": "Passwords do not match",
+    "area_target": "Area Target",
+    "stores_count": "Stores Count",
+    "stores_in_area": "Stores in Area"
   },
   ar: {
     "dashboard": "لوحة التحكم",
@@ -301,6 +304,9 @@ export const translations = {
     "create_your_account": "أنشئ حسابك",
     "confirm_password": "تأكيد كلمة المرور",
     "already_have_account": "لديك حساب بالفعل؟",
-    "passwords_do_not_match": "كلمتا المرور غير متطابقتين"
+    "passwords_do_not_match": "كلمتا المرور غير متطابقتين",
+    "area_target": "هدف المنطقة",
+    "stores_count": "عدد المعارض",
+    "stores_in_area": "المعارض في المنطقة"
   }
 };

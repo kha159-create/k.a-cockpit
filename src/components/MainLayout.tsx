@@ -17,6 +17,7 @@ import SmartUploaderPage from '@/pages/SmartUploaderPage';
 import LFLPage from '@/pages/LFLPage';
 import SettingsPage from '@/pages/SettingsPage';
 import StoreDetailPage from '@/pages/StoreDetailPage';
+import AreaDetailPage from '@/pages/AreaDetailPage';
 // import NaturalLanguageSearch from '@/components/NaturalLanguageSearch';
 import PendingApprovalPage from '@/pages/PendingApprovalPage';
 import PendingApprovalsPage from '@/pages/PendingApprovalsPage';
@@ -198,6 +199,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreSummary | null>(null);
+  const [selectedArea, setSelectedArea] = useState<{ managerName: string; stores: StoreSummary[] } | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
@@ -697,6 +699,23 @@ const handleNotificationClick = (notificationId: string) => {
     );
   }
 
+  if (activeTab === 'stores' && selectedArea) {
+      return <AreaDetailPage 
+          areaManager={selectedArea.managerName}
+          stores={selectedArea.stores}
+          allMetrics={dailyMetrics} 
+          onBack={() => setSelectedArea(null)}
+          allStores={processedData.storeSummary}
+          setModalState={setModalState}
+          allDateData={allDateData}
+          profile={profile}
+          onSelectStore={(store) => {
+            setSelectedArea(null);
+            setSelectedStore(store);
+          }}
+      />;
+  }
+
   if (activeTab === 'stores' && selectedStore) {
       return <StoreDetailPage 
           store={selectedStore} 
@@ -729,7 +748,7 @@ const handleNotificationClick = (notificationId: string) => {
     case 'dashboard':
       return <Dashboard {...processedData} {...pageProps} dashboardPieFilter={dashboardPieFilter} setDashboardPieFilter={setDashboardPieFilter} tasks={tasks} onUpdateTaskStatus={handleUpdateTaskStatus} isProcessing={isProcessing} />;
     case 'stores':
-      return <StoresPage {...processedData} {...pageProps} onEdit={d => setModalState({type: 'store', data: d})} onDelete={(id, name) => handleDelete('stores', id, name)} onSelectStore={setSelectedStore} allMetrics={dailyMetrics} />;
+      return <StoresPage {...processedData} {...pageProps} onEdit={d => setModalState({type: 'store', data: d})} onDelete={(id, name) => handleDelete('stores', id, name)} onSelectStore={setSelectedStore} onSelectArea={(managerName, stores) => setSelectedArea({ managerName, stores })} allMetrics={dailyMetrics} />;
      case 'employees':
       return <EmployeesPage 
           {...processedData} 

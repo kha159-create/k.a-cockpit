@@ -2,38 +2,34 @@ import React, { useState, useMemo } from 'react';
 import { SparklesIcon, ArrowLeftIcon } from '../components/Icons';
 import { KPICard, ChartCard } from '../components/DashboardComponents';
 import MonthYearFilter from '../components/MonthYearFilter';
-import CustomBusinessRules from '../components/CustomBusinessRules';
-import type { StoreSummary, DailyMetric, ModalState, DateFilter, FilterableData, UserProfile, BusinessRule, SalesTransaction } from '../types';
+import type { StoreSummary, DailyMetric, ModalState, DateFilter, FilterableData, UserProfile, SalesTransaction } from '../types';
 import { calculateEffectiveTarget } from '../utils/calculator';
 import { generateText } from '../services/geminiService';
 import { useLocale } from '../context/LocaleContext';
+import { StoreName } from '@/components/Names';
 
-interface StoreDetailPageProps {
-    store: StoreSummary;
+interface AreaDetailPageProps {
+    areaManager: string;
+    stores: StoreSummary[];
     allMetrics: DailyMetric[];
     onBack: () => void;
     allStores: StoreSummary[];
     setModalState: React.Dispatch<React.SetStateAction<ModalState>>;
     allDateData: FilterableData[];
     profile: UserProfile | null;
-    businessRules: BusinessRule[];
-    onSaveRule: (rule: string, existingId?: string) => void;
-    onDeleteRule: (id: string) => void;
-    isProcessing: boolean;
+    onSelectStore: (store: StoreSummary) => void;
 }
 
-const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
-    store,
+const AreaDetailPage: React.FC<AreaDetailPageProps> = ({
+    areaManager,
+    stores,
     allMetrics,
     onBack,
     allStores,
     setModalState,
     allDateData,
     profile,
-    businessRules,
-    onSaveRule,
-    onDeleteRule,
-    isProcessing,
+    onSelectStore,
 }) => {
     const { t, locale } = useLocale();
     const [aiAnalysis, setAiAnalysis] = useState('');
@@ -41,8 +37,9 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
     const [dateFilter, setDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' });
 
     const filteredMetrics = useMemo(() => {
+        const storeNames = new Set(stores.map(s => s.name));
         return allMetrics.filter(m => {
-            if (m.store !== store.name) return false;
+            if (!storeNames.has(m.store)) return false;
             const itemTimestamp = m.date;
             if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
             const itemDate = itemTimestamp.toDate();
@@ -86,20 +83,27 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
             const dayMatch = dateFilter.day === 'all' || normalizedDate.getUTCDate() === dateFilter.day;
             return yearMatch && monthMatch && dayMatch;
         });
-    }, [store.name, allMetrics, dateFilter]);
+    }, [stores, allMetrics, dateFilter]);
 
-    const storeData = useMemo(() => {
+    const areaData = useMemo(() => {
         const totalSales = filteredMetrics.reduce((sum, m) => sum + (m.totalSales || 0), 0);
         const totalVisitors = filteredMetrics.reduce((sum, m) => sum + (m.visitors || 0), 0);
         const totalTransactions = filteredMetrics.reduce((sum, m) => sum + (m.transactionCount || 0), 0);
+        const totalTarget = stores.reduce((sum, s) => sum + calculateEffectiveTarget(s.targets, dateFilter), 0);
+        const totalSalesFromStores = stores.reduce((sum, s) => sum + (s.totalSales || 0), 0);
+        const targetAchievement = totalTarget > 0 ? (totalSalesFromStores / totalTarget) * 100 : 0;
+        
         return {
-            totalSales, totalVisitors, totalTransactions,
+            totalSales, 
+            totalVisitors, 
+            totalTransactions,
+            totalTarget,
+            targetAchievement,
             atv: totalTransactions > 0 ? totalSales / totalTransactions : 0,
             visitorRate: totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0,
             salesPerVisitor: totalVisitors > 0 ? totalSales / totalVisitors : 0,
         };
-    }, [filteredMetrics]);
-
+    }, [filteredMetrics, stores, dateFilter]);
 
     const dynamicTargetData = useMemo(() => {
         const now = new Date();
@@ -111,12 +115,13 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
         const remainingDays = Math.max(0, totalDaysInMonth - todayDate + 1);
         
         const salesThisMonth = allMetrics.filter(m => {
-            if (m.store !== store.name || !m.date || typeof m.date.toDate !== 'function') return false;
+            const storeNames = new Set(stores.map(s => s.name));
+            if (!storeNames.has(m.store) || !m.date || typeof m.date.toDate !== 'function') return false;
             const metricDate = m.date.toDate();
             return metricDate.getFullYear() === year && metricDate.getMonth() === month;
         }).reduce((sum, m) => sum + (m.totalSales || 0), 0);
             
-        const monthlyTarget = calculateEffectiveTarget(store.targets, {year, month, day: 'all'});
+        const monthlyTarget = stores.reduce((sum, s) => sum + calculateEffectiveTarget(s.targets, {year, month, day: 'all'}), 0);
         const remainingTarget = monthlyTarget - salesThisMonth;
 
         // 90% goal calculations
@@ -130,14 +135,14 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
             requiredDailyAverage: remainingDays > 0 ? Math.max(0, remainingTarget) / remainingDays : 0,
             requiredDailyAverage90: remainingDays > 0 ? Math.max(0, remainingTarget90) / remainingDays : 0,
         };
-    }, [store.name, store.targets, allMetrics]);
+    }, [stores, allMetrics]);
     
     const handleGenerateAnalysis = async () => {
         setIsAnalyzing(true);
         setAiAnalysis('');
         try {
             const languageInstruction = locale === 'ar' ? 'Provide the response in Arabic.' : '';
-            const prompt = `Analyze the performance for store "${store.name}". Data: ${JSON.stringify(storeData)}. Provide a brief summary, 2 strengths, 1 area for improvement, and 2 actionable steps. ${languageInstruction}`;
+            const prompt = `Analyze the performance for area managed by "${areaManager}". Data: ${JSON.stringify(areaData)}. Provide a brief summary, 2 strengths, 1 area for improvement, and 2 actionable steps. ${languageInstruction}`;
             const result = await generateText({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] });
             setAiAnalysis(result);
         } catch (error: any) {
@@ -151,9 +156,9 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
         setModalState({
             type: 'aiComparison',
             data: {
-                item: store,
+                item: { name: areaManager, ...areaData },
                 allItems: allStores,
-                type: 'store'
+                type: 'area'
             }
         });
     };
@@ -170,19 +175,20 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
             </div>
            
             <div className="p-6 bg-white rounded-xl shadow-sm border">
-                <h2 className="text-3xl font-bold text-zinc-800">{store.name}</h2>
-                <p className="text-zinc-500">{t('monthly_target')}: {calculateEffectiveTarget(store.targets, {year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all'}).toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
+                <h2 className="text-3xl font-bold text-zinc-800">{areaManager}</h2>
+                <p className="text-zinc-500">{t('area_target')}: {areaData.totalTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
+                <p className="text-zinc-500">{t('stores_count')}: {stores.length}</p>
             </div>
 
             <MonthYearFilter dateFilter={dateFilter} setDateFilter={setDateFilter} allData={allDateData} />
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <KPICard title={t('total_sales')} value={storeData.totalSales} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })} />
-                <KPICard title={t('visitors')} value={storeData.totalVisitors} />
-                <KPICard title={t('total_transactions')} value={storeData.totalTransactions} />
-                <KPICard title={t('avg_transaction_value')} value={storeData.atv} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}/>
-                <KPICard title={t('conversion_rate')} value={storeData.visitorRate} format={v => `${v.toFixed(1)}%`} />
-                <KPICard title={t('sales_per_visitor')} value={storeData.salesPerVisitor} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })} />
+                <KPICard title={t('total_sales')} value={areaData.totalSales} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })} />
+                <KPICard title={t('visitors')} value={areaData.totalVisitors} />
+                <KPICard title={t('total_transactions')} value={areaData.totalTransactions} />
+                <KPICard title={t('avg_transaction_value')} value={areaData.atv} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}/>
+                <KPICard title={t('conversion_rate')} value={areaData.visitorRate} format={v => `${v.toFixed(1)}%`} />
+                <KPICard title={t('sales_per_visitor')} value={areaData.salesPerVisitor} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -206,16 +212,33 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
                  </div>
             </div>
 
-            <CustomBusinessRules
-                rules={businessRules}
-                stores={[store]}
-                onSave={onSaveRule}
-                onDelete={onDeleteRule}
-                isProcessing={isProcessing}
-                showGeneralRules={false}
-            />
+            {/* Stores List */}
+            <div className="p-6 bg-white rounded-xl shadow-sm border">
+                <h3 className="font-semibold text-lg text-zinc-700 mb-4">{t('stores_in_area')}</h3>
+                <div className="space-y-2">
+                    {stores.map(store => (
+                        <div 
+                            key={store.id} 
+                            onClick={() => onSelectStore(store)}
+                            className="p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors"
+                        >
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <StoreName id={(store as any).store_id ?? (store as any).id ?? store.name} fallback={store.name} />
+                                    <p className="text-sm text-zinc-500">{t('sales')}: {store.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="font-semibold text-zinc-700">{store.targetAchievement.toFixed(1)}%</p>
+                                    <p className="text-sm text-zinc-500">{t('achievement')}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 };
 
-export default StoreDetailPage;
+export default AreaDetailPage;
+
