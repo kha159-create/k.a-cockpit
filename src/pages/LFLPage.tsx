@@ -272,34 +272,197 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                 ['']
             ];
 
-            // Prepare data with proper formatting
-            const excelData = [
-                ...headerInfo,
-                ['Metric', 'Current', 'Previous', 'Difference', 'Change %'],
-                ...tableData.map(row => [
-                    row.metric,
-                    row.current, // Use raw numbers for Excel formatting
-                    row.previous,
-                    row.difference,
-                    row.percentageChange
-                ])
-            ];
+            let excelData: any[] = [];
+            let headerRow = 9;
+            let columnHeaders: string[] = [];
+            let storesToProcess: typeof visibleStores = [];
+
+            if (storeFilter === 'All') {
+                // Detailed report for all stores
+                columnHeaders = ['Store', 'Area Manager', 'Metric', 'Current', 'Previous', 'Difference', 'Change %'];
+                
+                // Get current period data based on comparison type
+                const currentData = data;
+                
+                // Process each store
+                storesToProcess = visibleStores;
+                const storeDataRows: any[] = [];
+                
+                storesToProcess.forEach(store => {
+                    // Get store metrics
+                    const storeMetrics = allMetrics.filter(m => m.store === store.name);
+                    
+                    // Process period for this store
+                    const processStorePeriod = (storeMetrics: DailyMetric[], startDate: Date, endDate: Date): LFLData => {
+                        const filtered = storeMetrics.filter(s => {
+                            if (!s.date || typeof s.date.toDate !== 'function') return false;
+                            const d = s.date.toDate();
+                            const itemDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+                            return itemDate >= startDate && itemDate <= endDate;
+                        });
+                        const totalSales = filtered.reduce((sum, item) => sum + (item.totalSales || 0), 0);
+                        const totalVisitors = filtered.reduce((sum, item) => sum + (item.visitors || 0), 0);
+                        const totalTransactions = filtered.reduce((sum, item) => sum + (item.transactionCount || 0), 0);
+                        return {
+                            totalSales, totalTransactions, totalVisitors,
+                            atv: totalTransactions > 0 ? totalSales / totalTransactions : 0,
+                            visitorRate: totalVisitors > 0 ? (totalTransactions / totalVisitors) * 100 : 0,
+                        };
+                    };
+
+                    const parseYmd = (s: string) => {
+                        const [y, m, d] = s.split('-').map(Number);
+                        return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+                    };
+
+                    const now = new Date();
+                    const currentYear = now.getUTCFullYear();
+                    const currentMonth = now.getUTCMonth();
+                    const currentDay = now.getUTCDate();
+                    const previousYear = currentYear - 1;
+
+                    let storeCurrent: LFLData, storePrevious: LFLData;
+
+                    if (comparisonType === 'daily') {
+                        const dailyParts = dailyDate.split('-').map(Number);
+                        const selectedDay = new Date(Date.UTC(dailyParts[0], dailyParts[1] - 1, dailyParts[2]));
+                        const selectedDayLY = new Date(Date.UTC(selectedDay.getUTCFullYear() - 1, selectedDay.getUTCMonth(), selectedDay.getUTCDate()));
+                        storeCurrent = processStorePeriod(storeMetrics, selectedDay, selectedDay);
+                        storePrevious = processStorePeriod(storeMetrics, selectedDayLY, selectedDayLY);
+                    } else if (comparisonType === 'mtd') {
+                        const startOfMonth = new Date(Date.UTC(currentYear, currentMonth, 1));
+                        const yesterday = new Date(Date.UTC(currentYear, currentMonth, currentDay - 1));
+                        const startOfMonthLY = new Date(Date.UTC(previousYear, currentMonth, 1));
+                        const yesterdayLY = new Date(Date.UTC(previousYear, currentMonth, currentDay - 1));
+                        storeCurrent = processStorePeriod(storeMetrics, startOfMonth, yesterday);
+                        storePrevious = processStorePeriod(storeMetrics, startOfMonthLY, yesterdayLY);
+                    } else if (comparisonType === 'ytd') {
+                        const startOfYear = new Date(Date.UTC(currentYear, 0, 1));
+                        const yesterday = new Date(Date.UTC(currentYear, currentMonth, currentDay - 1));
+                        const startOfYearLY = new Date(Date.UTC(previousYear, 0, 1));
+                        const yesterdayLY = new Date(Date.UTC(previousYear, currentMonth, currentDay - 1));
+                        storeCurrent = processStorePeriod(storeMetrics, startOfYear, yesterday);
+                        storePrevious = processStorePeriod(storeMetrics, startOfYearLY, yesterdayLY);
+                    } else if (comparisonType === 'monthly') {
+                        const startOfMonthFilter = new Date(Date.UTC(currentYear, monthFilter, 1));
+                        const endOfMonthFilter = new Date(Date.UTC(currentYear, monthFilter + 1, 0));
+                        const startOfMonthFilterLY = new Date(Date.UTC(previousYear, monthFilter, 1));
+                        const endOfMonthFilterLY = new Date(Date.UTC(previousYear, monthFilter + 1, 0));
+                        storeCurrent = processStorePeriod(storeMetrics, startOfMonthFilter, endOfMonthFilter);
+                        storePrevious = processStorePeriod(storeMetrics, startOfMonthFilterLY, endOfMonthFilterLY);
+                    } else {
+                        const hasRangeA = rangeAStart && rangeAEnd;
+                        const hasRangeB = rangeBStart && rangeBEnd;
+                        const startOfMonth = new Date(Date.UTC(currentYear, currentMonth, 1));
+                        const rangeCurrentStart = hasRangeA ? parseYmd(rangeAStart) : startOfMonth;
+                        const rangeCurrentEnd = hasRangeA ? parseYmd(rangeAEnd) : now;
+                        const startOfMonthLY = new Date(Date.UTC(previousYear, currentMonth, 1));
+                        const yesterdayLY = new Date(Date.UTC(previousYear, currentMonth, currentDay - 1));
+                        const rangePrevStart = hasRangeB ? parseYmd(rangeBStart) : startOfMonthLY;
+                        const rangePrevEnd = hasRangeB ? parseYmd(rangeBEnd) : yesterdayLY;
+                        storeCurrent = processStorePeriod(storeMetrics, rangeCurrentStart, rangeCurrentEnd);
+                        storePrevious = processStorePeriod(storeMetrics, rangePrevStart, rangePrevEnd);
+                    }
+
+                    // Add rows for each metric
+                    const storeMetricsData = [
+                        { key: 'sales', title: 'Sales', current: storeCurrent.totalSales, previous: storePrevious.totalSales, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
+                        { key: 'visitors', title: 'Visitors', current: storeCurrent.totalVisitors, previous: storePrevious.totalVisitors, format: (v: number) => v.toLocaleString('en-US') },
+                        { key: 'atv', title: 'ATV', current: storeCurrent.atv, previous: storePrevious.atv, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
+                        { key: 'transactions', title: 'Transactions', current: storeCurrent.totalTransactions, previous: storePrevious.totalTransactions, format: (v: number) => v.toLocaleString('en-US') },
+                        { key: 'visitorRate', title: 'Visitor Conversion Rate', current: storeCurrent.visitorRate, previous: storePrevious.visitorRate, format: (v: number) => `${v.toFixed(1)}%`, isPercentage: true },
+                        { key: 'salesPerVisitor', title: 'Sales per Visitor', current: storeCurrent.totalVisitors > 0 ? storeCurrent.totalSales / storeCurrent.totalVisitors : 0, previous: storePrevious.totalVisitors > 0 ? storePrevious.totalSales / storePrevious.totalVisitors : 0, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
+                    ];
+
+                    storeMetricsData.forEach(metric => {
+                        const difference = metric.current - metric.previous;
+                        const percentageChange = metric.previous !== 0 ? (difference / Math.abs(metric.previous)) * 100 : metric.current > 0 ? 100 : 0;
+                        storeDataRows.push([
+                            store.name,
+                            store.areaManager || '-',
+                            metric.title,
+                            metric.current,
+                            metric.previous,
+                            difference,
+                            percentageChange
+                        ]);
+                    });
+                });
+
+                // Add summary row (All Stores Total)
+                const summaryMetrics = [
+                    { key: 'sales', title: 'Sales', current: data.current.totalSales, previous: data.previous.totalSales },
+                    { key: 'visitors', title: 'Visitors', current: data.current.totalVisitors, previous: data.previous.totalVisitors },
+                    { key: 'atv', title: 'ATV', current: data.current.atv, previous: data.previous.atv },
+                    { key: 'transactions', title: 'Transactions', current: data.current.totalTransactions, previous: data.previous.totalTransactions },
+                    { key: 'visitorRate', title: 'Visitor Conversion Rate', current: data.current.visitorRate, previous: data.previous.visitorRate },
+                    { key: 'salesPerVisitor', title: 'Sales per Visitor', current: data.current.totalVisitors > 0 ? data.current.totalSales / data.current.totalVisitors : 0, previous: data.previous.totalVisitors > 0 ? data.previous.totalSales / data.previous.totalVisitors : 0 },
+                ];
+
+                summaryMetrics.forEach(metric => {
+                    const difference = metric.current - metric.previous;
+                    const percentageChange = metric.previous !== 0 ? (difference / Math.abs(metric.previous)) * 100 : metric.current > 0 ? 100 : 0;
+                    storeDataRows.push([
+                        'ALL STORES (TOTAL)',
+                        '-',
+                        metric.title,
+                        metric.current,
+                        metric.previous,
+                        difference,
+                        percentageChange
+                    ]);
+                });
+
+                excelData = [
+                    ...headerInfo,
+                    columnHeaders,
+                    ...storeDataRows
+                ];
+            } else {
+                // Single store report (existing format)
+                columnHeaders = ['Metric', 'Current', 'Previous', 'Difference', 'Change %'];
+                excelData = [
+                    ...headerInfo,
+                    columnHeaders,
+                    ...tableData.map(row => [
+                        row.metric,
+                        row.current,
+                        row.previous,
+                        row.difference,
+                        row.percentageChange
+                    ])
+                ];
+            }
 
             // Create worksheet
             const worksheet = XLSX.utils.aoa_to_sheet(excelData);
 
-            // Set column widths
-            worksheet['!cols'] = [
-                { wch: 25 }, // Metric
-                { wch: 18 }, // Current
-                { wch: 18 }, // Previous
-                { wch: 18 }, // Difference
-                { wch: 15 }  // Change %
-            ];
+            // Set column widths based on report type
+            if (storeFilter === 'All') {
+                worksheet['!cols'] = [
+                    { wch: 25 }, // Store
+                    { wch: 20 }, // Area Manager
+                    { wch: 25 }, // Metric
+                    { wch: 18 }, // Current
+                    { wch: 18 }, // Previous
+                    { wch: 18 }, // Difference
+                    { wch: 15 }  // Change %
+                ];
+            } else {
+                worksheet['!cols'] = [
+                    { wch: 25 }, // Metric
+                    { wch: 18 }, // Current
+                    { wch: 18 }, // Previous
+                    { wch: 18 }, // Difference
+                    { wch: 15 }  // Change %
+                ];
+            }
 
             // Format header row (row 10, 0-indexed)
             const headerRow = 9;
-            ['A', 'B', 'C', 'D', 'E'].forEach(col => {
+            const headerCols = storeFilter === 'All' ? ['A', 'B', 'C', 'D', 'E', 'F', 'G'] : ['A', 'B', 'C', 'D', 'E'];
+            
+            headerCols.forEach(col => {
                 const cellRef = `${col}${headerRow + 1}`;
                 if (!worksheet[cellRef]) return;
                 worksheet[cellRef].s = {
@@ -324,56 +487,136 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             }
 
             // Format data rows with numbers
-            tableData.forEach((row, index) => {
-                const rowNum = headerRow + 2 + index;
-                
-                // Format Current, Previous, Difference columns as numbers
-                // Check if it's a currency metric (sales, atv, salesPerVisitor)
-                const isCurrency = ['Sales', 'ATV', 'Sales per Visitor'].includes(row.metric);
-                const isPercentage = row.metric === 'Visitor Conversion Rate';
-                
-                ['B', 'C', 'D'].forEach(col => {
-                    const cellRef = `${col}${rowNum}`;
-                    if (worksheet[cellRef]) {
+            const dataStartRow = headerRow + 2;
+            const totalDataRows = storeFilter === 'All' 
+                ? (storesToProcess.length * 6) + 6 // Each store has 6 metrics + 6 summary rows
+                : tableData.length;
+
+            for (let i = 0; i < totalDataRows; i++) {
+                const rowNum = dataStartRow + i;
+                const rowData = excelData[headerRow + 1 + i];
+                if (!rowData) continue;
+
+                if (storeFilter === 'All') {
+                    // Format: Store, Area Manager, Metric, Current, Previous, Difference, Change %
+                    const metricName = rowData[2]; // Metric column
+                    const isCurrency = ['Sales', 'ATV', 'Sales per Visitor'].includes(metricName);
+                    const isPercentage = metricName === 'Visitor Conversion Rate';
+                    
+                    // Format Current (column D)
+                    const currentCellRef = `D${rowNum}`;
+                    if (worksheet[currentCellRef]) {
                         if (isPercentage) {
-                            worksheet[cellRef].z = '0.00%';
-                            worksheet[cellRef].s = {
-                                numFmt: '0.00%',
-                                alignment: { horizontal: 'right' }
-                            };
+                            worksheet[currentCellRef].z = '0.00%';
+                            worksheet[currentCellRef].s = { numFmt: '0.00%', alignment: { horizontal: 'right' } };
                         } else if (isCurrency) {
-                            worksheet[cellRef].z = '#,##0.00';
-                            worksheet[cellRef].s = {
-                                numFmt: '#,##0.00',
-                                alignment: { horizontal: 'right' }
-                            };
+                            worksheet[currentCellRef].z = '#,##0.00';
+                            worksheet[currentCellRef].s = { numFmt: '#,##0.00', alignment: { horizontal: 'right' } };
                         } else {
-                            worksheet[cellRef].z = '#,##0';
-                            worksheet[cellRef].s = {
-                                numFmt: '#,##0',
-                                alignment: { horizontal: 'right' }
-                            };
+                            worksheet[currentCellRef].z = '#,##0';
+                            worksheet[currentCellRef].s = { numFmt: '#,##0', alignment: { horizontal: 'right' } };
                         }
                     }
-                });
 
-                // Format Change % column
-                const changeCellRef = `E${rowNum}`;
-                if (worksheet[changeCellRef]) {
-                    // Convert percentage to decimal for Excel (e.g., 15.5% -> 0.155)
-                    const percentageValue = row.percentageChange / 100;
-                    worksheet[changeCellRef].v = percentageValue;
-                    worksheet[changeCellRef].z = '0.0%';
-                    worksheet[changeCellRef].s = {
-                        numFmt: '0.0%',
-                        font: { 
-                            bold: true,
-                            color: { rgb: row.percentageChange >= 0 ? '008000' : 'FF0000' } 
-                        },
-                        alignment: { horizontal: 'center', vertical: 'center' }
-                    };
+                    // Format Previous (column E)
+                    const previousCellRef = `E${rowNum}`;
+                    if (worksheet[previousCellRef]) {
+                        if (isPercentage) {
+                            worksheet[previousCellRef].z = '0.00%';
+                            worksheet[previousCellRef].s = { numFmt: '0.00%', alignment: { horizontal: 'right' } };
+                        } else if (isCurrency) {
+                            worksheet[previousCellRef].z = '#,##0.00';
+                            worksheet[previousCellRef].s = { numFmt: '#,##0.00', alignment: { horizontal: 'right' } };
+                        } else {
+                            worksheet[previousCellRef].z = '#,##0';
+                            worksheet[previousCellRef].s = { numFmt: '#,##0', alignment: { horizontal: 'right' } };
+                        }
+                    }
+
+                    // Format Difference (column F)
+                    const differenceCellRef = `F${rowNum}`;
+                    if (worksheet[differenceCellRef]) {
+                        if (isPercentage) {
+                            worksheet[differenceCellRef].z = '0.00%';
+                            worksheet[differenceCellRef].s = { numFmt: '0.00%', alignment: { horizontal: 'right' } };
+                        } else if (isCurrency) {
+                            worksheet[differenceCellRef].z = '#,##0.00';
+                            worksheet[differenceCellRef].s = { numFmt: '#,##0.00', alignment: { horizontal: 'right' } };
+                        } else {
+                            worksheet[differenceCellRef].z = '#,##0';
+                            worksheet[differenceCellRef].s = { numFmt: '#,##0', alignment: { horizontal: 'right' } };
+                        }
+                    }
+
+                    // Format Change % (column G)
+                    const changeCellRef = `G${rowNum}`;
+                    if (worksheet[changeCellRef] && rowData[6] !== undefined) {
+                        const percentageValue = Number(rowData[6]) / 100;
+                        worksheet[changeCellRef].v = percentageValue;
+                        worksheet[changeCellRef].z = '0.0%';
+                        worksheet[changeCellRef].s = {
+                            numFmt: '0.0%',
+                            font: { 
+                                bold: true,
+                                color: { rgb: percentageValue >= 0 ? '008000' : 'FF0000' } 
+                            },
+                            alignment: { horizontal: 'center', vertical: 'center' }
+                        };
+                    }
+
+                    // Highlight summary rows (ALL STORES)
+                    if (rowData[0] === 'ALL STORES (TOTAL)') {
+                        ['A', 'B', 'C', 'D', 'E', 'F', 'G'].forEach(col => {
+                            const cellRef = `${col}${rowNum}`;
+                            if (worksheet[cellRef]) {
+                                worksheet[cellRef].s = {
+                                    ...(worksheet[cellRef].s || {}),
+                                    fill: { fgColor: { rgb: 'FFF3E0' } },
+                                    font: { bold: true }
+                                };
+                            }
+                        });
+                    }
+                } else {
+                    // Single store format (existing)
+                    const row = tableData[i];
+                    if (!row) continue;
+                    
+                    const isCurrency = ['Sales', 'ATV', 'Sales per Visitor'].includes(row.metric);
+                    const isPercentage = row.metric === 'Visitor Conversion Rate';
+                    
+                    ['B', 'C', 'D'].forEach(col => {
+                        const cellRef = `${col}${rowNum}`;
+                        if (worksheet[cellRef]) {
+                            if (isPercentage) {
+                                worksheet[cellRef].z = '0.00%';
+                                worksheet[cellRef].s = { numFmt: '0.00%', alignment: { horizontal: 'right' } };
+                            } else if (isCurrency) {
+                                worksheet[cellRef].z = '#,##0.00';
+                                worksheet[cellRef].s = { numFmt: '#,##0.00', alignment: { horizontal: 'right' } };
+                            } else {
+                                worksheet[cellRef].z = '#,##0';
+                                worksheet[cellRef].s = { numFmt: '#,##0', alignment: { horizontal: 'right' } };
+                            }
+                        }
+                    });
+
+                    const changeCellRef = `E${rowNum}`;
+                    if (worksheet[changeCellRef]) {
+                        const percentageValue = row.percentageChange / 100;
+                        worksheet[changeCellRef].v = percentageValue;
+                        worksheet[changeCellRef].z = '0.0%';
+                        worksheet[changeCellRef].s = {
+                            numFmt: '0.0%',
+                            font: { 
+                                bold: true,
+                                color: { rgb: row.percentageChange >= 0 ? '008000' : 'FF0000' } 
+                            },
+                            alignment: { horizontal: 'center', vertical: 'center' }
+                        };
+                    }
                 }
-            });
+            }
 
             // Add worksheet to workbook
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Comparison');
