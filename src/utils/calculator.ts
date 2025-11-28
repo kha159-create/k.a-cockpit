@@ -89,19 +89,25 @@ export const getSmartDuvetCategory = (price: number, categories: ReturnType<type
  */
 export const getSmartPillowCategories = (prices: number[]): { 
     low: { min: number; max: number; label: string };
+    medium: { min: number; max: number; label: string };
     high: { min: number; max: number; label: string };
 } => {
-    // Fixed price ranges for pillows: 39-99 and 101-400+
+    // Fixed price ranges for pillows: 93-99, 100-190, 199+
     return {
         low: { 
-            min: 39, 
+            min: 93, 
             max: 99, 
-            label: 'Low Value (39-99)' 
+            label: 'Low Value (93-99)' 
+        },
+        medium: { 
+            min: 100, 
+            max: 190, 
+            label: 'Medium Value (100-190)' 
         },
         high: { 
-            min: 101, 
+            min: 199, 
             max: Infinity, 
-            label: 'High Value (101-400+)' 
+            label: 'High Value (199+)' 
         }
     };
 };
@@ -111,6 +117,7 @@ export const getSmartPillowCategories = (prices: number[]): {
  */
 export const getSmartPillowCategory = (price: number, categories: ReturnType<typeof getSmartPillowCategories>): string | null => {
     if (price >= categories.low.min && price <= categories.low.max) return categories.low.label;
+    if (price >= categories.medium.min && price <= categories.medium.max) return categories.medium.label;
     if (price >= categories.high.min) return categories.high.label;
     return null;
 };

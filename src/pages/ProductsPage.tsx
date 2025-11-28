@@ -253,16 +253,18 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         return {
           totalUnits: 0,
           breakdown: [
-            { name: 'Low Value (39-99)', units: 0, percentage: 0 },
-            { name: 'High Value (101-400+)', units: 0, percentage: 0 },
+            { name: 'Low Value (93-99)', units: 0, percentage: 0 },
+            { name: 'Medium Value (100-190)', units: 0, percentage: 0 },
+            { name: 'High Value (199+)', units: 0, percentage: 0 },
           ],
         };
       }
 
       const smartCategories = getSmartPillowCategories(pillowPrices);
-      const pillowLabels = [smartCategories.low.label, smartCategories.high.label];
+      const pillowLabels = [smartCategories.low.label, smartCategories.medium.label, smartCategories.high.label];
       const pillowBuckets: Record<string, number> = {
         [smartCategories.low.label]: 0,
+        [smartCategories.medium.label]: 0,
         [smartCategories.high.label]: 0,
       };
 
