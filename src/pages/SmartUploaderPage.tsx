@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import MonthYearFilter from '../components/MonthYearFilter';
 import { useLocale } from '../context/LocaleContext';
 import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary, FilterableData, SalesTransaction } from '../types';
-import { getCategory } from '../utils/calculator';
+import { getCategory, getSmartPillowCategories, getSmartPillowCategory } from '../utils/calculator';
 
 declare var XLSX: any;
 
@@ -279,6 +279,79 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     return result;
   }, [allData, dateFilter]);
 
+  // Calculate Pillow categories per store
+  const pillowSummary = useMemo(() => {
+    const filterByDate = (item: FilterableData) => {
+      const itemTimestamp = 'date' in item ? item.date : item['Bill Dt.'];
+      if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
+      const itemDate = itemTimestamp.toDate();
+      const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
+
+      const mode = dateFilter.mode ?? 'single';
+      const parseIsoDate = (value?: string | null) => {
+        if (!value) return null;
+        const [y, mValue, d] = value.split('-').map(Number);
+        if ([y, mValue, d].some(num => Number.isNaN(num))) return null;
+        return new Date(Date.UTC(y, (mValue || 1) - 1, d || 1));
+      };
+
+      if (mode === 'custom') {
+        const start = parseIsoDate(dateFilter.customStartDate);
+        const end = parseIsoDate(dateFilter.customEndDate);
+        if (start && normalizedDate < start) return false;
+        if (end && normalizedDate > end) return false;
+        return true;
+      }
+
+      const now = new Date();
+      const year = dateFilter.year === 'all' ? now.getUTCFullYear() : (dateFilter.year as number);
+      const month = dateFilter.month === 'all' ? now.getUTCMonth() : (dateFilter.month as number);
+      const yearMatch = normalizedDate.getUTCFullYear() === year;
+      const monthMatch = normalizedDate.getUTCMonth() === month;
+
+      if (mode === 'range') {
+        const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+        const fromDay = typeof dateFilter.dayFrom === 'number' ? dateFilter.dayFrom : 1;
+        const toDay = typeof dateFilter.dayTo === 'number' ? dateFilter.dayTo : lastDay;
+        const day = normalizedDate.getUTCDate();
+        return yearMatch && monthMatch && day >= fromDay && day <= toDay;
+      }
+
+      const day = dateFilter.day === 'all' ? true : normalizedDate.getUTCDate() === dateFilter.day;
+      return yearMatch && monthMatch && day;
+    };
+
+    const filteredSales = allData.filter((item): item is SalesTransaction => {
+      if (!filterByDate(item)) return false;
+      if (!('Item Name' in item && 'Item Alias' in item && 'Outlet Name' in item)) return false;
+      const category = getCategory({ name: item['Item Name'], alias: item['Item Alias'] });
+      return category === 'Pillows';
+    });
+
+    // Collect all pillow prices
+    const pillowPrices = filteredSales.map(s => Number(s['Item Rate'] || 0)).filter(p => p > 0);
+    const smartCategories = getSmartPillowCategories(pillowPrices);
+
+    return filteredSales.reduce((acc, sale) => {
+      const storeName = sale['Outlet Name'];
+      const category = getSmartPillowCategory(Number(sale['Item Rate'] || 0), smartCategories);
+      if (category) {
+        if (!acc[storeName]) {
+          acc[storeName] = { 
+            name: storeName, 
+            [smartCategories.low.label]: 0, 
+            [smartCategories.medium.label]: 0, 
+            [smartCategories.high.label]: 0, 
+            total: 0 
+          };
+        }
+        acc[storeName][category] = (acc[storeName][category] || 0) + (sale['Sold Qty'] || 0);
+        acc[storeName].total += (sale['Sold Qty'] || 0);
+      }
+      return acc;
+    }, {} as Record<string, { name: string; [key: string]: number | string }>);
+  }, [allData, dateFilter]);
+
   const sortedEmployeeRows = useMemo(() => {
     const rows = employeeSummaries.map((emp, index) => {
       const sourceEmployee =
@@ -322,9 +395,23 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       };
     };
     
+    // Get pillow category keys
+    const getPillowCategoryKeys = (pillowData: any) => {
+      if (!pillowData) return { low: 'Low Value (39-99)', medium: 'Medium Value (100-190)', high: 'High Value (199+)' };
+      const keys = Object.keys(pillowData).filter(k => k !== 'name' && k !== 'total');
+      return {
+        low: keys.find(k => k.toLowerCase().includes('low')) || 'Low Value (39-99)',
+        medium: keys.find(k => k.toLowerCase().includes('medium')) || 'Medium Value (100-190)',
+        high: keys.find(k => k.toLowerCase().includes('high')) || 'High Value (199+)',
+      };
+    };
+    
     // Find category keys from first available store
     const firstStoreWithData = storeSummaries.find(s => duvetSummary[s.name]);
     const categoryKeys = getCategoryKeys(duvetSummary[firstStoreWithData?.name || '']);
+    
+    const firstStoreWithPillowData = storeSummaries.find(s => pillowSummary[s.name]);
+    const pillowCategoryKeys = getPillowCategoryKeys(pillowSummary[firstStoreWithPillowData?.name || '']);
     
     return storeSummaries.map((store, index) => {
       const duvetData = duvetSummary[store.name];
@@ -333,6 +420,12 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       const high = duvetData?.[categoryKeys.high] ?? 0;
       const totalDuvetUnits = duvetData?.total ?? 0;
       const duvetTarget = storeDuvetTargets.get(store.name) || 0;
+      
+      const pillowData = pillowSummary[store.name];
+      const pillowLow = pillowData?.[pillowCategoryKeys.low] ?? 0;
+      const pillowMedium = pillowData?.[pillowCategoryKeys.medium] ?? 0;
+      const pillowHigh = pillowData?.[pillowCategoryKeys.high] ?? 0;
+      
       const extras = storePerformanceExtras[store.name] || {
         avgTicket: store.atv || 0,
         transactions: store.transactionCount || 0,
@@ -367,6 +460,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         duvetLow: low,
         duvetMedium: medium,
         duvetHigh: high,
+        pillowLow,
+        pillowMedium,
+        pillowHigh,
         categoryShareDuvetsValue: categoryShare.values.Duvets,
         categoryShareDuvetsFullValue: categoryShare.values['Duvets Full'],
         categoryShareToppersValue: categoryShare.values.Toppers,
@@ -379,7 +475,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         categoryShareOther: categoryShare.percentages.Other,
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [storeSummaries, storePerformanceExtras, duvetSummary, storeDuvetTargets, storeCategoryShare]);
+  }, [storeSummaries, storePerformanceExtras, duvetSummary, pillowSummary, storeDuvetTargets, storeCategoryShare]);
 
   const buildWorkbookStyles = () => {
     const headerStyle = {
@@ -569,6 +665,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       'Low Value Units',
       'Medium Value Units',
       'High Value Units',
+      'Pillow Low (39-99)',
+      'Pillow Medium (100-190)',
+      'Pillow High (199+)',
       'Duvets (SAR)',
       'Duvets %',
       'Duvets Full (SAR)',
@@ -608,6 +707,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
         row.duvetLow,
         row.duvetMedium,
         row.duvetHigh,
+        row.pillowLow,
+        row.pillowMedium,
+        row.pillowHigh,
         row.categoryShareDuvetsValue,
         row.categoryShareDuvets / 100,
         row.categoryShareDuvetsFullValue,
@@ -636,6 +738,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     const totalLow = storeReportRows.reduce((sum, row) => sum + row.duvetLow, 0);
     const totalMedium = storeReportRows.reduce((sum, row) => sum + row.duvetMedium, 0);
     const totalHigh = storeReportRows.reduce((sum, row) => sum + row.duvetHigh, 0);
+    const totalPillowLow = storeReportRows.reduce((sum, row) => sum + row.pillowLow, 0);
+    const totalPillowMedium = storeReportRows.reduce((sum, row) => sum + row.pillowMedium, 0);
+    const totalPillowHigh = storeReportRows.reduce((sum, row) => sum + row.pillowHigh, 0);
     const totalDuvetsValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareDuvetsValue, 0);
     const totalDuvetsFullValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareDuvetsFullValue, 0);
     const totalToppersValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareToppersValue, 0);
@@ -662,6 +767,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       totalLow,
       totalMedium,
       totalHigh,
+      totalPillowLow,
+      totalPillowMedium,
+      totalPillowHigh,
       totalDuvetsValue,
       totalCategoryValue > 0 ? (totalDuvetsValue / totalCategoryValue) * 100 : 0,
       totalDuvetsFullValue,
@@ -733,16 +841,19 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 15, format: '#,##0' },
       { index: 16, format: '#,##0' },
       { index: 17, format: '#,##0' },
-      { index: 18, format: '#,##0.00' }, // Duvets (SAR)
-      { index: 19, format: '0.0%' },     // Duvets %
-      { index: 20, format: '#,##0.00' }, // Duvets Full (SAR)
-      { index: 21, format: '0.0%' },     // Duvets Full %
-      { index: 22, format: '#,##0.00' }, // Toppers (SAR)
-      { index: 23, format: '0.0%' },     // Toppers %
-      { index: 24, format: '#,##0.00' }, // Pillows (SAR)
-      { index: 25, format: '0.0%' },     // Pillows %
-      { index: 26, format: '#,##0.00' }, // Other (SAR)
-      { index: 27, format: '0.0%' },     // Other %
+      { index: 18, format: '#,##0' },    // Pillow Low
+      { index: 19, format: '#,##0' },    // Pillow Medium
+      { index: 20, format: '#,##0' },    // Pillow High
+      { index: 21, format: '#,##0.00' }, // Duvets (SAR)
+      { index: 22, format: '0.0%' },     // Duvets %
+      { index: 23, format: '#,##0.00' }, // Duvets Full (SAR)
+      { index: 24, format: '0.0%' },     // Duvets Full %
+      { index: 25, format: '#,##0.00' }, // Toppers (SAR)
+      { index: 26, format: '0.0%' },     // Toppers %
+      { index: 27, format: '#,##0.00' }, // Pillows (SAR)
+      { index: 28, format: '0.0%' },     // Pillows %
+      { index: 29, format: '#,##0.00' }, // Other (SAR)
+      { index: 30, format: '0.0%' },     // Other %
     ]);
 
     const totalsRowIndex = dataStartRow + storeReportRows.length + 1;
@@ -762,16 +873,19 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { index: 15, format: '#,##0' },
       { index: 16, format: '#,##0' },
       { index: 17, format: '#,##0' },
-      { index: 18, format: '#,##0.00' }, // Duvets (SAR)
-      { index: 19, format: '0.0%' },     // Duvets %
-      { index: 20, format: '#,##0.00' }, // Duvets Full (SAR)
-      { index: 21, format: '0.0%' },     // Duvets Full %
-      { index: 22, format: '#,##0.00' }, // Toppers (SAR)
-      { index: 23, format: '0.0%' },     // Toppers %
-      { index: 24, format: '#,##0.00' }, // Pillows (SAR)
-      { index: 25, format: '0.0%' },     // Pillows %
-      { index: 26, format: '#,##0.00' }, // Other (SAR)
-      { index: 27, format: '0.0%' },     // Other %
+      { index: 18, format: '#,##0' },    // Pillow Low
+      { index: 19, format: '#,##0' },    // Pillow Medium
+      { index: 20, format: '#,##0' },    // Pillow High
+      { index: 21, format: '#,##0.00' }, // Duvets (SAR)
+      { index: 22, format: '0.0%' },     // Duvets %
+      { index: 23, format: '#,##0.00' }, // Duvets Full (SAR)
+      { index: 24, format: '0.0%' },     // Duvets Full %
+      { index: 25, format: '#,##0.00' }, // Toppers (SAR)
+      { index: 26, format: '0.0%' },     // Toppers %
+      { index: 27, format: '#,##0.00' }, // Pillows (SAR)
+      { index: 28, format: '0.0%' },     // Pillows %
+      { index: 29, format: '#,##0.00' }, // Other (SAR)
+      { index: 30, format: '0.0%' },     // Other %
     ]);
     for (let c = 0; c < header.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c });

@@ -58,18 +58,18 @@ export const getSmartDuvetCategories = (prices: number[]): {
     return {
         low: { 
             min: 99, 
-            max: 400, 
-            label: 'Low Value (99-400)' 
+            max: 300, 
+            label: 'Low Value (99-300)' 
         },
         medium: { 
-            min: 401, 
-            max: 700, 
-            label: 'Medium Value (401-700)' 
+            min: 301, 
+            max: 600, 
+            label: 'Medium Value (301-600)' 
         },
         high: { 
-            min: 701, 
+            min: 601, 
             max: Infinity, 
-            label: 'High Value (701+)' 
+            label: 'High Value (600+)' 
         }
     };
 };
