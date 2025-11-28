@@ -450,56 +450,62 @@ Use short sentences. Output in Arabic.` }]}
         {/* Charts */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <ChartCard 
-            title="Duvet Sales Analysis by Value (King)"
+            title="Duvet Sales Analysis by Value"
+            className="xl:col-span-2"
             watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
             watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
           >
-            <div className="space-y-3 p-1 h-full flex flex-col">
-              {summary.duvetKingAnalysis.totalUnits > 0 ? (
-                summary.duvetKingAnalysis.breakdown.map(item => (
-                  <div key={item.name}>
-                    <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
-                      <span>{item.name}</span>
-                      <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-zinc-500 text-sm">No duvet (King) sales data for this period.</p>
-              )}
-              <div className="mt-auto pt-2 border-t border-gray-200 text-xs flex justify-between">
-                <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
-                <span className="font-bold text-zinc-900">{summary.duvetKingAnalysis.totalUnits}</span>
+            <div className="space-y-6 p-1 h-full flex flex-col">
+              {/* Duvet (King) Section */}
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-zinc-800 mb-3 pb-2 border-b border-gray-200">Duvet (King)</h4>
+                <div className="space-y-3">
+                  {summary.duvetKingAnalysis.totalUnits > 0 ? (
+                    summary.duvetKingAnalysis.breakdown.map(item => (
+                      <div key={item.name}>
+                        <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
+                          <span>{item.name}</span>
+                          <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-zinc-500 text-sm">No duvet (King) sales data for this period.</p>
+                  )}
+                </div>
+                <div className="mt-3 pt-2 border-t border-gray-200 text-xs flex justify-between">
+                  <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
+                  <span className="font-bold text-zinc-900">{summary.duvetKingAnalysis.totalUnits}</span>
+                </div>
               </div>
-            </div>
-          </ChartCard>
-          <ChartCard 
-            title="Duvet Sales Analysis by Value (Full)"
-            watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
-            watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
-          >
-            <div className="space-y-3 p-1 h-full flex flex-col">
-              {summary.duvetFullAnalysis.totalUnits > 0 ? (
-                summary.duvetFullAnalysis.breakdown.map(item => (
-                  <div key={item.name}>
-                    <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
-                      <span>{item.name}</span>
-                      <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-zinc-500 text-sm">No duvet (Full) sales data for this period.</p>
-              )}
-              <div className="mt-auto pt-2 border-t border-gray-200 text-xs flex justify-between">
-                <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
-                <span className="font-bold text-zinc-900">{summary.duvetFullAnalysis.totalUnits}</span>
+
+              {/* Duvet Full Section */}
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-zinc-800 mb-3 pb-2 border-b border-gray-200">Duvet Full</h4>
+                <div className="space-y-3">
+                  {summary.duvetFullAnalysis.totalUnits > 0 ? (
+                    summary.duvetFullAnalysis.breakdown.map(item => (
+                      <div key={item.name}>
+                        <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
+                          <span>{item.name}</span>
+                          <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-zinc-500 text-sm">No duvet (Full) sales data for this period.</p>
+                  )}
+                </div>
+                <div className="mt-3 pt-2 border-t border-gray-200 text-xs flex justify-between">
+                  <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
+                  <span className="font-bold text-zinc-900">{summary.duvetFullAnalysis.totalUnits}</span>
+                </div>
               </div>
             </div>
           </ChartCard>
