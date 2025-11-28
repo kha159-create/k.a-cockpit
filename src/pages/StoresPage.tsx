@@ -134,26 +134,26 @@ const StoresPage: React.FC<StoresPageProps> = ({
                             {onSelectArea && (
                                 <div 
                                     onClick={() => onSelectArea(managerName, stores)}
-                                    className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg shadow-sm border-2 border-blue-200 cursor-pointer hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 transition-all mb-6"
+                                    className="bg-gradient-to-r from-orange-50/80 to-orange-100/80 p-4 rounded-lg shadow-sm border-2 border-orange-200/60 cursor-pointer hover:from-orange-100/90 hover:to-orange-200/90 hover:border-orange-300/80 transition-all mb-6"
                                 >
                                     <div className="flex justify-between items-start mb-3">
                                         <div>
-                                            <h4 className="text-xl font-bold text-blue-900 mb-2">{managerName}</h4>
-                                            <p className="text-sm text-blue-700">{t('stores_count')}: {storesCount}</p>
+                                            <h4 className="text-xl font-bold text-orange-900 mb-2">{managerName}</h4>
+                                            <p className="text-sm text-orange-700">{t('stores_count')}: {storesCount}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-2xl font-bold text-blue-900">{targetAchievement.toFixed(1)}%</p>
-                                            <p className="text-sm text-blue-700">{t('achievement')}</p>
+                                            <p className="text-2xl font-bold text-orange-900">{targetAchievement.toFixed(1)}%</p>
+                                            <p className="text-sm text-orange-700">{t('achievement')}</p>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <p className="text-sm text-blue-600 mb-1">{t('total_sales')}</p>
-                                            <p className="text-lg font-semibold text-blue-900">{totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
+                                            <p className="text-sm text-orange-600 mb-1">{t('total_sales')}</p>
+                                            <p className="text-lg font-semibold text-orange-900">{totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
                                         </div>
                                         <div>
-                                            <p className="text-sm text-blue-600 mb-1">{t('area_target')}</p>
-                                            <p className="text-lg font-semibold text-blue-900">{totalTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
+                                            <p className="text-sm text-orange-600 mb-1">{t('area_target')}</p>
+                                            <p className="text-lg font-semibold text-orange-900">{totalTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
                                         </div>
                                     </div>
                                 </div>
