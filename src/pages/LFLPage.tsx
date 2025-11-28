@@ -459,7 +459,6 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             }
 
             // Format header row (row 10, 0-indexed)
-            const headerRow = 9;
             const headerCols = storeFilter === 'All' ? ['A', 'B', 'C', 'D', 'E', 'F', 'G'] : ['A', 'B', 'C', 'D', 'E'];
             
             headerCols.forEach(col => {
