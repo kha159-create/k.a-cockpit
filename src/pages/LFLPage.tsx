@@ -212,7 +212,7 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             { key: 'visitors', title: 'Visitors', current: data.current.totalVisitors, previous: data.previous.totalVisitors, format: (v: number) => v.toLocaleString('en-US') },
             { key: 'atv', title: 'ATV', current: data.current.atv, previous: data.previous.atv, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
             { key: 'transactions', title: 'Transactions', current: data.current.totalTransactions, previous: data.previous.totalTransactions, format: (v: number) => v.toLocaleString('en-US') },
-            { key: 'visitorRate', title: 'Visitor Conversion Rate', current: data.current.visitorRate, previous: data.previous.visitorRate, format: (v: number) => `${v.toFixed(1)}%`, isPercentage: true },
+            { key: 'visitorRate', title: 'Visitor Conversion Rate', current: data.current.visitorRate, previous: data.previous.visitorRate, format: (v: number) => `${v.toFixed(2)}%`, isPercentage: true },
             { key: 'salesPerVisitor', title: 'Sales per Visitor', current: data.current.totalVisitors > 0 ? data.current.totalSales / data.current.totalVisitors : 0, previous: data.previous.totalVisitors > 0 ? data.previous.totalSales / data.previous.totalVisitors : 0, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
         ];
 
@@ -241,6 +241,8 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                 formattedCurrent: metric.format(metric.current),
                 formattedPrevious: metric.format(metric.previous),
                 formattedDifference: metric.format(Math.abs(difference)),
+                isCurrentPositive: difference >= 0,
+                isPreviousPositive: metric.current >= metric.previous,
             };
         });
 
@@ -370,20 +372,21 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                         { key: 'visitors', title: 'Visitors', current: storeCurrent.totalVisitors, previous: storePrevious.totalVisitors, format: (v: number) => v.toLocaleString('en-US') },
                         { key: 'atv', title: 'ATV', current: storeCurrent.atv, previous: storePrevious.atv, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
                         { key: 'transactions', title: 'Transactions', current: storeCurrent.totalTransactions, previous: storePrevious.totalTransactions, format: (v: number) => v.toLocaleString('en-US') },
-                        { key: 'visitorRate', title: 'Visitor Conversion Rate', current: storeCurrent.visitorRate, previous: storePrevious.visitorRate, format: (v: number) => `${v.toFixed(1)}%`, isPercentage: true },
+                        { key: 'visitorRate', title: 'Visitor Conversion Rate', current: storeCurrent.visitorRate, previous: storePrevious.visitorRate, format: (v: number) => `${v.toFixed(2)}%`, isPercentage: true },
                         { key: 'salesPerVisitor', title: 'Sales per Visitor', current: storeCurrent.totalVisitors > 0 ? storeCurrent.totalSales / storeCurrent.totalVisitors : 0, previous: storePrevious.totalVisitors > 0 ? storePrevious.totalSales / storePrevious.totalVisitors : 0, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
                     ];
 
                     storeMetricsData.forEach(metric => {
                         const difference = metric.current - metric.previous;
                         const percentageChange = metric.previous !== 0 ? (difference / Math.abs(metric.previous)) * 100 : metric.current > 0 ? 100 : 0;
+                        const isPercentage = metric.isPercentage;
                         storeDataRows.push([
                             store.name,
                             store.areaManager || '-',
                             metric.title,
-                            metric.current,
-                            metric.previous,
-                            difference,
+                            isPercentage ? metric.current / 100 : Math.round(metric.current),
+                            isPercentage ? metric.previous / 100 : Math.round(metric.previous),
+                            isPercentage ? difference / 100 : Math.round(difference),
                             percentageChange
                         ]);
                     });
@@ -402,13 +405,14 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                 summaryMetrics.forEach(metric => {
                     const difference = metric.current - metric.previous;
                     const percentageChange = metric.previous !== 0 ? (difference / Math.abs(metric.previous)) * 100 : metric.current > 0 ? 100 : 0;
+                    const isPercentage = metric.key === 'visitorRate';
                     storeDataRows.push([
                         'ALL STORES (TOTAL)',
                         '-',
                         metric.title,
-                        metric.current,
-                        metric.previous,
-                        difference,
+                        isPercentage ? metric.current / 100 : Math.round(metric.current),
+                        isPercentage ? metric.previous / 100 : Math.round(metric.previous),
+                        isPercentage ? difference / 100 : Math.round(difference),
                         percentageChange
                     ]);
                 });
@@ -424,13 +428,16 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                 excelData = [
                     ...headerInfo,
                     columnHeaders,
-                    ...tableData.map(row => [
-                        row.metric,
-                        row.current,
-                        row.previous,
-                        row.difference,
-                        row.percentageChange
-                    ])
+                    ...tableData.map(row => {
+                        const isPercentage = row.metric === 'Visitor Conversion Rate';
+                        return [
+                            row.metric,
+                            isPercentage ? row.current / 100 : Math.round(row.current),
+                            isPercentage ? row.previous / 100 : Math.round(row.previous),
+                            isPercentage ? row.difference / 100 : Math.round(row.difference),
+                            row.percentageChange
+                        ];
+                    })
                 ];
             }
 
@@ -504,46 +511,85 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                     
                     // Format Current (column D)
                     const currentCellRef = `D${rowNum}`;
+                    const currentValue = Number(rowData[3]);
                     if (worksheet[currentCellRef]) {
                         if (isPercentage) {
                             worksheet[currentCellRef].z = '0.00%';
-                            worksheet[currentCellRef].s = { numFmt: '0.00%', alignment: { horizontal: 'right' } };
+                            worksheet[currentCellRef].s = { 
+                                numFmt: '0.00%', 
+                                alignment: { horizontal: 'right' },
+                                font: { color: { rgb: currentValue >= 0 ? '008000' : 'FF0000' } }
+                            };
                         } else if (isCurrency) {
-                            worksheet[currentCellRef].z = '#,##0.00';
-                            worksheet[currentCellRef].s = { numFmt: '#,##0.00', alignment: { horizontal: 'right' } };
+                            worksheet[currentCellRef].z = '#,##0';
+                            worksheet[currentCellRef].s = { 
+                                numFmt: '#,##0', 
+                                alignment: { horizontal: 'right' },
+                                font: { color: { rgb: currentValue >= 0 ? '008000' : 'FF0000' } }
+                            };
                         } else {
                             worksheet[currentCellRef].z = '#,##0';
-                            worksheet[currentCellRef].s = { numFmt: '#,##0', alignment: { horizontal: 'right' } };
+                            worksheet[currentCellRef].s = { 
+                                numFmt: '#,##0', 
+                                alignment: { horizontal: 'right' },
+                                font: { color: { rgb: currentValue >= 0 ? '008000' : 'FF0000' } }
+                            };
                         }
                     }
 
                     // Format Previous (column E)
                     const previousCellRef = `E${rowNum}`;
+                    const previousValue = Number(rowData[4]);
                     if (worksheet[previousCellRef]) {
                         if (isPercentage) {
                             worksheet[previousCellRef].z = '0.00%';
-                            worksheet[previousCellRef].s = { numFmt: '0.00%', alignment: { horizontal: 'right' } };
+                            worksheet[previousCellRef].s = { 
+                                numFmt: '0.00%', 
+                                alignment: { horizontal: 'right' },
+                                font: { color: { rgb: previousValue >= 0 ? '008000' : 'FF0000' } }
+                            };
                         } else if (isCurrency) {
-                            worksheet[previousCellRef].z = '#,##0.00';
-                            worksheet[previousCellRef].s = { numFmt: '#,##0.00', alignment: { horizontal: 'right' } };
+                            worksheet[previousCellRef].z = '#,##0';
+                            worksheet[previousCellRef].s = { 
+                                numFmt: '#,##0', 
+                                alignment: { horizontal: 'right' },
+                                font: { color: { rgb: previousValue >= 0 ? '008000' : 'FF0000' } }
+                            };
                         } else {
                             worksheet[previousCellRef].z = '#,##0';
-                            worksheet[previousCellRef].s = { numFmt: '#,##0', alignment: { horizontal: 'right' } };
+                            worksheet[previousCellRef].s = { 
+                                numFmt: '#,##0', 
+                                alignment: { horizontal: 'right' },
+                                font: { color: { rgb: previousValue >= 0 ? '008000' : 'FF0000' } }
+                            };
                         }
                     }
 
                     // Format Difference (column F)
                     const differenceCellRef = `F${rowNum}`;
+                    const differenceValue = Number(rowData[5]);
                     if (worksheet[differenceCellRef]) {
                         if (isPercentage) {
                             worksheet[differenceCellRef].z = '0.00%';
-                            worksheet[differenceCellRef].s = { numFmt: '0.00%', alignment: { horizontal: 'right' } };
+                            worksheet[differenceCellRef].s = { 
+                                numFmt: '0.00%', 
+                                alignment: { horizontal: 'right' },
+                                font: { color: { rgb: differenceValue >= 0 ? '008000' : 'FF0000' } }
+                            };
                         } else if (isCurrency) {
-                            worksheet[differenceCellRef].z = '#,##0.00';
-                            worksheet[differenceCellRef].s = { numFmt: '#,##0.00', alignment: { horizontal: 'right' } };
+                            worksheet[differenceCellRef].z = '#,##0';
+                            worksheet[differenceCellRef].s = { 
+                                numFmt: '#,##0', 
+                                alignment: { horizontal: 'right' },
+                                font: { color: { rgb: differenceValue >= 0 ? '008000' : 'FF0000' } }
+                            };
                         } else {
                             worksheet[differenceCellRef].z = '#,##0';
-                            worksheet[differenceCellRef].s = { numFmt: '#,##0', alignment: { horizontal: 'right' } };
+                            worksheet[differenceCellRef].s = { 
+                                numFmt: '#,##0', 
+                                alignment: { horizontal: 'right' },
+                                font: { color: { rgb: differenceValue >= 0 ? '008000' : 'FF0000' } }
+                            };
                         }
                     }
 
@@ -552,9 +598,9 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                     if (worksheet[changeCellRef] && rowData[6] !== undefined) {
                         const percentageValue = Number(rowData[6]) / 100;
                         worksheet[changeCellRef].v = percentageValue;
-                        worksheet[changeCellRef].z = '0.0%';
+                        worksheet[changeCellRef].z = '0.00%';
                         worksheet[changeCellRef].s = {
-                            numFmt: '0.0%',
+                            numFmt: '0.00%',
                             font: { 
                                 bold: true,
                                 color: { rgb: percentageValue >= 0 ? '008000' : 'FF0000' } 
@@ -584,18 +630,31 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                     const isCurrency = ['Sales', 'ATV', 'Sales per Visitor'].includes(row.metric);
                     const isPercentage = row.metric === 'Visitor Conversion Rate';
                     
-                    ['B', 'C', 'D'].forEach(col => {
+                    ['B', 'C', 'D'].forEach((col, idx) => {
                         const cellRef = `${col}${rowNum}`;
+                        const cellValue = idx === 0 ? row.current : idx === 1 ? row.previous : row.difference;
                         if (worksheet[cellRef]) {
                             if (isPercentage) {
                                 worksheet[cellRef].z = '0.00%';
-                                worksheet[cellRef].s = { numFmt: '0.00%', alignment: { horizontal: 'right' } };
+                                worksheet[cellRef].s = { 
+                                    numFmt: '0.00%', 
+                                    alignment: { horizontal: 'right' },
+                                    font: { color: { rgb: cellValue >= 0 ? '008000' : 'FF0000' } }
+                                };
                             } else if (isCurrency) {
-                                worksheet[cellRef].z = '#,##0.00';
-                                worksheet[cellRef].s = { numFmt: '#,##0.00', alignment: { horizontal: 'right' } };
+                                worksheet[cellRef].z = '#,##0';
+                                worksheet[cellRef].s = { 
+                                    numFmt: '#,##0', 
+                                    alignment: { horizontal: 'right' },
+                                    font: { color: { rgb: cellValue >= 0 ? '008000' : 'FF0000' } }
+                                };
                             } else {
                                 worksheet[cellRef].z = '#,##0';
-                                worksheet[cellRef].s = { numFmt: '#,##0', alignment: { horizontal: 'right' } };
+                                worksheet[cellRef].s = { 
+                                    numFmt: '#,##0', 
+                                    alignment: { horizontal: 'right' },
+                                    font: { color: { rgb: cellValue >= 0 ? '008000' : 'FF0000' } }
+                                };
                             }
                         }
                     });
@@ -604,9 +663,9 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                     if (worksheet[changeCellRef]) {
                         const percentageValue = row.percentageChange / 100;
                         worksheet[changeCellRef].v = percentageValue;
-                        worksheet[changeCellRef].z = '0.0%';
+                        worksheet[changeCellRef].z = '0.00%';
                         worksheet[changeCellRef].s = {
-                            numFmt: '0.0%',
+                            numFmt: '0.00%',
                             font: { 
                                 bold: true,
                                 color: { rgb: row.percentageChange >= 0 ? '008000' : 'FF0000' } 
@@ -629,9 +688,45 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
 
         const tableColumns: Column<typeof tableData[0]>[] = [
             { key: 'metric', label: 'Metric', sortable: true, render: (value) => value as string },
-            { key: 'formattedCurrent', label: 'Current', sortable: true, render: (value) => value as string },
-            { key: 'formattedPrevious', label: 'Previous', sortable: true, render: (value) => value as string },
-            { key: 'formattedDifference', label: 'Difference', sortable: true, render: (value) => value as string },
+            { 
+                key: 'formattedCurrent', 
+                label: 'Current', 
+                sortable: true, 
+                render: (value, record) => {
+                    const isPositive = record.isCurrentPositive;
+                    return (
+                        <span className={isPositive ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                            {value as string}
+                        </span>
+                    );
+                }
+            },
+            { 
+                key: 'formattedPrevious', 
+                label: 'Previous', 
+                sortable: true, 
+                render: (value, record) => {
+                    const isPositive = record.isPreviousPositive;
+                    return (
+                        <span className={isPositive ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                            {value as string}
+                        </span>
+                    );
+                }
+            },
+            { 
+                key: 'formattedDifference', 
+                label: 'Difference', 
+                sortable: true, 
+                render: (value, record) => {
+                    const isPositive = record.difference >= 0;
+                    return (
+                        <span className={isPositive ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                            {isPositive ? '+' : '-'}{value as string}
+                        </span>
+                    );
+                }
+            },
             { 
                 key: 'percentageChange', 
                 label: 'Change %', 
@@ -641,7 +736,7 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                     const isPositive = change >= 0;
                     return (
                         <span className={isPositive ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                            {isPositive ? '▲' : '▼'} {Math.abs(change).toFixed(1)}%
+                            {isPositive ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
                         </span>
                     );
                 }
