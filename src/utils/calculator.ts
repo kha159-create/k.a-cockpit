@@ -92,7 +92,7 @@ export const getSmartPillowCategories = (prices: number[]): {
     medium: { min: number; max: number; label: string };
     high: { min: number; max: number; label: string };
 } => {
-    // Fixed price ranges for pillows: 39-99, 100-190, 199+
+    // Fixed price ranges for pillows: 39-99, 100-189, 190+
     return {
         low: { 
             min: 39, 
@@ -101,13 +101,13 @@ export const getSmartPillowCategories = (prices: number[]): {
         },
         medium: { 
             min: 100, 
-            max: 190, 
-            label: 'Medium Value (100-190)' 
+            max: 189, 
+            label: 'Medium Value (100-189)' 
         },
         high: { 
-            min: 199, 
+            min: 190, 
             max: Infinity, 
-            label: 'High Value (199+)' 
+            label: 'High Value (190+)' 
         }
     };
 };

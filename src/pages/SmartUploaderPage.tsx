@@ -396,8 +396,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     };
     
     // Get pillow category keys
-    const getPillowCategoryKeys = (pillowData: any) => {
-      if (!pillowData) return { low: 'Low Value (39-99)', medium: 'Medium Value (100-190)', high: 'High Value (199+)' };
+      const getPillowCategoryKeys = (pillowData: any) => {
+      if (!pillowData) return { low: 'Low Value (39-99)', medium: 'Medium Value (100-189)', high: 'High Value (190+)' };
       const keys = Object.keys(pillowData).filter(k => k !== 'name' && k !== 'total');
       return {
         low: keys.find(k => k.toLowerCase().includes('low')) || 'Low Value (39-99)',
@@ -666,8 +666,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       'Medium Value Units',
       'High Value Units',
       'Pillow Low (39-99)',
-      'Pillow Medium (100-190)',
-      'Pillow High (199+)',
+      'Pillow Medium (100-189)',
+      'Pillow High (190+)',
       'Duvets (SAR)',
       'Duvets %',
       'Duvets Full (SAR)',
