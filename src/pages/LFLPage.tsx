@@ -876,12 +876,36 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     return (
         <div className="space-y-6">
             <div className="bg-white p-4 rounded-xl shadow-sm border space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {(profile?.role === 'admin' || profile?.role === 'general_manager') && (
+                        <div>
+                            <label className="label">Filter by Area:</label>
+                            <select 
+                                value={areaFilter} 
+                                onChange={e => {
+                                    setAreaFilter(e.target.value);
+                                    setStoreFilter('All'); // Reset store filter when area changes
+                                }} 
+                                className="input"
+                            >
+                                {availableAreaManagers.map(area => (
+                                    <option key={area} value={area}>{area === 'All' ? 'All Areas' : area}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div>
                         <label className="label">Filter by Store:</label>
-                        <select value={storeFilter} onChange={e => setStoreFilter(e.target.value)} className="input" disabled={profile?.role === 'employee'}>
+                        <select 
+                            value={storeFilter} 
+                            onChange={e => setStoreFilter(e.target.value)} 
+                            className="input" 
+                            disabled={profile?.role === 'employee'}
+                        >
                             <option value="All">All Stores</option>
-                            {visibleStores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                            {availableStoresForFilter.map(s => (
+                                <option key={s.id} value={s.name}>{s.name}</option>
+                            ))}
                         </select>
                     </div>
                      <div>
