@@ -177,48 +177,75 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       return 0;
     };
 
-    const duvetProducts = filteredProducts.filter(p => {
+    // Separate Duvets (King) and Duvets Full
+    const duvetKingProducts = filteredProducts.filter(p => {
       const category = getCategory(p);
-      if (filters.category === 'Duvets' || filters.category === 'Duvets Full') {
-        return category === filters.category;
+      if (filters.category === 'Duvets') {
+        return category === 'Duvets';
       }
-      return category === 'Duvets' || category === 'Duvets Full';
+      return filters.category === 'All' && category === 'Duvets';
     });
 
-    // Smart categorization: collect all prices first, then create categories
-    const duvetPrices = duvetProducts.map(p => resolveUnitPrice(p)).filter(p => p > 0);
-    const smartCategories = getSmartDuvetCategories(duvetPrices);
-    
-    const duvetLabels = [smartCategories.low.label, smartCategories.medium.label, smartCategories.high.label];
-    const duvetBuckets: Record<string, number> = {
-      [smartCategories.low.label]: 0,
-      [smartCategories.medium.label]: 0,
-      [smartCategories.high.label]: 0,
+    const duvetFullProducts = filteredProducts.filter(p => {
+      const category = getCategory(p);
+      if (filters.category === 'Duvets Full') {
+        return category === 'Duvets Full';
+      }
+      return filters.category === 'All' && category === 'Duvets Full';
+    });
+
+    // Helper function to calculate duvet analysis
+    const calculateDuvetAnalysis = (products: typeof filteredProducts) => {
+      const duvetPrices = products.map(p => resolveUnitPrice(p)).filter(p => p > 0);
+      if (duvetPrices.length === 0) {
+        return {
+          totalUnits: 0,
+          breakdown: [
+            { name: 'Low Value (99-400)', units: 0, percentage: 0 },
+            { name: 'Medium Value (401-700)', units: 0, percentage: 0 },
+            { name: 'High Value (701+)', units: 0, percentage: 0 },
+          ],
+        };
+      }
+
+      const smartCategories = getSmartDuvetCategories(duvetPrices);
+      const duvetLabels = [smartCategories.low.label, smartCategories.medium.label, smartCategories.high.label];
+      const duvetBuckets: Record<string, number> = {
+        [smartCategories.low.label]: 0,
+        [smartCategories.medium.label]: 0,
+        [smartCategories.high.label]: 0,
+      };
+
+      let totalDuvetUnits = 0;
+      products.forEach(product => {
+        const price = resolveUnitPrice(product);
+        const category = getSmartDuvetCategory(price, smartCategories);
+        if (!category) return;
+        const qty = product.soldQty || 0;
+        duvetBuckets[category] += qty;
+        totalDuvetUnits += qty;
+      });
+
+      const duvetBreakdown = duvetLabels.map(label => ({
+        name: label,
+        units: duvetBuckets[label] || 0,
+        percentage: totalDuvetUnits > 0 ? ((duvetBuckets[label] || 0) / totalDuvetUnits) * 100 : 0,
+      }));
+
+      return {
+        totalUnits: totalDuvetUnits,
+        breakdown: duvetBreakdown,
+      };
     };
 
-    let totalDuvetUnits = 0;
-    duvetProducts.forEach(product => {
-      const price = resolveUnitPrice(product);
-      const category = getSmartDuvetCategory(price, smartCategories);
-      if (!category) return;
-      const qty = product.soldQty || 0;
-      duvetBuckets[category] += qty;
-      totalDuvetUnits += qty;
-    });
-
-    const duvetBreakdown = duvetLabels.map(label => ({
-      name: label,
-      units: duvetBuckets[label] || 0,
-      percentage: totalDuvetUnits > 0 ? ((duvetBuckets[label] || 0) / totalDuvetUnits) * 100 : 0,
-    }));
+    const duvetKingAnalysis = calculateDuvetAnalysis(duvetKingProducts);
+    const duvetFullAnalysis = calculateDuvetAnalysis(duvetFullProducts);
 
     return {
       totalQty, totalValue, best, weak, avgDaily, monthlyGrowth,
       charts: { top10, monthlyTrend, categoryShare },
-      duvetAnalysis: {
-        totalUnits: totalDuvetUnits,
-        breakdown: duvetBreakdown,
-      },
+      duvetKingAnalysis,
+      duvetFullAnalysis,
     };
   }, [allDateData, allStores, areaStoreFilter, dateFilter, filteredProducts, filters.category]);
 
@@ -423,13 +450,13 @@ Use short sentences. Output in Arabic.` }]}
         {/* Charts */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <ChartCard 
-            title="Duvet Sales Analysis by Value"
+            title="Duvet Sales Analysis by Value (King)"
             watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
             watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
           >
             <div className="space-y-3 p-1 h-full flex flex-col">
-              {summary.duvetAnalysis.totalUnits > 0 ? (
-                summary.duvetAnalysis.breakdown.map(item => (
+              {summary.duvetKingAnalysis.totalUnits > 0 ? (
+                summary.duvetKingAnalysis.breakdown.map(item => (
                   <div key={item.name}>
                     <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
                       <span>{item.name}</span>
@@ -441,11 +468,38 @@ Use short sentences. Output in Arabic.` }]}
                   </div>
                 ))
               ) : (
-                <p className="text-center text-zinc-500 text-sm">No duvet sales data for this period.</p>
+                <p className="text-center text-zinc-500 text-sm">No duvet (King) sales data for this period.</p>
               )}
               <div className="mt-auto pt-2 border-t border-gray-200 text-xs flex justify-between">
                 <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
-                <span className="font-bold text-zinc-900">{summary.duvetAnalysis.totalUnits}</span>
+                <span className="font-bold text-zinc-900">{summary.duvetKingAnalysis.totalUnits}</span>
+              </div>
+            </div>
+          </ChartCard>
+          <ChartCard 
+            title="Duvet Sales Analysis by Value (Full)"
+            watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
+            watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
+          >
+            <div className="space-y-3 p-1 h-full flex flex-col">
+              {summary.duvetFullAnalysis.totalUnits > 0 ? (
+                summary.duvetFullAnalysis.breakdown.map(item => (
+                  <div key={item.name}>
+                    <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
+                      <span>{item.name}</span>
+                      <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-zinc-500 text-sm">No duvet (Full) sales data for this period.</p>
+              )}
+              <div className="mt-auto pt-2 border-t border-gray-200 text-xs flex justify-between">
+                <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
+                <span className="font-bold text-zinc-900">{summary.duvetFullAnalysis.totalUnits}</span>
               </div>
             </div>
           </ChartCard>
