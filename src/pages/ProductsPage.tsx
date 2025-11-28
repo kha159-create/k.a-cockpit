@@ -253,7 +253,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         return {
           totalUnits: 0,
           breakdown: [
-            { name: 'Low Value (93-99)', units: 0, percentage: 0 },
+            { name: 'Low Value (39-99)', units: 0, percentage: 0 },
             { name: 'Medium Value (100-190)', units: 0, percentage: 0 },
             { name: 'High Value (199+)', units: 0, percentage: 0 },
           ],
