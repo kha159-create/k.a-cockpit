@@ -5,7 +5,7 @@ import { Table, Column } from '../components/Table';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import { SparklesIcon } from '../components/Icons';
 import { StoreName } from '@/components/Names';
-import { getCategory, getSmartDuvetCategories, getSmartDuvetCategory } from '../utils/calculator';
+import { getCategory, getSmartDuvetCategories, getSmartDuvetCategory, getSmartPillowCategories, getSmartPillowCategory } from '../utils/calculator';
 import type { ProductSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile } from '../types';
 import { ChartCard, BarChart, LineChart, PieChart } from '../components/DashboardComponents';
 import { generateText } from '../services/geminiService';
@@ -194,6 +194,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       return filters.category === 'All' && category === 'Duvets Full';
     });
 
+    const pillowProducts = filteredProducts.filter(p => {
+      const category = getCategory(p);
+      if (filters.category === 'Pillows') {
+        return category === 'Pillows';
+      }
+      return filters.category === 'All' && category === 'Pillows';
+    });
+
     // Helper function to calculate duvet analysis
     const calculateDuvetAnalysis = (products: typeof filteredProducts) => {
       const duvetPrices = products.map(p => resolveUnitPrice(p)).filter(p => p > 0);
@@ -238,14 +246,58 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       };
     };
 
+    // Helper function to calculate pillow analysis
+    const calculatePillowAnalysis = (products: typeof filteredProducts) => {
+      const pillowPrices = products.map(p => resolveUnitPrice(p)).filter(p => p > 0);
+      if (pillowPrices.length === 0) {
+        return {
+          totalUnits: 0,
+          breakdown: [
+            { name: 'Low Value (39-99)', units: 0, percentage: 0 },
+            { name: 'High Value (101-400+)', units: 0, percentage: 0 },
+          ],
+        };
+      }
+
+      const smartCategories = getSmartPillowCategories(pillowPrices);
+      const pillowLabels = [smartCategories.low.label, smartCategories.high.label];
+      const pillowBuckets: Record<string, number> = {
+        [smartCategories.low.label]: 0,
+        [smartCategories.high.label]: 0,
+      };
+
+      let totalPillowUnits = 0;
+      products.forEach(product => {
+        const price = resolveUnitPrice(product);
+        const category = getSmartPillowCategory(price, smartCategories);
+        if (!category) return;
+        const qty = product.soldQty || 0;
+        pillowBuckets[category] += qty;
+        totalPillowUnits += qty;
+      });
+
+      const pillowBreakdown = pillowLabels.map(label => ({
+        name: label,
+        units: pillowBuckets[label] || 0,
+        percentage: totalPillowUnits > 0 ? ((pillowBuckets[label] || 0) / totalPillowUnits) * 100 : 0,
+      }));
+
+      return {
+        totalUnits: totalPillowUnits,
+        breakdown: pillowBreakdown,
+      };
+    };
+
     const duvetKingAnalysis = calculateDuvetAnalysis(duvetKingProducts);
     const duvetFullAnalysis = calculateDuvetAnalysis(duvetFullProducts);
+    const pillowAnalysis = calculatePillowAnalysis(pillowProducts);
 
     return {
       totalQty, totalValue, best, weak, avgDaily, monthlyGrowth,
       charts: { top10, monthlyTrend, categoryShare },
       duvetKingAnalysis,
       duvetFullAnalysis,
+      pillowAnalysis,
     };
   }, [allDateData, allStores, areaStoreFilter, dateFilter, filteredProducts, filters.category]);
 
@@ -450,7 +502,7 @@ Use short sentences. Output in Arabic.` }]}
         {/* Charts */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <ChartCard 
-            title="Duvet Sales Analysis by Value"
+            title="Sales Analysis by Value"
             watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
             watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
           >
@@ -504,6 +556,32 @@ Use short sentences. Output in Arabic.` }]}
                 <div className="mt-3 pt-2 border-t border-gray-200 text-xs flex justify-between">
                   <span className="font-semibold text-zinc-700">Total Duvet Units (MTD):</span>
                   <span className="font-bold text-zinc-900">{summary.duvetFullAnalysis.totalUnits}</span>
+                </div>
+              </div>
+
+              {/* Pillows Section */}
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-zinc-800 mb-3 pb-2 border-b border-gray-200">Pillows</h4>
+                <div className="space-y-3">
+                  {summary.pillowAnalysis.totalUnits > 0 ? (
+                    summary.pillowAnalysis.breakdown.map(item => (
+                      <div key={item.name}>
+                        <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
+                          <span>{item.name}</span>
+                          <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-zinc-500 text-sm">No pillow sales data for this period.</p>
+                  )}
+                </div>
+                <div className="mt-3 pt-2 border-t border-gray-200 text-xs flex justify-between">
+                  <span className="font-semibold text-zinc-700">Total Pillow Units (MTD):</span>
+                  <span className="font-bold text-zinc-900">{summary.pillowAnalysis.totalUnits}</span>
                 </div>
               </div>
             </div>

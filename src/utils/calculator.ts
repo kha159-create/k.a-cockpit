@@ -84,6 +84,37 @@ export const getSmartDuvetCategory = (price: number, categories: ReturnType<type
     return null;
 };
 
+/**
+ * Pillow price categorization - fixed price ranges
+ */
+export const getSmartPillowCategories = (prices: number[]): { 
+    low: { min: number; max: number; label: string };
+    high: { min: number; max: number; label: string };
+} => {
+    // Fixed price ranges for pillows: 39-99 and 100-400+
+    return {
+        low: { 
+            min: 39, 
+            max: 99, 
+            label: 'Low Value (39-99)' 
+        },
+        high: { 
+            min: 100, 
+            max: Infinity, 
+            label: 'High Value (100-400+)' 
+        }
+    };
+};
+
+/**
+ * Get pillow category based on fixed price ranges
+ */
+export const getSmartPillowCategory = (price: number, categories: ReturnType<typeof getSmartPillowCategories>): string | null => {
+    if (price >= categories.low.min && price <= categories.low.max) return categories.low.label;
+    if (price >= categories.high.min) return categories.high.label;
+    return null;
+};
+
 
 export const calculateEffectiveTarget = (
     targetsMap: { [year: string]: { [month: string]: number } } | undefined,
