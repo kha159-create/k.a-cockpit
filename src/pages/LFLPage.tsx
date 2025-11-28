@@ -43,6 +43,7 @@ const ComparisonTypeSelector: React.FC<{ value: string, onChange: (value: string
 
 
 const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => {
+    const [areaFilter, setAreaFilter] = useState('All');
     const [storeFilter, setStoreFilter] = useState('All');
     const [monthFilter, setMonthFilter] = useState(new Date().getMonth());
     const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -53,23 +54,40 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     const [rangeBEnd, setRangeBEnd] = useState('');
     const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
+    const availableAreaManagers = useMemo(() => {
+        const managers = new Set(allStores.map(s => s.areaManager).filter(Boolean));
+        return ['All', ...Array.from(managers).sort()];
+    }, [allStores]);
+
     const visibleStores = useMemo(() => {
         if (!profile) return [];
-        if (profile.role === 'admin' || profile.role === 'general_manager') return allStores;
         
-        const { role, areaManager, store: userStoreName } = profile;
-        if (role === 'area_manager') {
-            return allStores.filter(s => s.areaManager === areaManager);
+        let stores = allStores;
+        
+        // Apply role-based filtering first
+        if (profile.role !== 'admin' && profile.role !== 'general_manager') {
+            const { role, areaManager, store: userStoreName } = profile;
+            if (role === 'area_manager') {
+                stores = stores.filter(s => s.areaManager === areaManager);
+            } else if (role === 'store_manager') {
+                const userStore = stores.find(s => s.name === userStoreName);
+                stores = userStore ? stores.filter(s => s.areaManager === userStore.areaManager) : [];
+            } else if (role === 'employee') {
+                stores = stores.filter(s => s.name === userStoreName);
+            }
         }
-        if (role === 'store_manager') {
-            const userStore = allStores.find(s => s.name === userStoreName);
-            return userStore ? allStores.filter(s => s.areaManager === userStore.areaManager) : [];
+        
+        // Apply area filter
+        if (areaFilter !== 'All') {
+            stores = stores.filter(s => s.areaManager === areaFilter);
         }
-        if (role === 'employee') {
-            return allStores.filter(s => s.name === userStoreName);
-        }
-        return [];
-    }, [allStores, profile]);
+        
+        return stores;
+    }, [allStores, profile, areaFilter]);
+
+    const availableStoresForFilter = useMemo(() => {
+        return visibleStores;
+    }, [visibleStores]);
 
     const lflData = useMemo(() => {
         const processPeriod = (data: DailyMetric[], startDate: Date, endDate: Date): LFLData => {
