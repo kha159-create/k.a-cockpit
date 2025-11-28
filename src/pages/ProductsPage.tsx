@@ -451,7 +451,6 @@ Use short sentences. Output in Arabic.` }]}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <ChartCard 
             title="Duvet Sales Analysis by Value"
-            className="xl:col-span-2"
             watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
             watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
           >
@@ -511,7 +510,6 @@ Use short sentences. Output in Arabic.` }]}
           </ChartCard>
           <ChartCard 
             title="Category Share" 
-            className="xl:col-span-2"
             watermark={areaStoreFilter.store !== 'All' ? areaStoreFilter.store : undefined}
             watermarkOpacity={areaStoreFilter.store !== 'All' ? 0.15 : 0}
           >
