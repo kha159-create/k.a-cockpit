@@ -814,8 +814,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       { wch: 16 },
     ];
     ws['!merges'] = [
-      XLSX.utils.decode_range('A1:AG1'),
-      XLSX.utils.decode_range('A2:AG2'),
+      XLSX.utils.decode_range('A1:AJ1'),
+      XLSX.utils.decode_range('A2:AJ2'),
     ];
 
     if (ws['A1']) ws['A1'].s = titleStyle;
