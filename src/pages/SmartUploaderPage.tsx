@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import MonthYearFilter from '../components/MonthYearFilter';
 import { useLocale } from '../context/LocaleContext';
-import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary, FilterableData, SalesTransaction } from '../types';
+import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary, FilterableData, SalesTransaction, Store } from '../types';
 import { getCategory, getSmartPillowCategories, getSmartPillowCategory } from '../utils/calculator';
 
 declare var XLSX: any;
@@ -29,6 +29,8 @@ interface SmartUploaderPageProps {
   dateFilter: DateFilter;
   setDateFilter: React.Dispatch<React.SetStateAction<DateFilter>>;
   allData: FilterableData[];
+  allMetrics?: any[];
+  allStores?: any[];
 }
 
 const downloadTemplate = (fileName: string, headers: string[]) => {
@@ -54,7 +56,9 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
   employees,
   dateFilter,
   setDateFilter,
-  allData
+  allData,
+  allMetrics = [],
+  allStores = []
 }) => {
     const [file, setFile] = useState<File | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -345,8 +349,10 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
             total: 0 
           };
         }
-        acc[storeName][category] = (acc[storeName][category] || 0) + (sale['Sold Qty'] || 0);
-        acc[storeName].total += (sale['Sold Qty'] || 0);
+        const currentValue = typeof acc[storeName][category] === 'number' ? acc[storeName][category] : 0;
+        acc[storeName][category] = currentValue + (sale['Sold Qty'] || 0);
+        const currentTotal = typeof acc[storeName].total === 'number' ? acc[storeName].total : 0;
+        acc[storeName].total = currentTotal + (sale['Sold Qty'] || 0);
       }
       return acc;
     }, {} as Record<string, { name: string; [key: string]: number | string }>);
@@ -735,12 +741,12 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     const totalDuvetTarget = storeReportRows.reduce((sum, row) => sum + row.duvetTarget, 0);
     const totalDuvetUnits = storeReportRows.reduce((sum, row) => sum + row.duvetUnits, 0);
     const totalDuvetAchievement = totalDuvetTarget > 0 ? totalDuvetUnits / totalDuvetTarget : 0;
-    const totalLow = storeReportRows.reduce((sum, row) => sum + row.duvetLow, 0);
-    const totalMedium = storeReportRows.reduce((sum, row) => sum + row.duvetMedium, 0);
-    const totalHigh = storeReportRows.reduce((sum, row) => sum + row.duvetHigh, 0);
-    const totalPillowLow = storeReportRows.reduce((sum, row) => sum + row.pillowLow, 0);
-    const totalPillowMedium = storeReportRows.reduce((sum, row) => sum + row.pillowMedium, 0);
-    const totalPillowHigh = storeReportRows.reduce((sum, row) => sum + row.pillowHigh, 0);
+    const totalLow = storeReportRows.reduce((sum, row) => sum + (typeof row.duvetLow === 'number' ? row.duvetLow : 0), 0);
+    const totalMedium = storeReportRows.reduce((sum, row) => sum + (typeof row.duvetMedium === 'number' ? row.duvetMedium : 0), 0);
+    const totalHigh = storeReportRows.reduce((sum, row) => sum + (typeof row.duvetHigh === 'number' ? row.duvetHigh : 0), 0);
+    const totalPillowLow = storeReportRows.reduce((sum, row) => sum + (typeof row.pillowLow === 'number' ? row.pillowLow : 0), 0);
+    const totalPillowMedium = storeReportRows.reduce((sum, row) => sum + (typeof row.pillowMedium === 'number' ? row.pillowMedium : 0), 0);
+    const totalPillowHigh = storeReportRows.reduce((sum, row) => sum + (typeof row.pillowHigh === 'number' ? row.pillowHigh : 0), 0);
     const totalDuvetsValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareDuvetsValue, 0);
     const totalDuvetsFullValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareDuvetsFullValue, 0);
     const totalToppersValue = storeReportRows.reduce((sum, row) => sum + row.categoryShareToppersValue, 0);
@@ -898,6 +904,391 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     XLSX.writeFile(wb, fileName);
   };
 
+  const downloadAnnualComprehensiveReport = () => {
+    if (!ensureWorkbookLib()) return;
+    if (!allMetrics || allMetrics.length === 0 || !allStores || allStores.length === 0) {
+      alert('لا توجد بيانات كافية لإنشاء التقرير السنوي الشامل.');
+      return;
+    }
+
+    const { headerStyle, titleStyle, subtitleStyle, totalStyle } = buildWorkbookStyles();
+    const currentYear = new Date().getFullYear();
+    const previousYear = currentYear - 1;
+    const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Process monthly data for each store
+    const processStoreMonth = (storeName: string, year: number, month: number) => {
+      const startDate = new Date(Date.UTC(year, month, 1));
+      const endDate = new Date(Date.UTC(year, month + 1, 0));
+      
+      const filtered = allMetrics.filter(m => {
+        if (m.store !== storeName || !m.date || typeof m.date.toDate !== 'function') return false;
+        const d = m.date.toDate();
+        const itemDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+        return itemDate >= startDate && itemDate <= endDate;
+      });
+      
+      const totalSales = filtered.reduce((sum, item) => sum + (item.totalSales || 0), 0);
+      return totalSales;
+    };
+
+    // Get store target for a specific month
+    const getStoreTarget = (store: Store, year: number, month: number) => {
+      if (!store.targets) return 0;
+      const yearData = store.targets[String(year)];
+      if (!yearData) return 0;
+      const monthKey = String(month + 1);
+      return Number(yearData[monthKey]) || 0;
+    };
+
+    // Build report data
+    const reportData: any[] = [];
+    const stores = allStores.sort((a, b) => a.name.localeCompare(b.name));
+    
+    stores.forEach(store => {
+      const storeRow: any = {
+        store: store.name,
+        areaManager: store.areaManager || '-',
+        months: [] as any[],
+        yearTotal2025: 0,
+        yearTotal2024: 0,
+        yearTarget2025: 0,
+        yearAchievement2025: 0,
+      };
+
+      // Process each month
+      for (let month = 0; month < 12; month++) {
+        const sales2025 = processStoreMonth(store.name, currentYear, month);
+        const sales2024 = processStoreMonth(store.name, previousYear, month);
+        const target2025 = getStoreTarget(store, currentYear, month);
+        const difference = sales2025 - sales2024;
+        const percentageChange = sales2024 !== 0 ? (difference / Math.abs(sales2024)) * 100 : (sales2025 > 0 ? 100 : 0);
+        const achievement = target2025 > 0 ? (sales2025 / target2025) * 100 : 0;
+
+        storeRow.months.push({
+          month: monthNamesShort[month],
+          sales2025,
+          sales2024,
+          difference,
+          percentageChange,
+          target2025,
+          achievement,
+        });
+
+        storeRow.yearTotal2025 += sales2025;
+        storeRow.yearTotal2024 += sales2024;
+        storeRow.yearTarget2025 += target2025;
+      }
+
+      storeRow.yearAchievement2025 = storeRow.yearTarget2025 > 0 
+        ? (storeRow.yearTotal2025 / storeRow.yearTarget2025) * 100 
+        : 0;
+
+      reportData.push(storeRow);
+    });
+
+    // Calculate grand totals
+    const grandTotal2025 = reportData.reduce((sum, row) => sum + row.yearTotal2025, 0);
+    const grandTotal2024 = reportData.reduce((sum, row) => sum + row.yearTotal2024, 0);
+    const grandTarget2025 = reportData.reduce((sum, row) => sum + row.yearTarget2025, 0);
+    const grandAchievement2025 = grandTarget2025 > 0 ? (grandTotal2025 / grandTarget2025) * 100 : 0;
+
+    // Build Excel data
+    const header = [
+      'Store',
+      'Area Manager',
+      'Jan 2025',
+      'Jan 2024',
+      'Jan Diff',
+      'Jan Change %',
+      'Jan Target',
+      'Jan Achievement %',
+      'Feb 2025',
+      'Feb 2024',
+      'Feb Diff',
+      'Feb Change %',
+      'Feb Target',
+      'Feb Achievement %',
+      'Mar 2025',
+      'Mar 2024',
+      'Mar Diff',
+      'Mar Change %',
+      'Mar Target',
+      'Mar Achievement %',
+      'Apr 2025',
+      'Apr 2024',
+      'Apr Diff',
+      'Apr Change %',
+      'Apr Target',
+      'Apr Achievement %',
+      'May 2025',
+      'May 2024',
+      'May Diff',
+      'May Change %',
+      'May Target',
+      'May Achievement %',
+      'Jun 2025',
+      'Jun 2024',
+      'Jun Diff',
+      'Jun Change %',
+      'Jun Target',
+      'Jun Achievement %',
+      'Jul 2025',
+      'Jul 2024',
+      'Jul Diff',
+      'Jul Change %',
+      'Jul Target',
+      'Jul Achievement %',
+      'Aug 2025',
+      'Aug 2024',
+      'Aug Diff',
+      'Aug Change %',
+      'Aug Target',
+      'Aug Achievement %',
+      'Sep 2025',
+      'Sep 2024',
+      'Sep Diff',
+      'Sep Change %',
+      'Sep Target',
+      'Sep Achievement %',
+      'Oct 2025',
+      'Oct 2024',
+      'Oct Diff',
+      'Oct Change %',
+      'Oct Target',
+      'Oct Achievement %',
+      'Nov 2025',
+      'Nov 2024',
+      'Nov Diff',
+      'Nov Change %',
+      'Nov Target',
+      'Nov Achievement %',
+      'Dec 2025',
+      'Dec 2024',
+      'Dec Diff',
+      'Dec Change %',
+      'Dec Target',
+      'Dec Achievement %',
+      'Year Total 2025',
+      'Year Total 2024',
+      'Year Diff',
+      'Year Change %',
+      'Year Target 2025',
+      'Year Achievement %',
+    ];
+
+    const data: (string | number | null)[][] = [
+      ['التقرير السنوي الشامل - Annual Comprehensive Report'],
+      [`Year Comparison: ${currentYear} vs ${previousYear}`],
+      [''],
+      header,
+    ];
+
+    // Add store rows
+    reportData.forEach(row => {
+      const storeRow: (string | number | null)[] = [
+        row.store,
+        row.areaManager,
+      ];
+
+      // Add monthly data (7 columns per month: sales2025, sales2024, diff, change%, target, achievement%)
+      for (let month = 0; month < 12; month++) {
+        const monthData = row.months[month];
+        storeRow.push(
+          monthData.sales2025,
+          monthData.sales2024,
+          monthData.difference,
+          monthData.percentageChange / 100, // Convert to decimal for Excel percentage
+          monthData.target2025,
+          monthData.achievement / 100, // Convert to decimal for Excel percentage
+        );
+      }
+
+      // Add year totals
+      const yearDiff = row.yearTotal2025 - row.yearTotal2024;
+      const yearChange = row.yearTotal2024 !== 0 ? (yearDiff / Math.abs(row.yearTotal2024)) * 100 : (row.yearTotal2025 > 0 ? 100 : 0);
+      storeRow.push(
+        row.yearTotal2025,
+        row.yearTotal2024,
+        yearDiff,
+        yearChange / 100, // Convert to decimal for Excel percentage
+        row.yearTarget2025,
+        row.yearAchievement2025 / 100, // Convert to decimal for Excel percentage
+      );
+
+      data.push(storeRow);
+    });
+
+    // Add grand total row
+    const grandYearDiff = grandTotal2025 - grandTotal2024;
+    const grandYearChange = grandTotal2024 !== 0 ? (grandYearDiff / Math.abs(grandTotal2024)) * 100 : (grandTotal2025 > 0 ? 100 : 0);
+    data.push([]);
+    const grandTotalRow: (string | number | null)[] = [
+      'GRAND TOTAL',
+      '-',
+    ];
+
+    // Monthly grand totals
+    for (let month = 0; month < 12; month++) {
+      const monthTotal2025 = reportData.reduce((sum, row) => sum + row.months[month].sales2025, 0);
+      const monthTotal2024 = reportData.reduce((sum, row) => sum + row.months[month].sales2024, 0);
+      const monthDiff = monthTotal2025 - monthTotal2024;
+      const monthChange = monthTotal2024 !== 0 ? (monthDiff / Math.abs(monthTotal2024)) * 100 : (monthTotal2025 > 0 ? 100 : 0);
+      const monthTarget = reportData.reduce((sum, row) => sum + row.months[month].target2025, 0);
+      const monthAchievement = monthTarget > 0 ? (monthTotal2025 / monthTarget) * 100 : 0;
+
+      grandTotalRow.push(
+        monthTotal2025,
+        monthTotal2024,
+        monthDiff,
+        monthChange / 100,
+        monthTarget,
+        monthAchievement / 100,
+      );
+    }
+
+    // Year grand totals
+    grandTotalRow.push(
+      grandTotal2025,
+      grandTotal2024,
+      grandYearDiff,
+      grandYearChange / 100,
+      grandTarget2025,
+      grandAchievement2025 / 100,
+    );
+
+    data.push(grandTotalRow);
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    
+    // Set column widths
+    const colWidths = [
+      { wch: 25 }, // Store
+      { wch: 20 }, // Area Manager
+    ];
+    // 12 months * 6 columns each (sales2025, sales2024, diff, change%, target, achievement%)
+    for (let i = 0; i < 12; i++) {
+      colWidths.push({ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 18 });
+    }
+    // Year totals: 6 columns
+    colWidths.push({ wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 });
+    ws['!cols'] = colWidths;
+
+    // Merge title rows
+    ws['!merges'] = [
+      XLSX.utils.decode_range('A1:BD1'),
+      XLSX.utils.decode_range('A2:BD2'),
+    ];
+
+    if (ws['A1']) ws['A1'].s = titleStyle;
+    if (ws['A2']) ws['A2'].s = subtitleStyle;
+
+    const headerRowIndex = 3;
+    applyHeaderStyles(ws, headerRowIndex, header.length, headerStyle);
+
+    // Format data rows
+    const dataStartRow = headerRowIndex + 1;
+    const totalRows = reportData.length;
+    
+    for (let r = 0; r < totalRows; r++) {
+      const rowNum = dataStartRow + r;
+      // Format sales columns (2025, 2024, diff) - every 6 columns starting from column 2 (0-indexed: 2, 8, 14, ...)
+      for (let month = 0; month < 12; month++) {
+        const baseCol = 2 + (month * 6);
+        [0, 1, 2].forEach((idx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: rowNum, c: baseCol + idx });
+          if (ws[cellRef]) {
+            ws[cellRef].z = '#,##0';
+            ws[cellRef].s = {
+              numFmt: '#,##0',
+              alignment: { horizontal: 'right' },
+              font: { color: { rgb: '000000' } }
+            };
+          }
+        });
+        // Format percentage columns (change%, achievement%)
+        [0, 1].forEach((idx) => {
+          const cellRef = XLSX.utils.encode_cell({ r: rowNum, c: baseCol + 3 + (idx * 2) });
+          if (ws[cellRef]) {
+            ws[cellRef].z = '0.00%';
+            ws[cellRef].s = {
+              numFmt: '0.00%',
+              alignment: { horizontal: 'center' },
+              font: { 
+                bold: idx === 1, // achievement% is bold
+                color: { rgb: '000000' }
+              }
+            };
+          }
+        });
+        // Format target column
+        const targetCellRef = XLSX.utils.encode_cell({ r: rowNum, c: baseCol + 4 });
+        if (ws[targetCellRef]) {
+          ws[targetCellRef].z = '#,##0';
+          ws[targetCellRef].s = {
+            numFmt: '#,##0',
+            alignment: { horizontal: 'right' },
+            font: { color: { rgb: '000000' } }
+          };
+        }
+      }
+      // Format year totals columns
+      const yearBaseCol = 2 + (12 * 6);
+      [0, 1, 2, 3].forEach((idx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: rowNum, c: yearBaseCol + (idx < 3 ? idx : idx + 1) });
+        if (ws[cellRef]) {
+          ws[cellRef].z = idx < 3 ? '#,##0' : '#,##0';
+          ws[cellRef].s = {
+            numFmt: idx < 3 ? '#,##0' : '#,##0',
+            alignment: { horizontal: 'right' },
+            font: { bold: idx === 3, color: { rgb: '000000' } }
+          };
+        }
+      });
+      // Year change% and achievement%
+      [0, 1].forEach((idx) => {
+        const cellRef = XLSX.utils.encode_cell({ r: rowNum, c: yearBaseCol + 3 + (idx * 2) });
+        if (ws[cellRef]) {
+          ws[cellRef].z = '0.00%';
+          ws[cellRef].s = {
+            numFmt: '0.00%',
+            alignment: { horizontal: 'center' },
+            font: { 
+              bold: true,
+              color: { rgb: '000000' }
+            }
+          };
+        }
+      });
+    }
+
+    // Format grand total row
+    const grandTotalRowIndex = dataStartRow + totalRows + 1;
+    for (let c = 0; c < header.length; c++) {
+      const addr = XLSX.utils.encode_cell({ r: grandTotalRowIndex, c });
+      if (ws[addr]) {
+        ws[addr].s = { ...(ws[addr].s || {}), ...totalStyle };
+        // Format numbers
+        if (c >= 2) {
+          if (c % 6 === 3 || c % 6 === 5 || (c >= 2 + (12 * 6) && (c % 6 === 3 || c % 6 === 5))) {
+            // Percentage columns
+            ws[addr].z = '0.00%';
+            ws[addr].s = { ...ws[addr].s, numFmt: '0.00%' };
+          } else {
+            // Number columns
+            ws[addr].z = '#,##0';
+            ws[addr].s = { ...ws[addr].s, numFmt: '#,##0' };
+          }
+        }
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Annual Report');
+    const fileName = `التقرير_السنوي_الشامل_Annual_Comprehensive_Report_${currentYear}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             setFile(e.target.files[0]);
@@ -955,6 +1346,19 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
           >
             {copy.storeButton}
           </button>
+        </div>
+        <div className="mt-3">
+          <button
+            onClick={downloadAnnualComprehensiveReport}
+            className="btn-primary w-full text-sm flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700"
+          >
+            📊 {locale === 'ar' ? 'تحميل التقرير السنوي الشامل' : 'Download Annual Comprehensive Report'}
+          </button>
+          <p className="text-xs text-sky-600 mt-2">
+            {locale === 'ar' 
+              ? 'يتضمن التقرير السنوي الشامل: مقارنة كاملة لسنة 2025-2024 لكل شهر لكل معرض، نسبة تحقيق التارجت لكل شهر، والتوتل السنوي.'
+              : 'Annual Comprehensive Report includes: Complete comparison of 2025-2024 for each month per store, target achievement percentage per month, and annual totals.'}
+          </p>
         </div>
         <div className="text-xs text-sky-600">
           <p>{copy.employeeNote}</p>

@@ -781,6 +781,8 @@ const handleNotificationClick = (notificationId: string) => {
            dateFilter={dateFilter}
            setDateFilter={pageProps.setDateFilter}
            allData={allDateData}
+           allMetrics={dailyMetrics}
+           allStores={stores}
          />
        );
      case 'lfl':
