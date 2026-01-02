@@ -46,6 +46,7 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     const [areaFilter, setAreaFilter] = useState('All');
     const [storeFilter, setStoreFilter] = useState('All');
     const [monthFilter, setMonthFilter] = useState(new Date().getMonth());
+    const [yearFilter, setYearFilter] = useState(new Date().getFullYear());
     const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().split('T')[0]);
     const [comparisonType, setComparisonType] = useState('daily');
     const [rangeAStart, setRangeAStart] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
@@ -89,6 +90,19 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
         return visibleStores;
     }, [visibleStores]);
 
+    const availableYears = useMemo(() => {
+        const yearSet = new Set<number>();
+        allMetrics.forEach(m => {
+            if (m.date && typeof m.date.toDate === 'function') {
+                const d = m.date.toDate();
+                yearSet.add(d.getUTCFullYear());
+            }
+        });
+        const currentYear = new Date().getFullYear();
+        yearSet.add(currentYear);
+        return Array.from(yearSet).sort((a, b) => b - a);
+    }, [allMetrics]);
+
     const lflData = useMemo(() => {
         const processPeriod = (data: DailyMetric[], startDate: Date, endDate: Date): LFLData => {
             const filtered = data.filter(s => {
@@ -120,7 +134,16 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
         const currentDay = now.getUTCDate();
         const previousYear = currentYear - 1;
 
-        const dataForFilter = storeFilter === 'All' ? allMetrics : allMetrics.filter(s => s.store === storeFilter);
+        // Filter metrics by store and area
+        let dataForFilter = allMetrics;
+        if (storeFilter !== 'All') {
+            dataForFilter = dataForFilter.filter(s => s.store === storeFilter);
+        } else if (areaFilter !== 'All') {
+            // When storeFilter is 'All' but areaFilter is set, filter by area
+            const storesInArea = visibleStores.map(s => s.name);
+            const storeSet = new Set(storesInArea);
+            dataForFilter = dataForFilter.filter(s => storeSet.has(s.store));
+        }
         
         // Daily
         const dailyParts = dailyDate.split('-').map(Number);
@@ -149,11 +172,13 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             previous: processPeriod(dataForFilter, startOfYearLY, yesterdayLY),
         };
 
-        // Full Month
-        const startOfMonthFilter = new Date(Date.UTC(currentYear, monthFilter, 1));
-        const endOfMonthFilter = new Date(Date.UTC(currentYear, monthFilter + 1, 0));
-        const startOfMonthFilterLY = new Date(Date.UTC(previousYear, monthFilter, 1));
-        const endOfMonthFilterLY = new Date(Date.UTC(previousYear, monthFilter + 1, 0));
+        // Full Month - use selected year and compare with previous year
+        const selectedYear = yearFilter;
+        const comparisonYear = selectedYear - 1; // Compare selected year with previous year
+        const startOfMonthFilter = new Date(Date.UTC(selectedYear, monthFilter, 1));
+        const endOfMonthFilter = new Date(Date.UTC(selectedYear, monthFilter + 1, 0));
+        const startOfMonthFilterLY = new Date(Date.UTC(comparisonYear, monthFilter, 1));
+        const endOfMonthFilterLY = new Date(Date.UTC(comparisonYear, monthFilter + 1, 0));
         const monthly = {
             current: processPeriod(dataForFilter, startOfMonthFilter, endOfMonthFilter),
             previous: processPeriod(dataForFilter, startOfMonthFilterLY, endOfMonthFilterLY),
@@ -172,17 +197,25 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
         };
 
         return { daily, mtd, ytd, monthly, dayRange };
-    }, [allMetrics, storeFilter, monthFilter, dailyDate, rangeAStart, rangeAEnd, rangeBStart, rangeBEnd]);
+    }, [allMetrics, storeFilter, areaFilter, visibleStores, monthFilter, yearFilter, dailyDate, rangeAStart, rangeAEnd, rangeBStart, rangeBEnd]);
 
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const currentYear = new Date().getFullYear();
-    const previousYear = currentYear - 1;
 
     // Prepare trend data for line chart (Monthly data from Jan to Dec)
     const trendData = useMemo(() => {
         const currentYear = new Date().getFullYear();
         const previousYear = currentYear - 1;
-        const dataForFilter = storeFilter === 'All' ? allMetrics : allMetrics.filter(s => s.store === storeFilter);
+        
+        // Filter metrics by store and area
+        let dataForFilter = allMetrics;
+        if (storeFilter !== 'All') {
+            dataForFilter = dataForFilter.filter(s => s.store === storeFilter);
+        } else if (areaFilter !== 'All') {
+            // When storeFilter is 'All' but areaFilter is set, filter by area
+            const storesInArea = visibleStores.map(s => s.name);
+            const storeSet = new Set(storesInArea);
+            dataForFilter = dataForFilter.filter(s => storeSet.has(s.store));
+        }
 
         const processMonth = (year: number, month: number) => {
             const startDate = new Date(Date.UTC(year, month, 1));
@@ -222,7 +255,7 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             sales: monthlyData.map(m => ({ name: m.name, Current: m.Current, Previous: m.Previous })),
             visitors: monthlyData.map(m => ({ name: m.name, Current: m.CurrentVisitors, Previous: m.PreviousVisitors })),
         };
-    }, [allMetrics, storeFilter]);
+    }, [allMetrics, storeFilter, areaFilter, visibleStores]);
 
     const renderComparisonSet = (title: string, data: { current: LFLData, previous: LFLData }) => {
         const metrics = [
@@ -280,15 +313,18 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             const currentDate = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
             
             // Prepare header information
+            const reportYear = comparisonType === 'monthly' ? yearFilter : currentYear;
+            const reportMonth = comparisonType === 'monthly' ? months[monthFilter] : currentMonth;
             const headerInfo = [
                 ['LFL Comparison Report'],
                 [''],
                 ['Report Title:', title],
                 ['Store Filter:', storeFilter],
+                ['Area Filter:', areaFilter],
                 ['Comparison Type:', comparisonType.toUpperCase()],
                 ['Generated Date:', currentDate],
-                ['Year:', currentYear.toString()],
-                ['Month:', currentMonth],
+                ['Year:', reportYear.toString()],
+                ['Month:', reportMonth],
                 ['']
             ];
 
@@ -364,10 +400,12 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                         storeCurrent = processStorePeriod(storeMetrics, startOfYear, yesterday);
                         storePrevious = processStorePeriod(storeMetrics, startOfYearLY, yesterdayLY);
                     } else if (comparisonType === 'monthly') {
-                        const startOfMonthFilter = new Date(Date.UTC(currentYear, monthFilter, 1));
-                        const endOfMonthFilter = new Date(Date.UTC(currentYear, monthFilter + 1, 0));
-                        const startOfMonthFilterLY = new Date(Date.UTC(previousYear, monthFilter, 1));
-                        const endOfMonthFilterLY = new Date(Date.UTC(previousYear, monthFilter + 1, 0));
+                        const selectedYear = yearFilter;
+                        const comparisonYear = selectedYear - 1;
+                        const startOfMonthFilter = new Date(Date.UTC(selectedYear, monthFilter, 1));
+                        const endOfMonthFilter = new Date(Date.UTC(selectedYear, monthFilter + 1, 0));
+                        const startOfMonthFilterLY = new Date(Date.UTC(comparisonYear, monthFilter, 1));
+                        const endOfMonthFilterLY = new Date(Date.UTC(comparisonYear, monthFilter + 1, 0));
                         storeCurrent = processStorePeriod(storeMetrics, startOfMonthFilter, endOfMonthFilter);
                         storePrevious = processStorePeriod(storeMetrics, startOfMonthFilterLY, endOfMonthFilterLY);
                     } else {
@@ -862,7 +900,8 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             case 'ytd':
                 return renderComparisonSet(`Year-to-Date Comparison (YTD vs YTD Last Year)`, lflData.ytd);
             case 'monthly':
-                return renderComparisonSet(`Full Month Comparison (${months[monthFilter]} ${currentYear} vs ${previousYear})`, lflData.monthly);
+                const comparisonYear = yearFilter - 1;
+                return renderComparisonSet(`Full Month Comparison (${months[monthFilter]} ${yearFilter} vs ${comparisonYear})`, lflData.monthly);
             case 'dayRange':
                 return renderComparisonSet(
                     `Day Range Comparison (${rangeAStart || '—'} to ${rangeAEnd || '—'} vs ${rangeBStart || '—'} to ${rangeBEnd || '—'})`,
@@ -920,11 +959,19 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                     </div>
                 )}
                  {comparisonType === 'monthly' && (
-                    <div>
-                        <label className="label">Select Month for Full Month Comparison:</label>
-                        <select value={monthFilter} onChange={e => setMonthFilter(Number(e.target.value))} className="input">
-                            {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                        </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="label">Select Year for Full Month Comparison:</label>
+                            <select value={yearFilter} onChange={e => setYearFilter(Number(e.target.value))} className="input">
+                                {availableYears.map(year => <option key={year} value={year}>{year}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label">Select Month for Full Month Comparison:</label>
+                            <select value={monthFilter} onChange={e => setMonthFilter(Number(e.target.value))} className="input">
+                                {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                            </select>
+                        </div>
                     </div>
                 )}
                 {comparisonType === 'dayRange' && (

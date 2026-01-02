@@ -143,33 +143,58 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
             { name: smartCategories.high.label, count: duvetSummary[smartCategories.high.label] || 0 },
         ];
 
-        // --- Dynamic & MTD Target Calculations (uses raw data, ignores global filter) ---
+        // --- Dynamic & MTD Target Calculations (uses filtered data based on date filter) ---
+        // Determine the period from dateFilter
         const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
-        const monthlyTarget = calculateEffectiveTarget(employee.targets, { year, month, day: 'all' });
-        const salesThisMonth = allMetrics.filter(m => {
-            if (m.employee !== employee.name || !m.date || typeof m.date.toDate !== 'function') return false;
-            const metricDate = m.date.toDate();
-            return metricDate.getFullYear() === year && metricDate.getMonth() === month;
-        }).reduce((sum, m) => sum + (m.totalSales || 0), 0);
-        const remainingTarget = monthlyTarget - salesThisMonth;
-        const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
-        const remainingDays = Math.max(0, totalDaysInMonth - now.getDate() + 1);
+        let targetYear = now.getFullYear();
+        let targetMonth = now.getMonth();
+        
+        // If date filter specifies a year and month, use those for target calculations
+        if (typeof dateFilter.year === 'number' && typeof dateFilter.month === 'number') {
+            targetYear = dateFilter.year;
+            targetMonth = dateFilter.month;
+        }
+        
+        const monthlyTarget = calculateEffectiveTarget(employee.targets, { year: targetYear, month: targetMonth, day: 'all' });
+        
+        // Use filtered metrics for sales calculation (respects date filter)
+        const salesThisPeriod = filteredMetrics
+            .filter(m => m.employee === employee.name)
+            .reduce((sum, m) => sum + (m.totalSales || 0), 0);
+        
+        // Calculate remaining target and days based on the selected period
+        const totalDaysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+        let remainingDays = 0;
+        
+        if (typeof dateFilter.year === 'number' && typeof dateFilter.month === 'number') {
+            // If filtering by specific month, calculate remaining days in that month
+            if (targetYear === now.getFullYear() && targetMonth === now.getMonth()) {
+                // Current month: calculate remaining days
+                remainingDays = Math.max(0, totalDaysInMonth - now.getDate() + 1);
+            } else if (targetYear < now.getFullYear() || (targetYear === now.getFullYear() && targetMonth < now.getMonth())) {
+                // Past month: no remaining days
+                remainingDays = 0;
+            } else {
+                // Future month: all days remaining
+                remainingDays = totalDaysInMonth;
+            }
+        } else {
+            // No specific month filter: use current month logic
+            remainingDays = Math.max(0, totalDaysInMonth - now.getDate() + 1);
+        }
+        
+        const remainingTarget = monthlyTarget - salesThisPeriod;
         const requiredDailyAverage = remainingDays > 0 ? Math.max(0, remainingTarget) / remainingDays : 0;
         const monthlyTarget90 = monthlyTarget * 0.9;
-        const remainingTarget90 = monthlyTarget90 - salesThisMonth;
+        const remainingTarget90 = monthlyTarget90 - salesThisPeriod;
         const requiredDailyAverage90 = remainingDays > 0 ? Math.max(0, remainingTarget90) / remainingDays : 0;
-        const dynamicTarget = { salesMTD: salesThisMonth, monthlyTarget, remainingTarget, remainingDays, requiredDailyAverage, requiredDailyAverage90 };
+        const dynamicTarget = { salesMTD: salesThisPeriod, monthlyTarget, remainingTarget, remainingDays, requiredDailyAverage, requiredDailyAverage90 };
 
-        const monthlyDuvetTarget = employee.duvetTargets?.[year]?.[String(month + 1)] || 0;
-        const duvetsSoldThisMonth = kingDuvetSales.filter(s => {
-            if (s['SalesMan Name'] !== employee.name || !s['Bill Dt.'] || typeof s['Bill Dt.'].toDate !== 'function') return false;
-            const saleDate = s['Bill Dt.'].toDate();
-            return saleDate.getFullYear() === year && saleDate.getMonth() === month;
-        }).reduce((sum, s) => sum + (s['Sold Qty'] || 0), 0);
-        const duvetAchievement = monthlyDuvetTarget > 0 ? (duvetsSoldThisMonth / monthlyDuvetTarget) * 100 : 0;
-        const duvetTargetData = { target: monthlyDuvetTarget, sold: duvetsSoldThisMonth, achievement: duvetAchievement };
+        // Use filtered duvet sales for target calculations (respects date filter)
+        const monthlyDuvetTarget = employee.duvetTargets?.[targetYear]?.[String(targetMonth + 1)] || 0;
+        const duvetsSoldThisPeriod = employeeDuvetSales.reduce((sum, s) => sum + (s['Sold Qty'] || 0), 0);
+        const duvetAchievement = monthlyDuvetTarget > 0 ? (duvetsSoldThisPeriod / monthlyDuvetTarget) * 100 : 0;
+        const duvetTargetData = { target: monthlyDuvetTarget, sold: duvetsSoldThisPeriod, achievement: duvetAchievement };
 
         return { 
             totalSales, atv, achievement, contributionPercentage, avgItemsPerBill,
