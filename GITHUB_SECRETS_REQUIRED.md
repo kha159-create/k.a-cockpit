@@ -1,4 +1,15 @@
-# GitHub Secrets المطلوبة
+# Environment Variables المطلوبة في Vercel
+
+## ⚠️ مهم: هذه القيم تُضاف في Vercel Dashboard وليس GitHub Secrets!
+
+### 📍 كيفية الوصول:
+1. اذهب إلى: **https://vercel.com/dashboard**
+2. اختر مشروعك
+3. **Settings** → **Environment Variables**
+
+### 📖 للتفاصيل الكاملة: راجع `VERCEL_SETUP_GUIDE.md`
+
+---
 
 ## Environment Variables التي يجب إضافتها في Vercel
 
