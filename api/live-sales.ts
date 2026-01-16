@@ -152,21 +152,21 @@ async function saveLiveSales(data: Array<{ outlet: string; sales: number }>): Pr
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Vercel Cron Jobs send a special header
   const isCronRequest = req.headers['x-vercel-cron'] === '1';
-  const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
-  const expectedSecret = process.env.CRON_SECRET;
-
-  // Allow Vercel Cron requests or requests with valid secret
-  if (!isCronRequest) {
-    if (req.method === 'GET' && cronSecret !== expectedSecret) {
+  
+  // Allow GET requests from client-side (for live page polling)
+  // Allow Vercel Cron requests automatically
+  // Only protect POST requests with secret
+  if (req.method === 'POST' && !isCronRequest) {
+    const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+    const authHeader = req.headers.authorization;
+    const expectedSecret = process.env.CRON_SECRET;
+    
+    if (authHeader !== `Bearer ${expectedSecret}` && cronSecret !== expectedSecret) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    if (req.method === 'POST') {
-      const authHeader = req.headers.authorization;
-      if (authHeader !== `Bearer ${expectedSecret}` && cronSecret !== expectedSecret) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-    }
   }
+  
+  // GET requests are allowed without authentication (for client-side polling)
 
   try {
     console.log('🚀 Starting live sales sync...');

@@ -62,8 +62,37 @@ const LivePage: React.FC = () => {
       }
     };
 
+    // Function to trigger API update (client-side polling)
+    const triggerAPIUpdate = async () => {
+      try {
+        // Call Vercel API endpoint to update live sales
+        const response = await fetch('/api/live-sales', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update live sales');
+        }
+
+        // After API call, reload from Firestore
+        const doc = await db.collection('liveSales').doc('today').get();
+        if (doc.exists) {
+          const data = doc.data() as LiveSalesData;
+          setLiveData(data);
+        }
+      } catch (err: any) {
+        console.error('Error triggering API update:', err);
+      }
+    };
+
     // Load immediately
     loadLiveData();
+
+    // Trigger API update immediately on mount
+    triggerAPIUpdate();
 
     // Set up real-time listener
     const unsubscribe = db.collection('liveSales').doc('today').onSnapshot(
@@ -85,9 +114,9 @@ const LivePage: React.FC = () => {
       }
     );
 
-    // Auto-refresh every 15 minutes as backup
+    // Auto-refresh API every 15 minutes (client-side polling)
     const refreshInterval = setInterval(() => {
-      loadLiveData();
+      triggerAPIUpdate();
     }, 15 * 60 * 1000); // 15 minutes
 
     return () => {
