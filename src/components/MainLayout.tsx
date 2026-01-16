@@ -15,6 +15,7 @@ import ProductsPage from '@/pages/ProductsPage';
 import CommissionsPage from '@/pages/CommissionsPage';
 import SmartUploaderPage from '@/pages/SmartUploaderPage';
 import LFLPage from '@/pages/LFLPage';
+import LivePage from '@/pages/LivePage';
 import SettingsPage from '@/pages/SettingsPage';
 import StoreDetailPage from '@/pages/StoreDetailPage';
 import AreaDetailPage from '@/pages/AreaDetailPage';
@@ -39,6 +40,13 @@ import {
   UploadIcon, ChartBarIcon, CalculatorIcon, CogIcon,
   MenuIcon, LogoutIcon, SunIcon, MoonIcon, GlobeIcon, ChevronDownIcon, BellIcon
 } from '@/components/Icons';
+
+// Live icon component
+const LiveIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+  </svg>
+);
 
 // FIX: Initialized Timestamp for use in Firestore operations.
 const { Timestamp } = firebase.firestore;
@@ -667,6 +675,7 @@ const handleNotificationClick = (notificationId: string) => {
       const role: UserRole = profile?.role || 'employee';
       const allItems = [
           { icon: <HomeIcon />, label: t('dashboard'), name: "dashboard", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
+          { icon: <LiveIcon />, label: t('live'), name: "live", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
           { icon: <ChartBarIcon />, label: t('lfl_comparison'), name: "lfl", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
           { icon: <OfficeBuildingIcon />, label: t('stores'), name: "stores", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
           { icon: <UserGroupIcon />, label: t('employees'), name: "employees", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
@@ -785,6 +794,8 @@ const handleNotificationClick = (notificationId: string) => {
            allStores={stores}
          />
        );
+     case 'live':
+        return <LivePage />;
      case 'lfl':
         return <LFLPage allStores={stores} allMetrics={dailyMetrics} profile={profile}/>;
      case 'settings':

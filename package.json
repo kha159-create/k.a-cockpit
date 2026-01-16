@@ -10,9 +10,12 @@
     "ci:fix": "rm -rf node_modules package-lock.json && npm install && npm install rollup @rollup/rollup-linux-x64-gnu --force"
   },
   "dependencies": {
+    "@azure/msal-node": "^2.6.0",
     "@google/generative-ai": "^0.24.1",
     "@rollup/rollup-linux-x64-gnu": "^4.24.0",
+    "@vercel/node": "^3.0.0",
     "firebase": "^8.10.1",
+    "firebase-admin": "^12.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "rollup": "^4.24.0"

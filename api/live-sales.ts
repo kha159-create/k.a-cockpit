@@ -1,0 +1,210 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { ConfidentialClientApplication } from '@azure/msal-node';
+import admin from 'firebase-admin';
+
+// Initialize Firebase Admin (only once)
+if (!admin.apps.length) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }),
+    });
+  } catch (error) {
+    console.error('Firebase Admin initialization error:', error);
+  }
+}
+
+const db = admin.firestore();
+
+interface D365Transaction {
+  OperatingUnitNumber: string;
+  PaymentAmount: number;
+  TransactionDate: string;
+}
+
+// Get access token from Microsoft Dynamics 365
+async function getAccessToken(): Promise<string> {
+  const clientId = process.env.D365_CLIENT_ID;
+  const clientSecret = process.env.D365_CLIENT_SECRET;
+  const tenantId = process.env.D365_TENANT_ID;
+  const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
+
+  if (!clientId || !clientSecret || !tenantId) {
+    throw new Error('Missing D365 credentials');
+  }
+
+  const authority = `https://login.microsoftonline.com/${tenantId}`;
+  const scope = `${d365Url}/.default`;
+
+  const app = new ConfidentialClientApplication({
+    auth: {
+      clientId,
+      clientSecret,
+      authority,
+    },
+  });
+
+  const result = await app.acquireTokenByClientCredential({
+    scopes: [scope],
+  });
+
+  if (!result?.accessToken) {
+    throw new Error(`Auth failed: ${JSON.stringify(result)}`);
+  }
+
+  return result.accessToken;
+}
+
+// Fetch today's transactions from D365
+async function fetchTodayTransactions(token: string): Promise<D365Transaction[]> {
+  const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
+  const baseUrl = `${d365Url}/data/RetailTransactions`;
+
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setUTCHours(0, 0, 0, 0);
+  
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1);
+
+  const startStr = todayStart.toISOString();
+  const endStr = tomorrowStart.toISOString();
+
+  const queryUrl = `${baseUrl}?$filter=PaymentAmount ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}&$select=OperatingUnitNumber,PaymentAmount,TransactionDate&$orderby=TransactionDate`;
+
+  const allTransactions: D365Transaction[] = [];
+  let nextLink: string | null = queryUrl;
+
+  while (nextLink) {
+    const response = await fetch(nextLink, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        Prefer: 'odata.maxpagesize=5000',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`D365 API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    allTransactions.push(...(data.value || []));
+    nextLink = data['@odata.nextLink'] || null;
+  }
+
+  return allTransactions;
+}
+
+// Load store mapping from Firestore
+async function loadStoreMapping(): Promise<Map<string, string>> {
+  const mapping = new Map<string, string>();
+  
+  try {
+    const storesSnapshot = await db.collection('stores').get();
+    storesSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const storeId = String(data?.store_id || data?.id || doc.id).trim();
+      const storeName = data?.name || data?.store_name || storeId;
+      mapping.set(storeId, storeName);
+    });
+  } catch (error) {
+    console.error('Error loading store mapping:', error);
+  }
+
+  return mapping;
+}
+
+// Transform and aggregate transactions
+function aggregateSales(transactions: D365Transaction[], storeMapping: Map<string, string>): Array<{ outlet: string; sales: number }> {
+  const salesMap = new Map<string, number>();
+
+  transactions.forEach((tx) => {
+    const storeId = String(tx.OperatingUnitNumber || '').trim();
+    const storeName = storeMapping.get(storeId) || storeId;
+    const amount = Number(tx.PaymentAmount) || 0;
+    
+    if (amount === 0) return;
+
+    const current = salesMap.get(storeName) || 0;
+    salesMap.set(storeName, current + amount);
+  });
+
+  return Array.from(salesMap.entries())
+    .map(([outlet, sales]) => ({ outlet, sales: Math.round(sales) }))
+    .sort((a, b) => b.sales - a.sales);
+}
+
+// Save to Firestore
+async function saveLiveSales(data: Array<{ outlet: string; sales: number }>): Promise<void> {
+  const docRef = db.collection('liveSales').doc('today');
+  
+  await docRef.set({
+    date: admin.firestore.Timestamp.fromDate(new Date()),
+    lastUpdate: admin.firestore.FieldValue.serverTimestamp(),
+    stores: data,
+  }, { merge: true });
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Vercel Cron Jobs send a special header
+  const isCronRequest = req.headers['x-vercel-cron'] === '1';
+  const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+  const expectedSecret = process.env.CRON_SECRET;
+
+  // Allow Vercel Cron requests or requests with valid secret
+  if (!isCronRequest) {
+    if (req.method === 'GET' && cronSecret !== expectedSecret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    if (req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (authHeader !== `Bearer ${expectedSecret}` && cronSecret !== expectedSecret) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    }
+  }
+
+  try {
+    console.log('🚀 Starting live sales sync...');
+
+    // 1. Get access token
+    const token = await getAccessToken();
+    console.log('✅ Got access token');
+
+    // 2. Fetch today's transactions
+    const transactions = await fetchTodayTransactions(token);
+    console.log(`✅ Fetched ${transactions.length} transactions`);
+
+    // 3. Load store mapping
+    const storeMapping = await loadStoreMapping();
+    console.log(`✅ Loaded ${storeMapping.size} store mappings`);
+
+    // 4. Aggregate sales
+    const salesData = aggregateSales(transactions, storeMapping);
+    console.log(`✅ Aggregated ${salesData.length} stores`);
+
+    // 5. Save to Firestore
+    await saveLiveSales(salesData);
+    console.log('✅ Saved to Firestore');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Live sales updated',
+      date: new Date().toISOString().split('T')[0],
+      storesCount: salesData.length,
+      transactionsCount: transactions.length,
+      lastUpdate: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('❌ Live sales sync error:', error);
+    
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Sync failed',
+    });
+  }
+}
