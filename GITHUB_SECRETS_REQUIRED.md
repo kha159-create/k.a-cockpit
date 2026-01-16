@@ -1,13 +1,21 @@
-# Environment Variables المطلوبة في Vercel
+# Environment Variables المطلوبة
 
-## ⚠️ مهم: هذه القيم تُضاف في Vercel Dashboard وليس GitHub Secrets!
+## ✅ يمكن إضافتها في GitHub Secrets أو Vercel Dashboard
 
-### 📍 كيفية الوصول:
-1. اذهب إلى: **https://vercel.com/dashboard**
-2. اختر مشروعك
-3. **Settings** → **Environment Variables**
+### 📍 الخيار 1: GitHub Secrets (موصى به - أسهل)
+- ✅ **مركزية** - كل Secrets في مكان واحد
+- ✅ **مفاتيح Firebase موجودة** - يمكن استخدام نفس المكان
+- ✅ **أسهل** - لا حاجة لإضافة في مكانين
 
-### 📖 للتفاصيل الكاملة: راجع `VERCEL_SETUP_GUIDE.md`
+**الرابط:** https://github.com/kha159-create/k.a-cockpit/settings/secrets/actions
+
+### 📍 الخيار 2: Vercel Dashboard
+- ✅ **مباشر** - للـ Vercel Functions فقط
+- ⚠️ **منفصل** - يحتاج إضافة منفصلة
+
+**الرابط:** https://vercel.com/dashboard → مشروعك → Settings → Environment Variables
+
+### 📖 للتفاصيل الكاملة: راجع `GITHUB_SECRETS_SETUP.md` أو `VERCEL_SETUP_GUIDE.md`
 
 ---
 
