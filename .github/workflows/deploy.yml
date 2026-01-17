@@ -38,6 +38,7 @@ jobs:
           VITE_FIREBASE_APP_ID: "${{ secrets.VITE_FIREBASE_APP_ID }}"
           VITE_GEMINI_API_KEY: "${{ secrets.VITE_GEMINI_API_KEY }}"
           VITE_VERCEL_API_URL: "${{ secrets.VITE_VERCEL_API_URL }}"
+          VITE_BASE_PATH: "/k.a-cockpit/"
         run: |
           node -e "const e=process.env; console.log('🔎 startsWith(AIza)?', (e.VITE_FIREBASE_API_KEY||'').startsWith('AIza')); console.log('🔎 KEY LEN', (e.VITE_FIREBASE_API_KEY||'').length)"
           npm run build
