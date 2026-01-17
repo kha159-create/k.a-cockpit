@@ -6,10 +6,10 @@ import path from 'path'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   
-  // Use base path based on environment
-  // Vercel uses root path, GitHub Pages uses subpath
-  // Check VITE_BASE_PATH env var first, then default based on environment
-  const base = env.VITE_BASE_PATH || (process.env.VERCEL ? '/' : '/k.a-cockpit/')
+  // Use base path from environment variable
+  // Default to "/" for Vercel (works out of the box)
+  // Set VITE_BASE_PATH=/k.a-cockpit/ for GitHub Pages deployment
+  const base = env.VITE_BASE_PATH ?? "/"
 
   return {
     base,

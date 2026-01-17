@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { Store, DailyMetric, UserProfile } from '../types';
 import { DetailedComparisonCard, ChartCard, BarChart, LineChart, PieChart } from '../components/DashboardComponents';
 import { Table, Column } from '../components/Table';
+import * as XLSX from 'xlsx';
 
 interface LFLPageProps {
     allStores: Store[];
@@ -298,12 +299,6 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
         });
 
         const exportToExcel = () => {
-            if (typeof (window as any).XLSX === 'undefined') {
-                alert('Excel library is loading. Please try again in a moment.');
-                return;
-            }
-
-            const XLSX = (window as any).XLSX;
             const workbook = XLSX.utils.book_new();
 
             // Get date information

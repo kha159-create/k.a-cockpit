@@ -1,7 +1,6 @@
 import React from 'react';
 import type { EmployeeSummary, StoreSummary, SalesTransaction } from '../types';
-
-declare var XLSX: any;
+import * as XLSX from 'xlsx';
 
 interface DataExporterProps {
     employeeSummary: EmployeeSummary[];
@@ -11,7 +10,6 @@ interface DataExporterProps {
 
 const DataExporter: React.FC<DataExporterProps> = ({ employeeSummary, storeSummary, kingDuvetSales }) => {
     const exportData = (data: any[], fileName: string) => {
-        if (typeof XLSX === 'undefined') { alert("File library is still loading..."); return; }
         const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Report");

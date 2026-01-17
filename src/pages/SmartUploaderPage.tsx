@@ -4,8 +4,7 @@ import MonthYearFilter from '../components/MonthYearFilter';
 import { useLocale } from '../context/LocaleContext';
 import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary, FilterableData, SalesTransaction, Store } from '../types';
 import { getCategory, getSmartPillowCategories, getSmartPillowCategory } from '../utils/calculator';
-
-declare var XLSX: any;
+import * as XLSX from 'xlsx';
 
 interface SmartUploaderPageProps {
   onUpload: (parsedData: any[], setProgress: (progress: number) => void) => void;
@@ -34,7 +33,6 @@ interface SmartUploaderPageProps {
 }
 
 const downloadTemplate = (fileName: string, headers: string[]) => {
-    if (typeof XLSX === 'undefined') { alert("File library is still loading..."); return; }
     const ws = XLSX.utils.json_to_sheet([], { header: headers });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
@@ -104,10 +102,7 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
   }, [setDateFilter]);
 
   const ensureWorkbookLib = () => {
-    if (typeof XLSX === 'undefined') {
-      alert('مكتبة إنشاء الملفات لم تجهز بعد، حاول بعد لحظات.');
-      return false;
-    }
+    // XLSX is now imported as a module, always available
     return true;
   };
 
