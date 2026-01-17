@@ -5,9 +5,14 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  
+  // Use base path based on environment
+  // Vercel uses root path, GitHub Pages uses subpath
+  // Check VITE_BASE_PATH env var first, then default based on environment
+  const base = env.VITE_BASE_PATH || (process.env.VERCEL ? '/' : '/k.a-cockpit/')
 
   return {
-    base: '/k.a-cockpit/',
+    base,
     plugins: [react()],
     publicDir: 'public',
     build: {
