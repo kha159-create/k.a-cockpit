@@ -254,7 +254,32 @@ const LivePage: React.FC = () => {
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{copy.title}</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">{copy.title}</h1>
+          
+          {/* View Mode Toggle */}
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <button
+              onClick={() => setViewMode('today')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                viewMode === 'today'
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {locale === 'ar' ? '📊 اليوم' : '📊 Today'}
+            </button>
+            <button
+              onClick={() => setViewMode('yesterday')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                viewMode === 'yesterday'
+                  ? 'bg-gray-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {locale === 'ar' ? '📅 أمس' : '📅 Yesterday'}
+            </button>
+          </div>
+          
           <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
             <div>
               <span className="font-semibold">{copy.date}:</span>{' '}
