@@ -159,7 +159,9 @@ function aggregateSales(transactions: D365Transaction[], storeMapping: Map<strin
   const salesMap = new Map<string, number>();
 
   transactions.forEach((tx) => {
+    // OperatingUnitNumber from D365 is the 4-digit store ID (e.g., 1001, 1101, etc.)
     const storeId = String(tx.OperatingUnitNumber || '').trim();
+    // Get store name from mapping, or use store ID if not found
     const storeName = storeMapping.get(storeId) || storeId;
     const amount = Number(tx.PaymentAmount) || 0;
     
