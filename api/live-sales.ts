@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import admin from 'firebase-admin';
+import * as XLSX from 'xlsx';
 
 // Initialize Firebase Admin (only once)
 if (!admin.apps.length) {
