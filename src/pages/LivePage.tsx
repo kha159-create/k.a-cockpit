@@ -244,6 +244,10 @@ const LivePage: React.FC = () => {
   // Support both new format (today/yesterday) and legacy format (stores)
   const todayStores = liveData?.today || liveData?.stores || [];
   const yesterdayStores = liveData?.yesterday || [];
+  
+  // Get current view data
+  const currentStores = viewMode === 'today' ? todayStores : yesterdayStores;
+  const totalSales = currentStores.reduce((sum, item) => sum + (item.sales || 0), 0);
 
   return (
     <div className="space-y-6">
