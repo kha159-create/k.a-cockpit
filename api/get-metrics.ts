@@ -134,9 +134,102 @@ async function loadStoreMapping(): Promise<Map<string, string>> {
   return mapping;
 }
 
-// Transform D365 transactions to DailyMetric format (compatible with Firestore structure)
+// Load employees_data.json from orange-dashboard (same structure as orange-dashboard)
+// Format: { "storeId": [["date", "employeeName", sales, transactions, ...], ...], ... }
+async function loadEmployeesData(): Promise<{ [storeId: string]: any[][] }> {
+  try {
+    console.log('📥 Loading employees_data.json from orange-dashboard...');
+    const response = await fetch('https://raw.githubusercontent.com/ALAAWF2/orange-dashboard/main/employees_data.json');
+    
+    if (!response.ok) {
+      console.warn('⚠️ Could not fetch employees_data.json from orange-dashboard');
+      return {};
+    }
+    
+    const data = await response.json();
+    console.log(`✅ Loaded employees data for ${Object.keys(data).length} stores`);
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error loading employees_data.json:', error.message);
+    return {};
+  }
+}
+
+// Transform employees_data.json to DailyMetric format (same as orange-dashboard structure)
 // IMPORTANT: Group by date + store + employee (like orange-dashboard)
 // Store totalSales = sum of employee.totalSales (same as old system)
+function transformEmployeesDataToMetrics(
+  employeesData: { [storeId: string]: any[][] },
+  storeMapping: Map<string, string>,
+  year: number,
+  month: number
+): any[] {
+  // employees_data.json format: { "storeId": [["date", "employeeName", sales, transactions, ...], ...], ... }
+  // Each entry: [date, employeeName, sales, transactions, ...]
+  const metricsMap = new Map<string, {
+    date: Date;
+    store: string;
+    totalSales: number;
+    transactionCount: number;
+    employee?: string;
+    employeeId?: string;
+  }>();
+
+  Object.entries(employeesData).forEach(([storeId, entries]) => {
+    if (!Array.isArray(entries)) return;
+    
+    const storeName = storeMapping.get(storeId) || storeId;
+    
+    entries.forEach((entry) => {
+      if (!Array.isArray(entry) || entry.length < 3) return;
+      
+      const dateStr = String(entry[0] || '').trim(); // "2026-01-17"
+      const employeeName = String(entry[1] || '').trim(); // "4661-Fatima Albeshi"
+      const sales = Number(entry[2]) || 0; // sales amount
+      const transactions = Number(entry[3]) || 0; // transaction count
+      
+      if (!dateStr || !employeeName || sales === 0) return;
+      
+      // Parse date
+      const txDate = new Date(dateStr + 'T00:00:00Z'); // Parse YYYY-MM-DD as UTC
+      
+      // Only include entries for the requested month/year
+      if (txDate.getUTCFullYear() !== year || txDate.getUTCMonth() !== month) {
+        return;
+      }
+      
+      const dateKey = dateStr; // YYYY-MM-DD
+      const docKey = `${dateKey}_${storeName}_${employeeName}`; // Per employee (like orange-dashboard)
+      
+      // Extract employeeId from name (e.g., "4661-Fatima Albeshi" -> "4661")
+      const employeeIdMatch = employeeName.match(/^(\d+)[-_\s]/);
+      const employeeId = employeeIdMatch ? employeeIdMatch[1] : null;
+
+      if (!metricsMap.has(docKey)) {
+        metricsMap.set(docKey, {
+          date: new Date(Date.UTC(year, month, txDate.getUTCDate())),
+          store: storeName,
+          totalSales: 0,
+          transactionCount: 0,
+          employee: employeeName,
+          ...(employeeId && { employeeId }),
+        });
+      }
+      const metric = metricsMap.get(docKey)!;
+      metric.totalSales += sales;
+      metric.transactionCount += transactions; // Use transactions from entry, not count of entries
+    });
+  });
+
+  // Convert to array and format dates as ISO strings (client will convert to Timestamp)
+  // Note: Multiple metrics per store (one per employee) - client will sum them for store totals
+  return Array.from(metricsMap.values()).map(metric => ({
+    ...metric,
+    date: metric.date.toISOString(), // Send as ISO string, client converts to Timestamp
+  }));
+}
+
+// Fallback: Transform D365 transactions to DailyMetric format (if employees_data.json not available)
 function transformToDailyMetrics(
   transactions: D365Transaction[],
   storeMapping: Map<string, string>,
@@ -231,22 +324,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`📊 Fetching metrics for ${year}-${month + 1}`);
 
-    // Get access token
-    const token = await getAccessToken();
-
     // Load store mapping
     const storeMapping = await loadStoreMapping();
 
-    // Calculate date range for the month
-    const startDate = new Date(Date.UTC(year, month, 1));
-    const endDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59));
+    // PRIMARY METHOD: Use employees_data.json from orange-dashboard (same structure)
+    // This ensures we get employee-level data exactly as orange-dashboard provides it
+    const employeesData = await loadEmployeesData();
+    let metrics: any[] = [];
 
-    // Fetch transactions
-    const transactions = await fetchTransactions(token, startDate, endDate);
-    console.log(`✅ Fetched ${transactions.length} transactions`);
+    if (Object.keys(employeesData).length > 0) {
+      // Use employees_data.json (primary method - same as orange-dashboard)
+      metrics = transformEmployeesDataToMetrics(employeesData, storeMapping, year, month);
+      console.log(`✅ Transformed ${metrics.length} metrics from employees_data.json`);
+    } else {
+      // FALLBACK: Use D365 API if employees_data.json not available
+      console.log('⚠️ employees_data.json not available, falling back to D365 API...');
+      const token = await getAccessToken();
+      
+      // Calculate date range for the month
+      const startDate = new Date(Date.UTC(year, month, 1));
+      const endDate = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59));
 
-    // Transform to DailyMetric format
-    const metrics = transformToDailyMetrics(transactions, storeMapping, year, month);
+      // Fetch transactions
+      const transactions = await fetchTransactions(token, startDate, endDate);
+      console.log(`✅ Fetched ${transactions.length} transactions from D365`);
+
+      // Transform to DailyMetric format
+      metrics = transformToDailyMetrics(transactions, storeMapping, year, month);
+      console.log(`✅ Transformed ${metrics.length} metrics from D365 transactions`);
+    }
 
     return res.status(200).json({
       success: true,
