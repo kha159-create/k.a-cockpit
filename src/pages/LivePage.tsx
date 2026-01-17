@@ -53,8 +53,10 @@ const LivePage: React.FC = () => {
         // Get Vercel API URL from environment or use current origin
         let apiUrl = '/api/live-sales';
         
-        if (import.meta.env.VITE_VERCEL_API_URL) {
-          let vercelUrl = import.meta.env.VITE_VERCEL_API_URL.trim();
+        // @ts-ignore - Vite environment variables
+        const vercelApiUrl = import.meta.env.VITE_VERCEL_API_URL;
+        if (vercelApiUrl) {
+          let vercelUrl = String(vercelApiUrl).trim();
           if (!vercelUrl.startsWith('http://') && !vercelUrl.startsWith('https://')) {
             vercelUrl = `https://${vercelUrl}`;
           }
