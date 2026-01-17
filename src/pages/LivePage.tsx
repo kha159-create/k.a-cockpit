@@ -68,9 +68,18 @@ const LivePage: React.FC = () => {
         // Get Vercel API URL from environment or use current origin
         // If deployed on GitHub Pages, use Vercel API URL from env
         // If deployed on Vercel, use relative path
-        const apiUrl = import.meta.env.VITE_VERCEL_API_URL 
-          ? `${import.meta.env.VITE_VERCEL_API_URL}/api/live-sales`
-          : '/api/live-sales';
+        let apiUrl = '/api/live-sales';
+        
+        if (import.meta.env.VITE_VERCEL_API_URL) {
+          let vercelUrl = import.meta.env.VITE_VERCEL_API_URL.trim();
+          // Ensure URL starts with https://
+          if (!vercelUrl.startsWith('http://') && !vercelUrl.startsWith('https://')) {
+            vercelUrl = `https://${vercelUrl}`;
+          }
+          // Remove trailing slash if exists
+          vercelUrl = vercelUrl.replace(/\/$/, '');
+          apiUrl = `${vercelUrl}/api/live-sales`;
+        }
         
         // Call Vercel API endpoint to update live sales
         const response = await fetch(apiUrl, {
