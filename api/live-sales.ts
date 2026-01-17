@@ -5,19 +5,33 @@ import admin from 'firebase-admin';
 // Initialize Firebase Admin (only once)
 if (!admin.apps.length) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
-    });
-  } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+    if (!projectId || !clientEmail || !privateKey) {
+      console.error('❌ Missing Firebase credentials. Please set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY');
+    } else {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+      });
+      console.log('✅ Firebase Admin initialized successfully');
+    }
+  } catch (error: any) {
+    console.error('❌ Firebase Admin initialization error:', error);
   }
 }
 
-const db = admin.firestore();
+let db: admin.firestore.Firestore | null = null;
+try {
+  db = admin.firestore();
+} catch (error: any) {
+  console.error('❌ Firestore initialization error:', error);
+}
 
 interface D365Transaction {
   OperatingUnitNumber: string;
@@ -103,6 +117,11 @@ async function fetchTodayTransactions(token: string): Promise<D365Transaction[]>
 async function loadStoreMapping(): Promise<Map<string, string>> {
   const mapping = new Map<string, string>();
   
+  if (!db) {
+    console.error('Error: Firestore not initialized');
+    return mapping;
+  }
+  
   try {
     const storesSnapshot = await db.collection('stores').get();
     storesSnapshot.forEach((doc) => {
@@ -140,6 +159,10 @@ function aggregateSales(transactions: D365Transaction[], storeMapping: Map<strin
 
 // Save to Firestore
 async function saveLiveSales(data: Array<{ outlet: string; sales: number }>): Promise<void> {
+  if (!db) {
+    throw new Error('Firestore not initialized');
+  }
+  
   const docRef = db.collection('liveSales').doc('today');
   
   await docRef.set({
@@ -169,6 +192,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // GET requests are allowed without authentication (for client-side polling)
 
   try {
+    // Check Firebase initialization
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Firebase not initialized. Please check environment variables: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY',
+      });
+    }
+
     console.log('🚀 Starting live sales sync...');
 
     // 1. Get access token
