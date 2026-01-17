@@ -4,9 +4,8 @@ import firebase from 'firebase/app';
 import { useLocale } from '@/context/LocaleContext';
 
 interface LiveSalesData {
-  date: firebase.firestore.Timestamp;
-  lastUpdate: firebase.firestore.Timestamp;
-  lastUpdateTime?: string; // HH:MM format
+  date: string; // YYYY-MM-DD (from JSON) or firebase.firestore.Timestamp (from Firestore)
+  lastUpdate: string; // HH:MM format (from JSON) or firebase.firestore.Timestamp (from Firestore)
   today: Array<{ outlet: string; sales: number }>;
   yesterday: Array<{ outlet: string; sales: number }>;
   // Legacy support - fallback to old format
@@ -45,47 +44,24 @@ const LivePage: React.FC = () => {
   }, [locale]);
 
   useEffect(() => {
-    const loadLiveData = async () => {
+    // Function to load from API (Local JSON like dailysales)
+    const loadLiveDataFromAPI = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const doc = await db.collection('liveSales').doc('today').get();
-        
-        if (doc.exists) {
-          const data = doc.data() as LiveSalesData;
-          setLiveData(data);
-        } else {
-          setError(copy.noData);
-        }
-      } catch (err: any) {
-        console.error('Error loading live sales:', err);
-        setError(err.message || copy.error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Function to trigger API update (client-side polling)
-    const triggerAPIUpdate = async () => {
-      try {
         // Get Vercel API URL from environment or use current origin
-        // If deployed on GitHub Pages, use Vercel API URL from env
-        // If deployed on Vercel, use relative path
         let apiUrl = '/api/live-sales';
         
         if (import.meta.env.VITE_VERCEL_API_URL) {
           let vercelUrl = import.meta.env.VITE_VERCEL_API_URL.trim();
-          // Ensure URL starts with https://
           if (!vercelUrl.startsWith('http://') && !vercelUrl.startsWith('https://')) {
             vercelUrl = `https://${vercelUrl}`;
           }
-          // Remove trailing slash if exists
           vercelUrl = vercelUrl.replace(/\/$/, '');
           apiUrl = `${vercelUrl}/api/live-sales`;
         }
         
-        // Call Vercel API endpoint to update live sales
         const response = await fetch(apiUrl, {
           method: 'GET',
           headers: {
@@ -94,31 +70,46 @@ const LivePage: React.FC = () => {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to update live sales');
+          throw new Error('Failed to fetch live sales');
         }
 
-        // After API call, reload from Firestore
-        const doc = await db.collection('liveSales').doc('today').get();
-        if (doc.exists) {
-          const data = doc.data() as LiveSalesData;
+        const result = await response.json();
+        
+        if (result.success && result.today) {
+          // Convert API response to LiveSalesData format
+          const data: LiveSalesData = {
+            date: result.date || new Date().toISOString().split('T')[0],
+            lastUpdate: result.lastUpdate || new Date().toTimeString().slice(0, 5),
+            today: result.today || [],
+            yesterday: result.yesterday || [],
+          };
           setLiveData(data);
+          setLoading(false);
+          setError(null);
+        } else {
+          throw new Error(result.error || 'Invalid response format');
         }
       } catch (err: any) {
-        console.error('Error triggering API update:', err);
+        console.error('Error loading live sales from API:', err);
+        // Fallback to Firestore if API fails (for backward compatibility)
+        loadLiveDataFromFirestore();
       }
     };
 
-    // Load immediately
-    loadLiveData();
-
-    // Trigger API update immediately on mount
-    triggerAPIUpdate();
-
-    // Set up real-time listener
-    const unsubscribe = db.collection('liveSales').doc('today').onSnapshot(
-      (doc) => {
+    // Fallback: Load from Firestore (for historical data or if API fails)
+    const loadLiveDataFromFirestore = async () => {
+      try {
+        const doc = await db.collection('liveSales').doc('today').get();
+        
         if (doc.exists) {
-          const data = doc.data() as LiveSalesData;
+          const firestoreData = doc.data() as any;
+          // Convert Firestore format to LiveSalesData format
+          const data: LiveSalesData = {
+            date: firestoreData.date?.toDate?.()?.toISOString()?.split('T')[0] || new Date().toISOString().split('T')[0],
+            lastUpdate: firestoreData.lastUpdateTime || firestoreData.lastUpdate?.toDate?.()?.toTimeString()?.slice(0, 5) || new Date().toTimeString().slice(0, 5),
+            today: firestoreData.today || firestoreData.stores || [],
+            yesterday: firestoreData.yesterday || [],
+          };
           setLiveData(data);
           setLoading(false);
           setError(null);
@@ -126,28 +117,34 @@ const LivePage: React.FC = () => {
           setError(copy.noData);
           setLoading(false);
         }
-      },
-      (err) => {
-        console.error('Snapshot error:', err);
+      } catch (err: any) {
+        console.error('Error loading live sales from Firestore:', err);
         setError(err.message || copy.error);
         setLoading(false);
       }
-    );
+    };
+
+    // Load immediately from API (Local JSON like dailysales)
+    loadLiveDataFromAPI();
 
     // Auto-refresh API every 15 minutes (client-side polling)
     const refreshInterval = setInterval(() => {
-      triggerAPIUpdate();
+      loadLiveDataFromAPI();
     }, 15 * 60 * 1000); // 15 minutes
 
     return () => {
-      unsubscribe();
       clearInterval(refreshInterval);
     };
   }, [copy]);
 
-  const formatDate = (timestamp: firebase.firestore.Timestamp | undefined) => {
-    if (!timestamp) return '-';
-    const date = timestamp.toDate();
+  const formatDate = (dateStr: string | firebase.firestore.Timestamp | undefined) => {
+    if (!dateStr) return '-';
+    let date: Date;
+    if (typeof dateStr === 'string') {
+      date = new Date(dateStr);
+    } else {
+      date = dateStr.toDate();
+    }
     return date.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
       year: 'numeric',
       month: 'long',
@@ -155,9 +152,14 @@ const LivePage: React.FC = () => {
     });
   };
 
-  const formatTime = (timestamp: firebase.firestore.Timestamp | undefined) => {
-    if (!timestamp) return '-';
-    const date = timestamp.toDate();
+  const formatTime = (timeStr: string | firebase.firestore.Timestamp | undefined) => {
+    if (!timeStr) return '-';
+    // If it's already a string (HH:MM format), return it
+    if (typeof timeStr === 'string') {
+      return timeStr;
+    }
+    // If it's a Firestore Timestamp, format it
+    const date = timeStr.toDate();
     return date.toLocaleTimeString(locale === 'ar' ? 'ar-SA' : 'en-US', {
       hour: '2-digit',
       minute: '2-digit',
@@ -210,7 +212,7 @@ const LivePage: React.FC = () => {
             </div>
             <div>
               <span className="font-semibold">{copy.lastUpdate}:</span>{' '}
-              {liveData?.lastUpdateTime || formatTime(liveData?.lastUpdate)}
+              {formatTime(liveData?.lastUpdate)}
             </div>
           </div>
         </div>

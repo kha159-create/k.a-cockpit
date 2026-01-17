@@ -174,25 +174,46 @@ function aggregateSales(transactions: D365Transaction[], storeMapping: Map<strin
     .sort((a, b) => b.sales - a.sales);
 }
 
-// Save to Firestore (with today and yesterday like dailysales)
-async function saveLiveSales(
+// Save to JSON response (like dailysales) - for local storage
+// Note: Vercel functions can't write files, so we return JSON for client-side storage
+function prepareLiveSalesJSON(
+  todayData: Array<{ outlet: string; sales: number }>,
+  yesterdayData: Array<{ outlet: string; sales: number }>
+): any {
+  const now = new Date();
+  return {
+    date: now.toISOString().split('T')[0], // YYYY-MM-DD
+    lastUpdate: now.toTimeString().slice(0, 5), // HH:MM format
+    today: todayData,
+    yesterday: yesterdayData,
+  };
+}
+
+// Optional: Save to Firestore as backup (for historical reference)
+async function saveLiveSalesToFirestore(
   todayData: Array<{ outlet: string; sales: number }>,
   yesterdayData: Array<{ outlet: string; sales: number }>
 ): Promise<void> {
   if (!db) {
-    throw new Error('Firestore not initialized');
+    console.warn('⚠️ Firestore not initialized, skipping Firestore backup');
+    return;
   }
   
-  const now = new Date();
-  const docRef = db.collection('liveSales').doc('today');
-  
-  await docRef.set({
-    date: admin.firestore.Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate())),
-    lastUpdate: admin.firestore.FieldValue.serverTimestamp(),
-    lastUpdateTime: now.toTimeString().slice(0, 5), // HH:MM format
-    today: todayData,
-    yesterday: yesterdayData,
-  }, { merge: true });
+  try {
+    const now = new Date();
+    const docRef = db.collection('liveSales').doc('today');
+    
+    await docRef.set({
+      date: admin.firestore.Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate())),
+      lastUpdate: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdateTime: now.toTimeString().slice(0, 5), // HH:MM format
+      today: todayData,
+      yesterday: yesterdayData,
+    }, { merge: true });
+    console.log('✅ Saved to Firestore (backup)');
+  } catch (error: any) {
+    console.warn('⚠️ Firestore backup failed:', error.message);
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -215,12 +236,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // GET requests are allowed without authentication (for client-side polling)
 
   try {
-    // Check Firebase initialization
+    // Note: Firebase is optional for Live Sales (we use local JSON like dailysales)
+    // Only needed for optional Firestore backup
     if (!db) {
-      return res.status(500).json({
-        success: false,
-        error: 'Firebase not initialized. Please check environment variables: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY',
-      });
+      console.warn('⚠️ Firebase not initialized - Live Sales will work but Firestore backup will be skipped');
     }
 
     console.log('🚀 Starting live sales sync...');
@@ -242,19 +261,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const yesterdaySales = aggregateSales(yesterdayTransactions, storeMapping);
     console.log(`✅ Aggregated ${todaySales.length} stores today, ${yesterdaySales.length} stores yesterday`);
 
-    // 5. Save to Firestore (with today and yesterday)
-    await saveLiveSales(todaySales, yesterdaySales);
-    console.log('✅ Saved to Firestore');
+    // 5. Prepare JSON data (like dailysales) - for local storage
+    const jsonData = prepareLiveSalesJSON(todaySales, yesterdaySales);
+    console.log('✅ Prepared JSON data');
+    
+    // 5b. Optional: Save to Firestore as backup (for historical reference)
+    await saveLiveSalesToFirestore(todaySales, yesterdaySales);
 
     return res.status(200).json({
       success: true,
       message: 'Live sales updated',
-      date: new Date().toISOString().split('T')[0],
+      date: jsonData.date,
+      lastUpdate: jsonData.lastUpdate,
+      today: jsonData.today,
+      yesterday: jsonData.yesterday,
+      // Metadata for debugging
       todayStoresCount: todaySales.length,
       yesterdayStoresCount: yesterdaySales.length,
       todayTransactionsCount: todayTransactions.length,
       yesterdayTransactionsCount: yesterdayTransactions.length,
-      lastUpdate: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error('❌ Live sales sync error:', error);
