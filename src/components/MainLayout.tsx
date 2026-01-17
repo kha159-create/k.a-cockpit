@@ -330,12 +330,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         const vercelUrl = 'https://k-a-cockpit.vercel.app';
         const apiUrl = `${vercelUrl}/api/get-metrics?year=${year}&month=${month}`;
         
+        console.log(`🔗 Fetching metrics from API: ${apiUrl}`);
+        
         const response = await fetch(apiUrl);
         if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
+          const errorText = await response.text();
+          console.error(`❌ API error ${response.status}:`, errorText);
+          throw new Error(`API error: ${response.status} - ${errorText}`);
         }
         
         const result = await response.json();
+        console.log(`✅ API response:`, { success: result.success, count: result.count || result.metrics?.length || 0 });
+        
         if (result.success && Array.isArray(result.metrics)) {
           // Convert ISO date strings to Firestore Timestamps
           const apiMetrics: DailyMetric[] = result.metrics.map((m: any) => ({
@@ -348,6 +354,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             employeeId: m.employeeId,
           }));
           
+          console.log(`📊 Converted ${apiMetrics.length} metrics from API`);
+          
           // Merge with Firestore metrics (keep old data, replace new data)
           setDailyMetrics(prevMetrics => {
             const oldMetrics = prevMetrics.filter(m => {
@@ -355,11 +363,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
               const metricDate = m.date.toDate();
               return metricDate.getFullYear() < 2026;
             });
+            console.log(`🔄 Merging: ${oldMetrics.length} old metrics + ${apiMetrics.length} new metrics`);
             return [...oldMetrics, ...apiMetrics];
           });
+        } else {
+          console.warn('⚠️ API returned no metrics:', result);
         }
       } catch (error: any) {
-        console.error('Error fetching metrics from API:', error);
+        console.error('❌ Error fetching metrics from API:', error.message || error);
       }
     };
 
