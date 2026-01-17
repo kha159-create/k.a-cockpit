@@ -217,6 +217,31 @@ async function saveLiveSalesToFirestore(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Handle CORS for cross-origin requests (GitHub Pages to Vercel API)
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'https://kha159-create.github.io',
+    'https://k-a-cockpit.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ];
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    // Allow requests without origin (same-origin)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-cron-secret, x-vercel-cron');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  // Handle preflight OPTIONS request
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Vercel Cron Jobs send a special header
   const isCronRequest = req.headers['x-vercel-cron'] === '1';
   
