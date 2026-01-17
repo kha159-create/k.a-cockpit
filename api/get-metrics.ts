@@ -38,6 +38,9 @@ interface D365Transaction {
   OperatingUnitNumber: string;
   PaymentAmount: number;
   TransactionDate: string;
+  StaffId?: string; // Employee ID (if available in D365)
+  StaffName?: string; // Employee Name (if available in D365)
+  [key: string]: any; // Allow other fields
 }
 
 // Fetch transactions from D365 for a date range (like sync-d365)
@@ -52,7 +55,10 @@ async function fetchTransactions(
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
-  const queryUrl = `${baseUrl}?$filter=PaymentAmount ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}&$select=OperatingUnitNumber,PaymentAmount,TransactionDate&$orderby=TransactionDate`;
+  // Try to get StaffId/StaffName if available in D365 (for employee sales)
+  // Note: D365 RetailTransactions may not have StaffId, so we try it first
+  const selectFields = 'OperatingUnitNumber,PaymentAmount,TransactionDate,StaffId,StaffName';
+  const queryUrl = `${baseUrl}?$filter=PaymentAmount ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}&$select=${selectFields}&$orderby=TransactionDate`;
 
   const allTransactions: D365Transaction[] = [];
   let nextLink: string | null = queryUrl;
@@ -129,13 +135,16 @@ async function loadStoreMapping(): Promise<Map<string, string>> {
 }
 
 // Transform D365 transactions to DailyMetric format (compatible with Firestore structure)
+// IMPORTANT: Group by date + store + employee (like orange-dashboard)
+// Store totalSales = sum of employee.totalSales (same as old system)
 function transformToDailyMetrics(
   transactions: D365Transaction[],
   storeMapping: Map<string, string>,
   year: number,
   month: number
 ): any[] {
-  // Group by date and store
+  // Group by: date + store + employee (if StaffId/StaffName available)
+  // This ensures employee sales are separate, then we sum them for store totals
   const metricsMap = new Map<string, {
     date: Date;
     store: string;
@@ -156,7 +165,14 @@ function transformToDailyMetrics(
     }
     
     const dateKey = txDate.toISOString().split('T')[0]; // YYYY-MM-DD
-    const docKey = `${dateKey}_${storeName}`;
+    const employeeName = tx.StaffName || tx.StaffId || null; // Try to get employee name
+    const employeeId = tx.StaffId || null;
+    
+    // If employee data available, create separate metric per employee (like old system)
+    // Otherwise, group by store only (fallback)
+    const docKey = employeeName 
+      ? `${dateKey}_${storeName}_${employeeName}` // Per employee
+      : `${dateKey}_${storeName}`; // Per store (fallback)
 
     const amount = Number(tx.PaymentAmount) || 0;
     if (amount === 0) return;
@@ -167,6 +183,8 @@ function transformToDailyMetrics(
         store: storeName,
         totalSales: 0,
         transactionCount: 0,
+        ...(employeeName && { employee: employeeName }),
+        ...(employeeId && { employeeId }),
       });
     }
     const metric = metricsMap.get(docKey)!;
@@ -175,6 +193,7 @@ function transformToDailyMetrics(
   });
 
   // Convert to array and format dates as ISO strings (client will convert to Timestamp)
+  // Note: Multiple metrics per store (one per employee) - client will sum them for store totals
   return Array.from(metricsMap.values()).map(metric => ({
     ...metric,
     date: metric.date.toISOString(), // Send as ISO string, client converts to Timestamp
