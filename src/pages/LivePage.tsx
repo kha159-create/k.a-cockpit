@@ -50,8 +50,9 @@ const LivePage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Get Vercel API URL from environment or use current origin
-        let apiUrl = '/api/live-sales';
+        // Get Vercel API URL - always use full URL for Vercel API
+        // Default to Vercel URL, use environment variable if available
+        let apiUrl = 'https://k-a-cockpit.vercel.app/api/live-sales';
         
         // @ts-ignore - Vite environment variables
         const vercelApiUrl = import.meta.env.VITE_VERCEL_API_URL;
@@ -63,6 +64,8 @@ const LivePage: React.FC = () => {
           vercelUrl = vercelUrl.replace(/\/$/, '');
           apiUrl = `${vercelUrl}/api/live-sales`;
         }
+        
+        console.log('🔗 Fetching from API URL:', apiUrl);
         
         const response = await fetch(apiUrl, {
           method: 'GET',
