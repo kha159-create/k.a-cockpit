@@ -75,7 +75,10 @@ const LivePage: React.FC = () => {
 
         const result = await response.json();
         
-        if (result.success && result.today) {
+        console.log('📊 API Response:', result);
+        
+        // Check if API returned data (even if success is false, we can still try to use the data)
+        if (result.today || result.yesterday) {
           // Convert API response to LiveSalesData format
           const data: LiveSalesData = {
             date: result.date || new Date().toISOString().split('T')[0],
@@ -86,11 +89,18 @@ const LivePage: React.FC = () => {
           setLiveData(data);
           setLoading(false);
           setError(null);
+          console.log('✅ Live data loaded successfully:', data);
+        } else if (result.success === false && result.error) {
+          // API returned explicit error
+          throw new Error(result.error);
         } else {
-          throw new Error(result.error || 'Invalid response format');
+          // No data and no explicit error - try Firestore fallback
+          console.warn('⚠️ API returned no data, trying Firestore fallback');
+          throw new Error('No data in API response');
         }
       } catch (err: any) {
-        console.error('Error loading live sales from API:', err);
+        console.error('❌ Error loading live sales from API:', err);
+        console.log('🔄 Falling back to Firestore...');
         // Fallback to Firestore if API fails (for backward compatibility)
         loadLiveDataFromFirestore();
       }
@@ -99,10 +109,12 @@ const LivePage: React.FC = () => {
     // Fallback: Load from Firestore (for historical data or if API fails)
     const loadLiveDataFromFirestore = async () => {
       try {
+        console.log('📦 Loading from Firestore...');
         const doc = await db.collection('liveSales').doc('today').get();
         
         if (doc.exists) {
           const firestoreData = doc.data() as any;
+          console.log('📦 Firestore data found:', firestoreData);
           // Convert Firestore format to LiveSalesData format
           const data: LiveSalesData = {
             date: firestoreData.date?.toDate?.()?.toISOString()?.split('T')[0] || new Date().toISOString().split('T')[0],
@@ -113,12 +125,14 @@ const LivePage: React.FC = () => {
           setLiveData(data);
           setLoading(false);
           setError(null);
+          console.log('✅ Firestore data loaded successfully:', data);
         } else {
+          console.warn('⚠️ No data in Firestore either');
           setError(copy.noData);
           setLoading(false);
         }
       } catch (err: any) {
-        console.error('Error loading live sales from Firestore:', err);
+        console.error('❌ Error loading live sales from Firestore:', err);
         setError(err.message || copy.error);
         setLoading(false);
       }
