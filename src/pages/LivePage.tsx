@@ -65,8 +65,15 @@ const LivePage: React.FC = () => {
     // Function to trigger API update (client-side polling)
     const triggerAPIUpdate = async () => {
       try {
+        // Get Vercel API URL from environment or use current origin
+        // If deployed on GitHub Pages, use Vercel API URL from env
+        // If deployed on Vercel, use relative path
+        const apiUrl = import.meta.env.VITE_VERCEL_API_URL 
+          ? `${import.meta.env.VITE_VERCEL_API_URL}/api/live-sales`
+          : '/api/live-sales';
+        
         // Call Vercel API endpoint to update live sales
-        const response = await fetch('/api/live-sales', {
+        const response = await fetch(apiUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
