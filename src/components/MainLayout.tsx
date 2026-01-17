@@ -221,7 +221,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         businessRules: setBusinessRules,
     };
 
-    if (profile?.role === 'admin' || profile?.role !== 'general_manager') {
+    if (profile?.role === 'admin' || profile?.role === 'general_manager') {
         collectionsToWatch.users = setAllUsers;
     }
 
