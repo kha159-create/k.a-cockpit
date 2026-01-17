@@ -74,11 +74,27 @@ const LivePage: React.FC = () => {
           },
         });
 
+        console.log('📡 Response status:', response.status, response.statusText);
+        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
-          throw new Error('Failed to fetch live sales');
+          const errorText = await response.text();
+          console.error('❌ Response error:', errorText);
+          throw new Error(`Failed to fetch live sales: ${response.status} ${response.statusText}`);
+        }
+
+        // Check if response has content
+        const contentType = response.headers.get('content-type');
+        console.log('📦 Content-Type:', contentType);
+
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.warn('⚠️ Response is not JSON:', text.substring(0, 200));
+          throw new Error('Response is not JSON');
         }
 
         const result = await response.json();
+        console.log('📊 Parsed result:', result);
         
         console.log('📊 API Response:', result);
         
