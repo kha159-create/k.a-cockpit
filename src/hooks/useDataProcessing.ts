@@ -240,11 +240,44 @@ export const useDataProcessing = ({
   }, [roleFilteredData, dateFilteredData, areaStoreFilter, dateFilter]);
 
   const storeSummary = useMemo((): StoreSummary[] => {
+    // First calculate employee summaries to get total sales per store from employees
+    const employeeSummaryForCalculation: { [storeName: string]: EmployeeSummary[] } = {};
+    
+    areaFilteredData.employees.forEach(employee => {
+      const storeForPeriod = getEmployeeStoreForPeriod(employee, dateFilter);
+      if (!areaFilteredData.stores.some(s => s.name === storeForPeriod)) return;
+
+      const metricsForEmployee = areaFilteredData.metrics.filter(m => 
+        m.employeeId === employee.employeeId || m.employee === employee.name
+      );
+      const totalSales = metricsForEmployee.reduce((sum, m) => sum + (m.totalSales || 0), 0);
+      const totalTransactions = metricsForEmployee.reduce((sum, m) => sum + (m.transactionCount || 0), 0);
+
+      if (!employeeSummaryForCalculation[storeForPeriod]) employeeSummaryForCalculation[storeForPeriod] = [];
+      employeeSummaryForCalculation[storeForPeriod].push({
+        ...employee,
+        store: storeForPeriod,
+        totalSales,
+        totalTransactions,
+      } as EmployeeSummary);
+    });
+    
+    // Calculate store totals from employees (store.totalSales = sum of employee sales)
     return areaFilteredData.stores.map(store => {
-      const metricsForStore = areaFilteredData.metrics.filter(m => m.store === store.name);
-      const totalSales = metricsForStore.reduce((sum, m) => sum + (m.totalSales || 0), 0);
-      const visitors = metricsForStore.reduce((sum, m) => sum + (m.visitors || 0), 0);
-      const transactionCount = metricsForStore.reduce((sum, m) => sum + (m.transactionCount || 0), 0);
+      // Get total sales from employees in this store
+      const employeesInStore = employeeSummaryForCalculation[store.name] || [];
+      const totalSalesFromEmployees = employeesInStore.reduce((sum, emp) => sum + (emp.totalSales || 0), 0);
+      const totalTransactionsFromEmployees = employeesInStore.reduce((sum, emp) => sum + (emp.totalTransactions || 0), 0);
+      
+      // Also get from direct store metrics (for backward compatibility or manual entries)
+      const metricsForStore = areaFilteredData.metrics.filter(m => m.store === store.name && !m.employee);
+      const totalSalesFromMetrics = metricsForStore.reduce((sum, m) => sum + (m.totalSales || 0), 0);
+      const transactionCountFromMetrics = metricsForStore.reduce((sum, m) => sum + (m.transactionCount || 0), 0);
+      
+      // Combine both: employees take priority, but add any direct store metrics
+      const totalSales = totalSalesFromEmployees + totalSalesFromMetrics;
+      const transactionCount = totalTransactionsFromEmployees + transactionCountFromMetrics;
+      const visitors = areaFilteredData.metrics.filter(m => m.store === store.name).reduce((sum, m) => sum + (m.visitors || 0), 0);
       const effectiveTarget = calculateEffectiveTarget(store.targets, dateFilter);
       
       return {
@@ -257,7 +290,7 @@ export const useDataProcessing = ({
         salesPerVisitor: visitors > 0 ? totalSales / visitors : 0,
       };
     });
-  }, [areaFilteredData.stores, areaFilteredData.metrics, dateFilter]);
+  }, [areaFilteredData.stores, areaFilteredData.metrics, areaFilteredData.employees, dateFilter]);
 
   const storeNamesSet = useMemo(() => new Set(areaFilteredData.stores.map(store => store.name)), [areaFilteredData.stores]);
 

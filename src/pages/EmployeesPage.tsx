@@ -78,7 +78,25 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
         }
         return acc;
     }, {} as {[storeName: string]: EmployeeSummary[]});
-  }, [employeeSummary, searchTerm]);
+  }, [employeeSummary, searchTerm, profile, allEmployees]);
+
+  // Group employees by area manager (like StoresPage)
+  const employeesByAreaManager = useMemo((): { [key: string]: { storeName: string; employees: EmployeeSummary[] }[] } => {
+    const grouped: { [key: string]: { storeName: string; employees: EmployeeSummary[] }[] } = {};
+    
+    Object.entries(filteredEmployeeSummary).forEach(([storeName, employees]) => {
+      // Find store to get areaManager
+      const store = allStores.find(s => s.name === storeName);
+      const manager = store?.areaManager || t('unassigned');
+      
+      if (!grouped[manager]) {
+        grouped[manager] = [];
+      }
+      grouped[manager].push({ storeName, employees });
+    });
+    
+    return grouped;
+  }, [filteredEmployeeSummary, allStores, t]);
 
   // Debug: Log filteredEmployeeSummary after it's defined (removed to prevent infinite re-render)
   // console.log('EmployeesPage - filteredEmployeeSummary:', filteredEmployeeSummary);
@@ -136,37 +154,65 @@ const EmployeesPage: React.FC<EmployeesPageProps> = ({
        </div>
         <div className="space-y-6">
             {isRecalculating ? <TableSkeleton /> : (
-                Object.keys(filteredEmployeeSummary).length === 0 ? (
+                Object.keys(employeesByAreaManager).length === 0 ? (
                      <div className="text-center p-10 bg-white rounded-lg shadow"><p>{t('no_employee_data')}</p></div>
                 ) : (
-                    Object.entries(filteredEmployeeSummary).sort(([a], [b]) => a.localeCompare(b)).map(([storeName, employees]) => (
-                        <div key={storeName} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <h3 className="text-xl font-semibold text-zinc-800 mb-4">{storeName}</h3>
-                            <Table 
-                                columns={columns} 
-                                data={employees as EmployeeSummary[]} 
-                                initialSortKey="totalSales"
-                                rowClassName={getRowClassName} 
-                                onRowClick={handleRowClick}
-                                renderExpandedRow={(item) => 
-                                    selectedEmployeeId === item.id && (
-                                        <div className="p-4">
-                                            <Employee360View
-                                                employee={item}
-                                                allMetrics={dailyMetrics}
-                                                salesTransactions={salesTransactions}
-                                                kingDuvetSales={kingDuvetSales}
-                                                storeSummary={storeSummary}
-                                                dateFilter={dateFilter}
-                                                setModalState={setModalState}
-                                                allEmployeeSummaries={allEmployeeSummaries}
-                                            />
+                    Object.keys(employeesByAreaManager).sort((a, b) => a.localeCompare(b)).map(managerName => {
+                        const storesWithEmployees = employeesByAreaManager[managerName];
+                        const totalEmployees = storesWithEmployees.reduce((sum, s) => sum + s.employees.length, 0);
+                        const totalSales = storesWithEmployees.reduce((sum, s) => {
+                            const storeSales = s.employees.reduce((empSum, emp) => empSum + (emp.totalSales || 0), 0);
+                            return sum + storeSales;
+                        }, 0);
+                        
+                        return (
+                            <div key={managerName} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                {/* Area Manager Summary Card (similar to StoresPage) */}
+                                <div className="bg-gradient-to-r from-blue-50/80 to-blue-100/80 p-4 rounded-lg shadow-sm border-2 border-blue-200/60 mb-6">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h4 className="text-xl font-bold text-blue-900 mb-2">{managerName}</h4>
+                                            <p className="text-sm text-blue-700">{t('stores_count')}: {storesWithEmployees.length} | {t('employees')}: {totalEmployees}</p>
                                         </div>
-                                    )
-                                }
-                            />
-                        </div>
-                    ))
+                                        <div className="text-right">
+                                            <p className="text-lg font-semibold text-blue-900">{totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
+                                            <p className="text-sm text-blue-700">{t('total_sales')}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Employees grouped by Store */}
+                                {storesWithEmployees.sort((a, b) => a.storeName.localeCompare(b.storeName)).map(({ storeName, employees }) => (
+                                    <div key={storeName} className="mb-6 last:mb-0">
+                                        <h5 className="text-md font-semibold text-gray-700 mb-3">{storeName}</h5>
+                                        <Table 
+                                            columns={columns} 
+                                            data={employees as EmployeeSummary[]} 
+                                            initialSortKey="totalSales"
+                                            rowClassName={getRowClassName} 
+                                            onRowClick={handleRowClick}
+                                            renderExpandedRow={(item) => 
+                                                selectedEmployeeId === item.id && (
+                                                    <div className="p-4">
+                                                        <Employee360View
+                                                            employee={item}
+                                                            allMetrics={dailyMetrics}
+                                                            salesTransactions={salesTransactions}
+                                                            kingDuvetSales={kingDuvetSales}
+                                                            storeSummary={storeSummary}
+                                                            dateFilter={dateFilter}
+                                                            setModalState={setModalState}
+                                                            allEmployeeSummaries={allEmployeeSummaries}
+                                                        />
+                                                    </div>
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })
                 )
             )}
         </div>
