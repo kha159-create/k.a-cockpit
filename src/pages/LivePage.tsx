@@ -87,16 +87,26 @@ const LivePage: React.FC = () => {
         const contentType = response.headers.get('content-type');
         console.log('📦 Content-Type:', contentType);
 
-        if (!contentType || !contentType.includes('application/json')) {
-          const text = await response.text();
-          console.warn('⚠️ Response is not JSON:', text.substring(0, 200));
-          throw new Error('Response is not JSON');
+        // Try to get response text first to check if it's empty
+        const responseText = await response.text();
+        console.log('📝 Response text length:', responseText.length);
+        
+        if (!responseText || responseText.trim().length === 0) {
+          console.warn('⚠️ Response is empty');
+          throw new Error('Response is empty');
         }
 
-        const result = await response.json();
-        console.log('📊 Parsed result:', result);
+        // Parse JSON
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch (parseError: any) {
+          console.error('❌ JSON parse error:', parseError);
+          console.warn('⚠️ Response text:', responseText.substring(0, 500));
+          throw new Error('Failed to parse JSON response');
+        }
         
-        console.log('📊 API Response:', result);
+        console.log('📊 Parsed result:', result);
         
         // Check if API returned data (even if success is false, we can still try to use the data)
         if (result.today || result.yesterday) {
