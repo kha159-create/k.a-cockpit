@@ -115,18 +115,32 @@ async function fetchTransactionsLastTwoDays(token: string): Promise<{
     nextLink = data['@odata.nextLink'] || null;
   }
 
-  // Split into today and yesterday
+  // Split into today and yesterday based on Saudi Arabia time (UTC+3)
+  // Get current Saudi time
+  const nowSaudi = new Date(now.getTime() + (3 * 60 * 60 * 1000)); // UTC+3
+  const saudiTodayStart = new Date(Date.UTC(nowSaudi.getUTCFullYear(), nowSaudi.getUTCMonth(), nowSaudi.getUTCDate(), 0, 0, 0));
+  const saudiYesterdayStart = new Date(saudiTodayStart);
+  saudiYesterdayStart.setUTCDate(saudiYesterdayStart.getUTCDate() - 1);
+  
+  // Convert to UTC for comparison with D365 dates (which are in UTC)
+  const todayStartSaudiUTC = new Date(saudiTodayStart.getTime() - (3 * 60 * 60 * 1000));
+  const yesterdayStartSaudiUTC = new Date(saudiYesterdayStart.getTime() - (3 * 60 * 60 * 1000));
+
   const todayTransactions: D365Transaction[] = [];
   const yesterdayTransactions: D365Transaction[] = [];
 
   allTransactions.forEach((tx) => {
     const txDate = new Date(tx.TransactionDate);
-    if (txDate >= todayStart) {
+    // Compare based on Saudi time boundaries
+    if (txDate >= todayStartSaudiUTC) {
       todayTransactions.push(tx);
-    } else if (txDate >= yesterdayStart && txDate < todayStart) {
+    } else if (txDate >= yesterdayStartSaudiUTC && txDate < todayStartSaudiUTC) {
       yesterdayTransactions.push(tx);
     }
   });
+  
+  console.log(`📅 Saudi time: ${nowSaudi.toISOString()}, Today UTC boundary: ${todayStartSaudiUTC.toISOString()}, Yesterday UTC boundary: ${yesterdayStartSaudiUTC.toISOString()}`);
+  console.log(`📊 Split: ${todayTransactions.length} today, ${yesterdayTransactions.length} yesterday`);
 
   return { today: todayTransactions, yesterday: yesterdayTransactions };
 }

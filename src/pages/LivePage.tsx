@@ -17,6 +17,7 @@ const LivePage: React.FC = () => {
   const [liveData, setLiveData] = useState<LiveSalesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'today' | 'yesterday'>('today');
 
   const copy = useMemo(() => {
     if (locale === 'ar') {
@@ -263,62 +264,61 @@ const LivePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Today Sales Grid */}
-      {todayStores.length === 0 ? (
+      {/* Total Card */}
+      <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-lg border border-orange-700 p-6 text-white">
+        <div className="text-center">
+          <div className="text-lg font-medium mb-2 opacity-90">
+            {locale === 'ar' 
+              ? (viewMode === 'today' ? '📊 إجمالي مبيعات اليوم' : '📅 إجمالي مبيعات أمس')
+              : (viewMode === 'today' ? '📊 Total Today\'s Sales' : '📅 Total Yesterday\'s Sales')}
+          </div>
+          <div className="text-5xl font-bold">
+            {formatSales(totalSales)}
+          </div>
+          <div className="text-sm mt-2 opacity-80">
+            {locale === 'ar' ? `${currentStores.length} معرض` : `${currentStores.length} outlets`}
+          </div>
+        </div>
+      </div>
+
+      {/* Sales Grid */}
+      {currentStores.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
           <p className="text-gray-500 text-lg">{copy.noData}</p>
         </div>
       ) : (
-        <>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              {locale === 'ar' ? '📊 مبيعات اليوم' : '📊 Today\'s Sales'}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {todayStores.map((item, index) => (
-                <div
-                  key={`today-${index}`}
-                  className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow-sm border-l-4 border-orange-500 p-6 hover:shadow-md transition-all duration-200"
-                >
-                  <div className="text-center">
-                    <div className="text-gray-700 text-sm font-medium mb-2 truncate">
-                      {item.outlet}
-                    </div>
-                    <div className="text-3xl font-bold text-orange-900">
-                      {formatSales(item.sales)}
-                    </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            {locale === 'ar' 
+              ? (viewMode === 'today' ? '📊 مبيعات اليوم' : '📅 مبيعات أمس')
+              : (viewMode === 'today' ? '📊 Today\'s Sales' : '📅 Yesterday\'s Sales')}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {currentStores.map((item, index) => (
+              <div
+                key={`${viewMode}-${index}`}
+                className={`rounded-xl shadow-sm border-l-4 p-6 hover:shadow-md transition-all duration-200 ${
+                  viewMode === 'today'
+                    ? 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-500'
+                    : 'bg-gray-50 border-gray-400'
+                }`}
+              >
+                <div className="text-center">
+                  <div className={`text-sm font-medium mb-2 truncate ${
+                    viewMode === 'today' ? 'text-gray-700' : 'text-gray-600'
+                  }`}>
+                    {item.outlet}
+                  </div>
+                  <div className={`text-3xl font-bold ${
+                    viewMode === 'today' ? 'text-orange-900' : 'text-gray-800'
+                  }`}>
+                    {formatSales(item.sales)}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Yesterday Sales Grid (if available) */}
-          {yesterdayStores.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                {locale === 'ar' ? '📅 مبيعات أمس' : '📅 Yesterday\'s Sales'}
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {yesterdayStores.map((item, index) => (
-                  <div
-                    key={`yesterday-${index}`}
-                    className="bg-gray-50 rounded-xl shadow-sm border-l-4 border-gray-400 p-6 hover:shadow-md transition-all duration-200"
-                  >
-                    <div className="text-center">
-                      <div className="text-gray-600 text-sm font-medium mb-2 truncate">
-                        {item.outlet}
-                      </div>
-                      <div className="text-3xl font-bold text-gray-800">
-                        {formatSales(item.sales)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
-            </div>
-          )}
-        </>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Auto-refresh indicator */}
