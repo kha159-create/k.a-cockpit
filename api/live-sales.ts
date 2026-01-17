@@ -116,31 +116,45 @@ async function fetchTransactionsLastTwoDays(token: string): Promise<{
   }
 
   // Split into today and yesterday based on Saudi Arabia time (UTC+3)
-  // Get current Saudi time
-  const nowSaudi = new Date(now.getTime() + (3 * 60 * 60 * 1000)); // UTC+3
-  const saudiTodayStart = new Date(Date.UTC(nowSaudi.getUTCFullYear(), nowSaudi.getUTCMonth(), nowSaudi.getUTCDate(), 0, 0, 0));
-  const saudiYesterdayStart = new Date(saudiTodayStart);
-  saudiYesterdayStart.setUTCDate(saudiYesterdayStart.getUTCDate() - 1);
+  // After 12 AM SAST (midnight Saudi time), sales belong to "today"
+  // Before 12 AM SAST, sales belong to "yesterday"
   
-  // Convert to UTC for comparison with D365 dates (which are in UTC)
-  const todayStartSaudiUTC = new Date(saudiTodayStart.getTime() - (3 * 60 * 60 * 1000));
-  const yesterdayStartSaudiUTC = new Date(saudiYesterdayStart.getTime() - (3 * 60 * 60 * 1000));
+  // Get current Saudi time (UTC+3)
+  const nowSaudi = new Date(now.getTime() + (3 * 60 * 60 * 1000)); // UTC+3
+  const saudiYear = nowSaudi.getUTCFullYear();
+  const saudiMonth = nowSaudi.getUTCMonth();
+  const saudiDate = nowSaudi.getUTCDate();
+  const saudiHour = nowSaudi.getUTCHours();
+  
+  // Today starts at 00:00 SAST (which is 21:00 UTC of previous day)
+  // Yesterday starts at 00:00 SAST of previous day (which is 21:00 UTC two days ago)
+  
+  // Calculate today's start in Saudi time (00:00 SAST = 21:00 UTC previous day)
+  const saudiTodayStart = new Date(Date.UTC(saudiYear, saudiMonth, saudiDate, 0, 0, 0));
+  const saudiTodayStartUTC = new Date(saudiTodayStart.getTime() - (3 * 60 * 60 * 1000)); // Convert SAST to UTC
+  
+  // Calculate yesterday's start in Saudi time
+  const saudiYesterdayStart = new Date(Date.UTC(saudiYear, saudiMonth, saudiDate - 1, 0, 0, 0));
+  const saudiYesterdayStartUTC = new Date(saudiYesterdayStart.getTime() - (3 * 60 * 60 * 1000)); // Convert SAST to UTC
 
   const todayTransactions: D365Transaction[] = [];
   const yesterdayTransactions: D365Transaction[] = [];
 
   allTransactions.forEach((tx) => {
     const txDate = new Date(tx.TransactionDate);
-    // Compare based on Saudi time boundaries
-    if (txDate >= todayStartSaudiUTC) {
+    // Compare based on Saudi time boundaries (00:00 SAST = 21:00 UTC previous day)
+    // All transactions >= today 00:00 SAST belong to today
+    if (txDate >= saudiTodayStartUTC) {
       todayTransactions.push(tx);
-    } else if (txDate >= yesterdayStartSaudiUTC && txDate < todayStartSaudiUTC) {
+    } 
+    // All transactions >= yesterday 00:00 SAST and < today 00:00 SAST belong to yesterday
+    else if (txDate >= saudiYesterdayStartUTC && txDate < saudiTodayStartUTC) {
       yesterdayTransactions.push(tx);
     }
   });
   
-  console.log(`📅 Saudi time: ${nowSaudi.toISOString()}, Today UTC boundary: ${todayStartSaudiUTC.toISOString()}, Yesterday UTC boundary: ${yesterdayStartSaudiUTC.toISOString()}`);
-  console.log(`📊 Split: ${todayTransactions.length} today, ${yesterdayTransactions.length} yesterday`);
+  console.log(`📅 Saudi time: ${nowSaudi.toISOString()} (${saudiHour}:00 SAST), Today UTC boundary: ${saudiTodayStartUTC.toISOString()}, Yesterday UTC boundary: ${saudiYesterdayStartUTC.toISOString()}`);
+  console.log(`📊 Split: ${todayTransactions.length} today (after 12 AM SAST), ${yesterdayTransactions.length} yesterday (before 12 AM SAST)`);
 
   return { today: todayTransactions, yesterday: yesterdayTransactions };
 }
