@@ -130,25 +130,72 @@ async function fetchTransactionsLastTwoDays(token: string): Promise<{
   return { today: todayTransactions, yesterday: yesterdayTransactions };
 }
 
-// Load store mapping from Firestore
+// Load store mapping from orange-dashboard (like dailysales) - LOCAL JSON, no Firestore needed
 async function loadStoreMapping(): Promise<Map<string, string>> {
   const mapping = new Map<string, string>();
   
-  if (!db) {
-    console.error('Error: Firestore not initialized');
-    return mapping;
-  }
-  
   try {
-    const storesSnapshot = await db.collection('stores').get();
-    storesSnapshot.forEach((doc) => {
-      const data = doc.data();
-      const storeId = String(data?.store_id || data?.id || doc.id).trim();
-      const storeName = data?.name || data?.store_name || storeId;
-      mapping.set(storeId, storeName);
+    // Fetch mapping.xlsx from orange-dashboard GitHub repository (like dailysales)
+    console.log('📥 Loading store mapping from orange-dashboard...');
+    const response = await fetch('https://raw.githubusercontent.com/ALAAWF2/dailysales/main/backend/mapping.xlsx');
+    
+    if (!response.ok) {
+      console.warn('⚠️ Could not fetch mapping from orange-dashboard, using empty mapping');
+      return mapping;
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    // Parse Excel using XLSX (same as dailysales)
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet) as any[];
+    
+    // Find columns (flexible matching like dailysales fetch_sales.py)
+    const firstRow = data[0] || {};
+    const keys = Object.keys(firstRow);
+    
+    const storeIdCol = keys.find(k => {
+      const kLower = k.toLowerCase();
+      return kLower.includes('store') && (kLower.includes('number') || kLower.includes('id'));
+    }) || keys[0];
+    
+    const storeNameCol = keys.find(k => {
+      const kLower = k.toLowerCase();
+      return kLower.includes('outlet') || (kLower.includes('name') && !kLower.includes('store'));
+    }) || keys[1];
+    
+    console.log(`📊 Excel columns: ${storeIdCol} -> ${storeNameCol}`);
+    
+    // Build mapping
+    data.forEach((row: any) => {
+      const storeId = String(row[storeIdCol] || '').trim();
+      const storeName = String(row[storeNameCol] || '').trim();
+      if (storeId && storeName && storeId !== 'NaN' && storeName !== 'NaN') {
+        mapping.set(storeId, storeName);
+      }
     });
-  } catch (error) {
-    console.error('Error loading store mapping:', error);
+    
+    console.log(`✅ Loaded ${mapping.size} store mappings from orange-dashboard`);
+  } catch (error: any) {
+    console.error('❌ Error loading store mapping from orange-dashboard:', error.message);
+    // Fallback: Try Firestore if orange-dashboard fails (for backward compatibility)
+    if (db) {
+      try {
+        const storesSnapshot = await db.collection('stores').get();
+        storesSnapshot.forEach((doc) => {
+          const data = doc.data();
+          const storeId = String(data?.store_id || data?.id || doc.id).trim();
+          const storeName = data?.name || data?.store_name || storeId;
+          mapping.set(storeId, storeName);
+        });
+        console.log(`✅ Fallback: Loaded ${mapping.size} stores from Firestore`);
+      } catch (firestoreError) {
+        console.error('❌ Firestore fallback also failed:', firestoreError);
+      }
+    }
   }
 
   return mapping;
@@ -182,10 +229,21 @@ function prepareLiveSalesJSON(
   todayData: Array<{ outlet: string; sales: number }>,
   yesterdayData: Array<{ outlet: string; sales: number }>
 ): any {
+  // Convert to Saudi Arabia time (UTC+3)
   const now = new Date();
+  const saudiTime = new Date(now.getTime() + (3 * 60 * 60 * 1000)); // UTC+3
+  
+  // Format date in Saudi time
+  const saudiDateStr = saudiTime.toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  // Format time in Saudi time (HH:MM)
+  const hours = String(saudiTime.getUTCHours()).padStart(2, '0');
+  const minutes = String(saudiTime.getUTCMinutes()).padStart(2, '0');
+  const saudiTimeStr = `${hours}:${minutes}`;
+  
   return {
-    date: now.toISOString().split('T')[0], // YYYY-MM-DD
-    lastUpdate: now.toTimeString().slice(0, 5), // HH:MM format
+    date: saudiDateStr, // YYYY-MM-DD (Saudi time)
+    lastUpdate: saudiTimeStr, // HH:MM format (Saudi time)
     today: todayData,
     yesterday: yesterdayData,
   };
