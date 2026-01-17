@@ -215,13 +215,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     const collectionsToWatch: { [key: string]: React.Dispatch<React.SetStateAction<any>> } = {
         stores: setStores,
         employees: setEmployees,
-        dailyMetrics: setDailyMetrics,
+        // dailyMetrics: handled separately (Firestore + API merge)
         kingDuvetSales: setKingDuvetSales,
         salesTransactions: setSalesTransactions,
         businessRules: setBusinessRules,
     };
 
-    if (profile?.role === 'admin' || profile?.role === 'general_manager') {
+    if (profile?.role === 'admin' || profile?.role !== 'general_manager') {
         collectionsToWatch.users = setAllUsers;
     }
 
@@ -251,6 +251,49 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             }
         )
     );
+
+    // Separate listener for dailyMetrics (only for < 2026 data from Firestore)
+    const dailyMetricsUnsubscriber = db.collection('dailyMetrics').onSnapshot(
+        (snapshot) => {
+            const firestoreMetrics = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter((m: any) => {
+                    // Only include data from before 2026 (old system)
+                    if (!m.date || typeof m.date.toDate !== 'function') return true; // Include if date is invalid
+                    const metricDate = m.date.toDate();
+                    return metricDate.getFullYear() < 2026;
+                }) as DailyMetric[];
+            
+            // Merge with API metrics (2026+) from separate state
+            setDailyMetrics(prevMetrics => {
+                const apiMetrics = prevMetrics.filter(m => {
+                    if (!m.date || typeof m.date.toDate !== 'function') return false;
+                    const metricDate = m.date.toDate();
+                    return metricDate.getFullYear() >= 2026;
+                });
+                return [...firestoreMetrics, ...apiMetrics];
+            });
+            
+            if (unsubscribers.length > 0 && loadedCount < collectionKeys.length) {
+                loadedCount++;
+                if (loadedCount === collectionKeys.length) {
+                    setDataLoading(false);
+                }
+            }
+        },
+        (err) => {
+            console.error('Error fetching dailyMetrics:', err);
+            if (unsubscribers.length > 0 && loadedCount < collectionKeys.length) {
+                loadedCount++;
+                if (loadedCount === collectionKeys.length) {
+                    setDataLoading(false);
+                }
+            }
+        }
+    );
+    
+    // Add dailyMetrics unsubscriber to cleanup
+    unsubscribers.push(dailyMetricsUnsubscriber);
     
     let tasksUnsubscriber: () => void = () => {};
     if (profile?.employeeId) {
@@ -268,6 +311,59 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         tasksUnsubscriber();
     };
 }, [profile]);
+
+  // Fetch metrics from API for 2026+ (new system, like orange-dashboard)
+  useEffect(() => {
+    if (!profile) return;
+    
+    const year = typeof dateFilter.year === 'number' ? dateFilter.year : new Date().getFullYear();
+    const month = typeof dateFilter.month === 'number' ? dateFilter.month : new Date().getMonth();
+    
+    // Only fetch from API if year >= 2026
+    if (year < 2026) {
+      return;
+    }
+
+    const fetchMetricsFromAPI = async () => {
+      try {
+        const vercelUrl = import.meta.env.VITE_VERCEL_API_URL || 'https://k-a-cockpit.vercel.app';
+        const apiUrl = `${vercelUrl}/api/get-metrics?year=${year}&month=${month}`;
+        
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        if (result.success && Array.isArray(result.metrics)) {
+          // Convert ISO date strings to Firestore Timestamps
+          const apiMetrics: DailyMetric[] = result.metrics.map((m: any) => ({
+            id: `${m.date}_${m.store}`,
+            date: firebase.firestore.Timestamp.fromDate(new Date(m.date)),
+            store: m.store,
+            totalSales: m.totalSales,
+            transactionCount: m.transactionCount,
+            employee: m.employee,
+            employeeId: m.employeeId,
+          }));
+          
+          // Merge with Firestore metrics (keep old data, replace new data)
+          setDailyMetrics(prevMetrics => {
+            const oldMetrics = prevMetrics.filter(m => {
+              if (!m.date || typeof m.date.toDate !== 'function') return true;
+              const metricDate = m.date.toDate();
+              return metricDate.getFullYear() < 2026;
+            });
+            return [...oldMetrics, ...apiMetrics];
+          });
+        }
+      } catch (error: any) {
+        console.error('Error fetching metrics from API:', error);
+      }
+    };
+
+    fetchMetricsFromAPI();
+  }, [profile, dateFilter.year, dateFilter.month]);
 
 
 useEffect(() => {
