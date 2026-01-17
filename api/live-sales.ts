@@ -72,19 +72,23 @@ async function getAccessToken(): Promise<string> {
   return result.accessToken;
 }
 
-// Fetch today's transactions from D365
-async function fetchTodayTransactions(token: string): Promise<D365Transaction[]> {
+// Fetch today's and yesterday's transactions from D365 (like dailysales)
+async function fetchTransactionsLastTwoDays(token: string): Promise<{
+  today: D365Transaction[];
+  yesterday: D365Transaction[];
+}> {
   const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
   const baseUrl = `${d365Url}/data/RetailTransactions`;
 
   const now = new Date();
   const todayStart = new Date(now);
   todayStart.setUTCHours(0, 0, 0, 0);
-  
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setUTCDate(yesterdayStart.getUTCDate() - 1);
   const tomorrowStart = new Date(todayStart);
   tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1);
 
-  const startStr = todayStart.toISOString();
+  const startStr = yesterdayStart.toISOString();
   const endStr = tomorrowStart.toISOString();
 
   const queryUrl = `${baseUrl}?$filter=PaymentAmount ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}&$select=OperatingUnitNumber,PaymentAmount,TransactionDate&$orderby=TransactionDate`;
@@ -110,7 +114,20 @@ async function fetchTodayTransactions(token: string): Promise<D365Transaction[]>
     nextLink = data['@odata.nextLink'] || null;
   }
 
-  return allTransactions;
+  // Split into today and yesterday
+  const todayTransactions: D365Transaction[] = [];
+  const yesterdayTransactions: D365Transaction[] = [];
+
+  allTransactions.forEach((tx) => {
+    const txDate = new Date(tx.TransactionDate);
+    if (txDate >= todayStart) {
+      todayTransactions.push(tx);
+    } else if (txDate >= yesterdayStart && txDate < todayStart) {
+      yesterdayTransactions.push(tx);
+    }
+  });
+
+  return { today: todayTransactions, yesterday: yesterdayTransactions };
 }
 
 // Load store mapping from Firestore
@@ -157,18 +174,24 @@ function aggregateSales(transactions: D365Transaction[], storeMapping: Map<strin
     .sort((a, b) => b.sales - a.sales);
 }
 
-// Save to Firestore
-async function saveLiveSales(data: Array<{ outlet: string; sales: number }>): Promise<void> {
+// Save to Firestore (with today and yesterday like dailysales)
+async function saveLiveSales(
+  todayData: Array<{ outlet: string; sales: number }>,
+  yesterdayData: Array<{ outlet: string; sales: number }>
+): Promise<void> {
   if (!db) {
     throw new Error('Firestore not initialized');
   }
   
+  const now = new Date();
   const docRef = db.collection('liveSales').doc('today');
   
   await docRef.set({
-    date: admin.firestore.Timestamp.fromDate(new Date()),
+    date: admin.firestore.Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate())),
     lastUpdate: admin.firestore.FieldValue.serverTimestamp(),
-    stores: data,
+    lastUpdateTime: now.toTimeString().slice(0, 5), // HH:MM format
+    today: todayData,
+    yesterday: yesterdayData,
   }, { merge: true });
 }
 
@@ -206,28 +229,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = await getAccessToken();
     console.log('✅ Got access token');
 
-    // 2. Fetch today's transactions
-    const transactions = await fetchTodayTransactions(token);
-    console.log(`✅ Fetched ${transactions.length} transactions`);
+    // 2. Fetch today's and yesterday's transactions (like dailysales)
+    const { today: todayTransactions, yesterday: yesterdayTransactions } = await fetchTransactionsLastTwoDays(token);
+    console.log(`✅ Fetched ${todayTransactions.length} today + ${yesterdayTransactions.length} yesterday transactions`);
 
     // 3. Load store mapping
     const storeMapping = await loadStoreMapping();
     console.log(`✅ Loaded ${storeMapping.size} store mappings`);
 
-    // 4. Aggregate sales
-    const salesData = aggregateSales(transactions, storeMapping);
-    console.log(`✅ Aggregated ${salesData.length} stores`);
+    // 4. Aggregate sales for both days
+    const todaySales = aggregateSales(todayTransactions, storeMapping);
+    const yesterdaySales = aggregateSales(yesterdayTransactions, storeMapping);
+    console.log(`✅ Aggregated ${todaySales.length} stores today, ${yesterdaySales.length} stores yesterday`);
 
-    // 5. Save to Firestore
-    await saveLiveSales(salesData);
+    // 5. Save to Firestore (with today and yesterday)
+    await saveLiveSales(todaySales, yesterdaySales);
     console.log('✅ Saved to Firestore');
 
     return res.status(200).json({
       success: true,
       message: 'Live sales updated',
       date: new Date().toISOString().split('T')[0],
-      storesCount: salesData.length,
-      transactionsCount: transactions.length,
+      todayStoresCount: todaySales.length,
+      yesterdayStoresCount: yesterdaySales.length,
+      todayTransactionsCount: todayTransactions.length,
+      yesterdayTransactionsCount: yesterdayTransactions.length,
       lastUpdate: new Date().toISOString(),
     });
   } catch (error: any) {

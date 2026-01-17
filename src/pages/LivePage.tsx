@@ -6,7 +6,11 @@ import { useLocale } from '@/context/LocaleContext';
 interface LiveSalesData {
   date: firebase.firestore.Timestamp;
   lastUpdate: firebase.firestore.Timestamp;
-  stores: Array<{ outlet: string; sales: number }>;
+  lastUpdateTime?: string; // HH:MM format
+  today: Array<{ outlet: string; sales: number }>;
+  yesterday: Array<{ outlet: string; sales: number }>;
+  // Legacy support - fallback to old format
+  stores?: Array<{ outlet: string; sales: number }>;
 }
 
 const LivePage: React.FC = () => {
@@ -189,7 +193,9 @@ const LivePage: React.FC = () => {
     );
   }
 
-  const stores = liveData?.stores || [];
+  // Support both new format (today/yesterday) and legacy format (stores)
+  const todayStores = liveData?.today || liveData?.stores || [];
+  const yesterdayStores = liveData?.yesterday || [];
 
   return (
     <div className="space-y-6">
@@ -204,35 +210,68 @@ const LivePage: React.FC = () => {
             </div>
             <div>
               <span className="font-semibold">{copy.lastUpdate}:</span>{' '}
-              {formatTime(liveData?.lastUpdate)}
+              {liveData?.lastUpdateTime || formatTime(liveData?.lastUpdate)}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Sales Grid */}
-      {stores.length === 0 ? (
+      {/* Today Sales Grid */}
+      {todayStores.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
           <p className="text-gray-500 text-lg">{copy.noData}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {stores.map((item, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-xl shadow-sm border-l-4 border-orange-500 p-6 hover:shadow-md transition-all duration-200"
-            >
-              <div className="text-center">
-                <div className="text-gray-600 text-sm font-medium mb-2 truncate">
-                  {item.outlet}
+        <>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              {locale === 'ar' ? '📊 مبيعات اليوم' : '📊 Today\'s Sales'}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {todayStores.map((item, index) => (
+                <div
+                  key={`today-${index}`}
+                  className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow-sm border-l-4 border-orange-500 p-6 hover:shadow-md transition-all duration-200"
+                >
+                  <div className="text-center">
+                    <div className="text-gray-700 text-sm font-medium mb-2 truncate">
+                      {item.outlet}
+                    </div>
+                    <div className="text-3xl font-bold text-orange-900">
+                      {formatSales(item.sales)}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-3xl font-bold text-gray-900">
-                  {formatSales(item.sales)}
-                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Yesterday Sales Grid (if available) */}
+          {yesterdayStores.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                {locale === 'ar' ? '📅 مبيعات أمس' : '📅 Yesterday\'s Sales'}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {yesterdayStores.map((item, index) => (
+                  <div
+                    key={`yesterday-${index}`}
+                    className="bg-gray-50 rounded-xl shadow-sm border-l-4 border-gray-400 p-6 hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="text-center">
+                      <div className="text-gray-600 text-sm font-medium mb-2 truncate">
+                        {item.outlet}
+                      </div>
+                      <div className="text-3xl font-bold text-gray-800">
+                        {formatSales(item.sales)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {/* Auto-refresh indicator */}
