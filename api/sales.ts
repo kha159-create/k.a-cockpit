@@ -157,15 +157,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Parse and validate input parameters
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
     const monthParam = req.query.month as string | undefined;
-    const month = monthParam !== undefined ? parseInt(monthParam) : undefined;
+    let month: number | undefined;
+    if (monthParam !== undefined) {
+      month = parseInt(monthParam);
+      if (isNaN(month) || month < 0 || month > 11) {
+        console.warn(`⚠️ Invalid month parameter: ${monthParam}, expected 0-11`);
+        return res.status(400).json({
+          success: false,
+          error: `Invalid month parameter: ${monthParam}. Expected 0-11 (0=January, 11=December)`,
+          range: { from: '', to: '', year },
+          byStore: [],
+          byEmployee: [],
+          totals: { salesAmount: 0, invoices: 0, kpis: { atv: 0, customerValue: 0 } },
+          debug: { source: 'd365', notes: [`Invalid month: ${monthParam}`] },
+        });
+      }
+    }
+    
     const dayParam = req.query.day as string | undefined;
-    const day = dayParam !== undefined ? parseInt(dayParam) : undefined;
+    let day: number | undefined;
+    if (dayParam !== undefined) {
+      day = parseInt(dayParam);
+      if (isNaN(day) || day < 1 || day > 31) {
+        console.warn(`⚠️ Invalid day parameter: ${dayParam}, expected 1-31`);
+        return res.status(400).json({
+          success: false,
+          error: `Invalid day parameter: ${dayParam}. Expected 1-31`,
+          range: { from: '', to: '', year },
+          byStore: [],
+          byEmployee: [],
+          totals: { salesAmount: 0, invoices: 0, kpis: { atv: 0, customerValue: 0 } },
+          debug: { source: 'd365', notes: [`Invalid day: ${dayParam}`] },
+        });
+      }
+    }
+    
     const storeId = req.query.storeId as string | undefined;
     const employeeId = req.query.employeeId as string | undefined;
 
-    console.log(`📊 /api/sales request: year=${year}, month=${month}, day=${day}, storeId=${storeId}, employeeId=${employeeId}`);
+    console.log(`📊 /api/sales request: year=${year}, month=${month} (${month !== undefined ? month + 1 : 'all'}), day=${day}, storeId=${storeId}, employeeId=${employeeId}`);
 
     // Only support 2026+ (legacy handled in frontend)
     if (year < 2026) {
@@ -210,17 +243,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`📅 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
-    console.log('🔐 Getting access token...');
-    const token = await getAccessToken();
-    console.log('✅ Access token obtained');
+    // Step 1: Get access token (with error isolation)
+    let token: string;
+    try {
+      console.log('🔐 Getting access token...');
+      token = await getAccessToken();
+      console.log('✅ Access token obtained');
+    } catch (error: any) {
+      console.error('❌ Failed to get access token:', error.message);
+      return res.status(200).json({
+        success: false,
+        range: {
+          from: startDate.toISOString().split('T')[0],
+          to: endDate.toISOString().split('T')[0],
+          year,
+          ...(month !== undefined && { month: month + 1 }),
+          ...(day !== undefined && { day }),
+        },
+        byStore: [],
+        byEmployee: [],
+        totals: { salesAmount: 0, invoices: 0, kpis: { atv: 0, customerValue: 0 } },
+        debug: { source: 'd365', notes: [`Access token error: ${error.message}`] },
+      });
+    }
 
-    console.log('🗺️ Loading store mapping...');
-    const storeMapping = await loadStoreMapping();
-    console.log(`✅ Loaded ${storeMapping.size} store mappings`);
+    // Step 2: Load store mapping (non-critical, can proceed if fails)
+    let storeMapping: Map<string, string>;
+    try {
+      console.log('🗺️ Loading store mapping...');
+      storeMapping = await loadStoreMapping();
+      console.log(`✅ Loaded ${storeMapping.size} store mappings`);
+    } catch (error: any) {
+      console.warn('⚠️ Failed to load store mapping, using empty mapping:', error.message);
+      storeMapping = new Map();
+    }
 
-    console.log('📦 Fetching D365 transactions...');
-    const { transactions, pages } = await fetchD365Transactions(token, startDate, endDate, storeId, employeeId);
-    console.log(`✅ Fetched ${transactions.length} transactions in ${pages} pages`);
+    // Step 3: Fetch D365 transactions (with error isolation)
+    let transactions: D365Transaction[];
+    let pages: number;
+    try {
+      console.log('📦 Fetching D365 transactions...');
+      const result = await fetchD365Transactions(token, startDate, endDate, storeId, employeeId);
+      transactions = result.transactions;
+      pages = result.pages;
+      console.log(`✅ Fetched ${transactions.length} transactions in ${pages} pages`);
+    } catch (error: any) {
+      console.error('❌ Failed to fetch D365 transactions:', error.message);
+      // Return 200 with empty data instead of 500 - no data is not an error
+      return res.status(200).json({
+        success: false,
+        range: {
+          from: startDate.toISOString().split('T')[0],
+          to: endDate.toISOString().split('T')[0],
+          year,
+          ...(month !== undefined && { month: month + 1 }),
+          ...(day !== undefined && { day }),
+        },
+        byStore: [],
+        byEmployee: [],
+        totals: { salesAmount: 0, invoices: 0, kpis: { atv: 0, customerValue: 0 } },
+        debug: { source: 'd365', notes: [`D365 fetch error: ${error.message}`] },
+      });
+    }
 
     // Aggregate by store
     const storeMap = new Map<string, { salesAmount: number; invoices: number }>();
@@ -310,21 +394,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
   } catch (error: any) {
-    console.error('❌ Error in /api/sales:', error);
+    // Catch-all error handler - should never reach here with proper error handling above
+    console.error('❌ Unexpected error in /api/sales:', error);
     console.error('Error details:', {
       message: error.message,
-      stack: error.stack,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n'),
       name: error.name,
     });
+    
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const monthParam = req.query.month as string | undefined;
+    const month = monthParam !== undefined ? parseInt(monthParam) : undefined;
+    const dayParam = req.query.day as string | undefined;
+    const day = dayParam !== undefined ? parseInt(dayParam) : undefined;
+    
     const errorMessage = error.message || String(error);
-    const errorStack = error.stack || '';
-    return res.status(500).json({
+    const errorStack = error.stack?.split('\n').slice(0, 3).join(' ') || '';
+    
+    // Return 200 with error info instead of 500 - graceful degradation
+    return res.status(200).json({
       success: false,
       range: {
-        from: new Date(year, 0, 1).toISOString().split('T')[0],
-        to: new Date(year, 11, 31).toISOString().split('T')[0],
+        from: new Date(year, month || 0, day || 1).toISOString().split('T')[0],
+        to: new Date(year, month !== undefined ? month : 11, day || 31).toISOString().split('T')[0],
         year,
+        ...(month !== undefined && { month: month + 1 }),
+        ...(day !== undefined && { day }),
       },
       byStore: [],
       byEmployee: [],
@@ -332,8 +427,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       debug: { 
         source: 'd365', 
         notes: [
-          `Error: ${errorMessage}`,
-          ...(errorStack ? [`Stack: ${errorStack.split('\n').slice(0, 3).join(' ')}`] : [])
+          `Unexpected error: ${errorMessage}`,
+          ...(errorStack ? [`Stack: ${errorStack}`] : [])
         ] 
       },
     });
