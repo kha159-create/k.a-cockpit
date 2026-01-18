@@ -50,6 +50,18 @@ interface LegacyResponse {
     atv: number;
     conversion: number;
   }>;
+  byDay?: Array<{
+    date: string; // "YYYY-MM-DD"
+    byStore: Array<{
+      storeId: string;
+      storeName?: string;
+      salesAmount: number;
+      visitors: number;
+      invoices: number;
+      atv: number;
+      conversion: number;
+    }>;
+  }>;
   byEmployee: []; // ALWAYS EMPTY for legacy
   debug: {
     source: 'legacy';
@@ -244,10 +256,64 @@ export async function getLegacyMetrics(params: LegacyMetricsParams): Promise<Leg
     totals.atv = Number.isFinite(totals.atv) ? totals.atv : 0;
     totals.conversion = Number.isFinite(totals.conversion) ? totals.conversion : 0;
 
+    // Build byDay array (for daily breakdown - same as D365 pattern)
+    // Group daily data by date from the maps (key format: "YYYY-MM-DD_STORE_ID")
+    const dailyByDate = new Map<string, Map<string, {
+      salesAmount: number;
+      visitors: number;
+      invoices: number;
+    }>>();
+
+    // Process all keys from all maps to build daily breakdown
+    allKeys.forEach((key) => {
+      const [dateStr, storeIdFromKey] = key.split('_');
+      
+      if (!dailyByDate.has(dateStr)) {
+        dailyByDate.set(dateStr, new Map());
+      }
+      
+      const dayStoresMap = dailyByDate.get(dateStr)!;
+      if (!dayStoresMap.has(storeIdFromKey)) {
+        dayStoresMap.set(storeIdFromKey, { salesAmount: 0, visitors: 0, invoices: 0 });
+      }
+      
+      const dayStoreData = dayStoresMap.get(storeIdFromKey)!;
+      dayStoreData.salesAmount += salesMap.get(key) || 0;
+      dayStoreData.visitors += visitorsMap.get(key) || 0;
+      dayStoreData.invoices += transactionsMap.get(key) || 0;
+    });
+
+    // Convert to byDay array format
+    const byDay = Array.from(dailyByDate.entries()).map(([dateStr, dayStoresMap]) => {
+      const storeMeta = data.store_meta || {};
+      return {
+        date: dateStr,
+        byStore: Array.from(dayStoresMap.entries()).map(([storeId, dayData]) => {
+          const meta = storeMeta[storeId] || {};
+          const storeName = meta.store_name || meta.outlet || storeId;
+          const atv = dayData.invoices > 0 ? dayData.salesAmount / dayData.invoices : 0;
+          const conversion = dayData.visitors > 0 ? (dayData.invoices / dayData.visitors) * 100 : 0;
+          
+          return {
+            storeId,
+            storeName,
+            salesAmount: Number.isFinite(dayData.salesAmount) ? dayData.salesAmount : 0,
+            visitors: Number.isFinite(dayData.visitors) ? dayData.visitors : 0,
+            invoices: Number.isFinite(dayData.invoices) ? dayData.invoices : 0,
+            atv: Number.isFinite(atv) ? atv : 0,
+            conversion: Number.isFinite(conversion) ? conversion : 0,
+          };
+        }),
+      };
+    }).sort((a, b) => a.date.localeCompare(b.date)); // Sort by date
+
+    console.log(`📅 Built ${byDay.length} days of legacy data from ${salesEntriesCount + visitorEntriesCount + transactionEntriesCount} entries`);
+
     return {
       success: true,
       totals,
       byStore,
+      byDay, // Daily breakdown (same format as D365)
       byEmployee: [], // ALWAYS EMPTY for legacy
       debug: {
         source: 'legacy',

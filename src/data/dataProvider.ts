@@ -84,6 +84,20 @@ export async function getSalesData(params: SalesParams): Promise<NormalizedSales
           customerValue: store.atv,
         },
       })),
+      byDay: legacyResult.byDay?.map(day => ({
+        date: day.date,
+        byStore: day.byStore.map(store => ({
+          storeId: store.storeId,
+          storeName: store.storeName,
+          salesAmount: store.salesAmount,
+          invoices: store.invoices,
+          kpis: {
+            atv: store.atv,
+            conversion: store.conversion,
+            customerValue: store.atv,
+          },
+        })),
+      })),
       byEmployee: [], // ALWAYS EMPTY for legacy
       totals: {
         salesAmount: legacyResult.totals.salesAmount,
@@ -97,7 +111,7 @@ export async function getSalesData(params: SalesParams): Promise<NormalizedSales
       },
       debug: {
         source: 'legacy',
-        notes: [`Legacy data from management_data.json`, `Stores: ${legacyResult.debug.counts.stores}`],
+        notes: [`Legacy data from management_data.json`, `Stores: ${legacyResult.debug.counts.stores}`, `Daily breakdown: ${legacyResult.byDay?.length || 0} days`],
       },
     };
   } else {
