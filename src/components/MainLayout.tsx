@@ -387,11 +387,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
 
     const fetchMetricsFromAPI = async () => {
       try {
+        // Use /api/sales endpoint (replaces deleted /api/get-metrics)
         // @ts-ignore
         const API = import.meta.env.VITE_API_BASE_URL || '';
         const apiUrl = API 
-          ? `${API}/api/get-metrics?year=${year}&month=${month}`
-          : `/api/get-metrics?year=${year}&month=${month}`;
+          ? `${API}/api/sales?year=${year}&month=${month}`
+          : `/api/sales?year=${year}&month=${month}`;
         
         console.log(`🔗 Fetching metrics from API: ${apiUrl}`);
         
