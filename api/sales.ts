@@ -64,6 +64,51 @@ async function loadEmployeesData(): Promise<{ [storeId: string]: any[][] }> {
   }
 }
 
+// Load targets and visitors from orange-dashboard's management_data.json (for 2026+)
+// D365 API doesn't provide targets/visitors, so we fetch them from orange-dashboard
+interface ManagementData {
+  targets?: {
+    [year: string]: {
+      [storeId: string]: {
+        [month: string]: number; // month: "1", "2", ... "12"
+      };
+    };
+  };
+  visitors?: Array<[string, string, number]>; // ["YYYY-MM-DD", "STORE_ID", count]
+}
+
+let cachedManagementData: ManagementData | null = null;
+
+async function loadTargetsAndVisitors(): Promise<{ targets: ManagementData['targets']; visitors: ManagementData['visitors'] }> {
+  if (cachedManagementData) {
+    return {
+      targets: cachedManagementData.targets || {},
+      visitors: cachedManagementData.visitors || [],
+    };
+  }
+
+  try {
+    console.log('📥 Loading targets and visitors from orange-dashboard management_data.json...');
+    const response: Response = await fetch('https://raw.githubusercontent.com/ALAAWF2/orange-dashboard/main/management_data.json');
+    
+    if (!response.ok) {
+      console.warn('⚠️ Could not fetch management_data.json from orange-dashboard');
+      return { targets: {}, visitors: [] };
+    }
+    
+    const data: ManagementData = await response.json();
+    cachedManagementData = data;
+    console.log(`✅ Loaded targets for ${Object.keys(data.targets || {}).length} years, ${(data.visitors || []).length} visitor entries`);
+    return {
+      targets: data.targets || {},
+      visitors: data.visitors || [],
+    };
+  } catch (error: any) {
+    console.error('❌ Error loading targets/visitors from orange-dashboard:', error.message);
+    return { targets: {}, visitors: [] };
+  }
+}
+
 async function loadStoreMapping(): Promise<Map<string, string>> {
   const mapping = new Map<string, string>();
   
@@ -313,11 +358,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Step 2: Load store mapping and employees data in parallel (optimize loading time)
-    console.log('🔄 Loading store mapping and employees data in parallel...');
-    const [storeMappingResult, employeesDataResult] = await Promise.allSettled([
+    // Step 2: Load store mapping, employees data, and targets/visitors in parallel (optimize loading time)
+    console.log('🔄 Loading store mapping, employees data, and targets/visitors in parallel...');
+    const [storeMappingResult, employeesDataResult, targetsVisitorsResult] = await Promise.allSettled([
       loadStoreMapping(),
       loadEmployeesData(),
+      loadTargetsAndVisitors(),
     ]);
     
     // Extract store mapping (non-critical)
@@ -338,6 +384,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       console.warn('⚠️ Failed to load employees data, employee aggregation will be empty:', employeesDataResult.reason?.message);
       employeesData = {};
+    }
+    
+    // Extract targets and visitors (for 2026+ - D365 doesn't provide them, fetch from orange-dashboard)
+    let targets: ManagementData['targets'] = {};
+    let visitors: Array<[string, string, number]> = [];
+    if (targetsVisitorsResult.status === 'fulfilled') {
+      targets = targetsVisitorsResult.value.targets || {};
+      visitors = targetsVisitorsResult.value.visitors || [];
+      console.log(`✅ Loaded targets for ${Object.keys(targets).length} years, ${visitors.length} visitor entries`);
+    } else {
+      console.warn('⚠️ Failed to load targets/visitors from orange-dashboard, using empty data:', targetsVisitorsResult.reason?.message);
+      targets = {};
+      visitors = [];
     }
 
     // Step 3: Fetch D365 aggregated groups (server-side aggregation - MUCH faster)
@@ -421,17 +480,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     });
 
+    // Calculate monthly visitors from orange-dashboard's visitors array (filter by date range)
+    const monthlyVisitorsMap = new Map<string, number>(); // Key: storeId
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    visitors.forEach((entry) => {
+      if (!Array.isArray(entry) || entry.length < 3) return;
+      const [entryDateStr, entryStoreId, count] = entry;
+      
+      // Filter by date range
+      if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
+      if (storeId && entryStoreId !== storeId) return;
+      
+      const currentCount = monthlyVisitorsMap.get(entryStoreId) || 0;
+      monthlyVisitorsMap.set(entryStoreId, currentCount + (Number(count) || 0));
+    });
+
     // Build monthly store response (for backward compatibility and totals)
+    // Merge D365 sales data with targets/visitors from orange-dashboard
     const byStore = Array.from(monthlyStoreMap.entries()).map(([storeId, data]) => {
       const storeName = storeMapping?.get(storeId) || storeId;
       const atv = data.invoices > 0 ? data.salesAmount / data.invoices : 0;
+      
+      // Get target for this store/month from orange-dashboard
+      const yearKey = String(year);
+      const monthKey = month !== undefined ? String(month + 1) : 'all'; // month is 0-11, target uses 1-12
+      const targetValue = targets?.[yearKey]?.[storeId]?.[monthKey] || 0;
+      
+      // Get visitors for this store (monthly total from filtered visitors array)
+      const monthlyVisitors = monthlyVisitorsMap.get(storeId) || 0;
+      const conversion = monthlyVisitors > 0 ? (data.invoices / monthlyVisitors) * 100 : 0;
+      
       return {
         storeId: storeId || 'Unknown',
         storeName: storeName || storeId || 'Unknown',
         salesAmount: Number(data.salesAmount) || 0,
         invoices: Number(data.invoices) || 0,
+        visitors: monthlyVisitors, // From orange-dashboard visitors array
+        target: Number(targetValue) || 0, // From orange-dashboard targets
         kpis: {
           atv: Number.isFinite(atv) ? atv : 0,
+          conversion: Number.isFinite(conversion) ? conversion : 0,
           customerValue: Number.isFinite(atv) ? atv : 0,
         },
       };
@@ -439,10 +528,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Build daily store data (for daily breakdown in MainLayout)
     // Group by date first, then by store
-    const dailyByDate = new Map<string, Array<{ storeId: string; storeName: string; salesAmount: number; invoices: number }>>();
+    // Also calculate daily visitors from orange-dashboard's visitors array
+    const dailyVisitorsMap = new Map<string, number>(); // Key: "YYYY-MM-DD_STORE_ID"
+    visitors.forEach((entry) => {
+      if (!Array.isArray(entry) || entry.length < 3) return;
+      const [entryDateStr, entryStoreId, count] = entry;
+      
+      // Filter by date range
+      if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
+      if (storeId && entryStoreId !== storeId) return;
+      
+      const dailyKey = `${entryDateStr}_${entryStoreId}`;
+      const currentCount = dailyVisitorsMap.get(dailyKey) || 0;
+      dailyVisitorsMap.set(dailyKey, currentCount + (Number(count) || 0));
+    });
+    
+    const dailyByDate = new Map<string, Array<{ storeId: string; storeName: string; salesAmount: number; invoices: number; visitors?: number }>>();
     dailyStoreMap.forEach((data, key) => {
       const [dateStr, storeId] = key.split('_');
       const storeName = storeMapping?.get(storeId) || storeId;
+      
+      // Get daily visitors for this store/date
+      const dailyVisitors = dailyVisitorsMap.get(key) || 0;
       
       if (!dailyByDate.has(dateStr)) {
         dailyByDate.set(dateStr, []);
@@ -452,6 +559,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         storeName,
         salesAmount: Number(data.salesAmount) || 0,
         invoices: Number(data.invoices) || 0,
+        visitors: dailyVisitors, // From orange-dashboard visitors array
       });
     });
 
@@ -550,7 +658,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Calculate totals with safe defaults (optional chaining)
     const totalSales = byStore.reduce((sum, s) => sum + (Number(s?.salesAmount) || 0), 0);
     const totalInvoices = byStore.reduce((sum, s) => sum + (Number(s?.invoices) || 0), 0);
+    const totalVisitors = byStore.reduce((sum, s) => sum + (Number(s?.visitors) || 0), 0);
     const totalAtv = totalInvoices > 0 && totalInvoices !== 0 ? totalSales / totalInvoices : 0;
+    const totalConversion = totalVisitors > 0 ? (totalInvoices / totalVisitors) * 100 : 0;
 
     // Build byDay array (for daily breakdown in MainLayout)
     // Format: [{ date: "YYYY-MM-DD", byStore: [...], byEmployee: [...] }, ...]
@@ -561,13 +671,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         byStore: stores.map(store => {
           const storeName = dayStoreName.get(store.storeId) || store.storeName;
           const atv = store.invoices > 0 ? store.salesAmount / store.invoices : 0;
+          const dailyVisitors = store.visitors || 0;
+          const conversion = dailyVisitors > 0 ? (store.invoices / dailyVisitors) * 100 : 0;
           return {
             storeId: store.storeId,
             storeName: storeName || store.storeId,
             salesAmount: store.salesAmount,
             invoices: store.invoices,
+            visitors: dailyVisitors, // From orange-dashboard visitors array
             kpis: {
               atv: Number.isFinite(atv) ? atv : 0,
+              conversion: Number.isFinite(conversion) ? conversion : 0,
               customerValue: Number.isFinite(atv) ? atv : 0,
             },
           };
@@ -594,8 +708,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totals: {
         salesAmount: totalSales,
         invoices: totalInvoices,
+        visitors: totalVisitors, // Total visitors from orange-dashboard
         kpis: {
           atv: Number.isFinite(totalAtv) ? totalAtv : 0,
+          conversion: Number.isFinite(totalConversion) ? totalConversion : 0,
           customerValue: Number.isFinite(totalAtv) ? totalAtv : 0,
         },
       },
