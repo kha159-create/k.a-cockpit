@@ -334,7 +334,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         unsubscribers.forEach(unsub => unsub());
         tasksUnsubscriber();
     };
-}, [profile]);
+}, [profile, dateFilter.year]); // Add dateFilter.year to reload stores/employees when year changes
 
   // Fetch metrics from API for 2024+ (hybrid: legacy for 2024/2025, D365 for 2026+)
   useEffect(() => {
