@@ -392,11 +392,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const endDateStr = endDate.toISOString().split('T')[0]; // "2026-01-31"
     
     // Process employees_data.json entries that match the date range
-    Object.entries(employeesData).forEach(([storeId, entries]) => {
+    Object.entries(employeesData).forEach(([dataStoreId, entries]) => {
       if (!Array.isArray(entries)) return;
       
-      // Filter by storeId if specified
-      if (storeId && storeId !== storeId) return;
+      // Filter by storeId if specified (from request parameter)
+      if (storeId && dataStoreId !== storeId) return;
       
       entries.forEach((entry) => {
         if (!Array.isArray(entry) || entry.length < 4) return;
@@ -416,13 +416,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const employeeId = employeeIdMatch ? employeeIdMatch[1] : employeeName.replace(/\s+/g, '_');
         
         // Key: employeeId + storeId (same employee can work at multiple stores)
-        const key = `${employeeId}_${storeId}`;
+        const key = `${employeeId}_${dataStoreId}`;
         
         if (!employeeMap.has(key)) {
           employeeMap.set(key, {
             employeeId,
             employeeName,
-            storeId,
+            storeId: dataStoreId,
             salesAmount: 0,
             invoices: 0,
           });
