@@ -73,7 +73,9 @@ async function loadManagementData(): Promise<ManagementData> {
   loadingPromise = (async () => {
     try {
       const baseUrl = import.meta.env.BASE_URL || '/';
-      const url = `${baseUrl}data/management_data.json`;
+      // Ensure baseUrl ends with / and remove leading / from path
+      const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+      const url = `${cleanBase}data/management_data.json`;
       console.log('📥 Loading legacy data from:', url);
       
       const response: Response = await fetch(url);
