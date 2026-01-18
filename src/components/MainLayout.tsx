@@ -218,7 +218,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     const loadStoresFromAPI = async () => {
       try {
         console.log('📥 Loading stores from API (orange-dashboard)...');
-        const apiUrl = 'https://k-a-cockpit.vercel.app/api/get-stores';
+        // @ts-ignore
+        const API = import.meta.env.VITE_API_BASE_URL || '';
+        const apiUrl = API ? `${API}/api/get-stores` : '/api/get-stores';
         const response = await fetch(apiUrl);
         
         if (response.ok) {
@@ -264,7 +266,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     const loadEmployeesFromAPI = async () => {
       try {
         console.log('📥 Loading employees from API (orange-dashboard)...');
-        const apiUrl = 'https://k-a-cockpit.vercel.app/api/get-employees';
+        // @ts-ignore
+        const API = import.meta.env.VITE_API_BASE_URL || '';
+        const apiUrl = API ? `${API}/api/get-employees` : '/api/get-employees';
         const response = await fetch(apiUrl);
         
         if (response.ok) {

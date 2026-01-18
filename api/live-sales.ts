@@ -1,38 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ConfidentialClientApplication } from '@azure/msal-node';
-import admin from 'firebase-admin';
 import * as XLSX from 'xlsx';
 
-// Initialize Firebase Admin (only once)
-if (!admin.apps.length) {
-  try {
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-    if (!projectId || !clientEmail || !privateKey) {
-      console.error('❌ Missing Firebase credentials. Please set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY');
-    } else {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-      });
-      console.log('✅ Firebase Admin initialized successfully');
-    }
-  } catch (error: any) {
-    console.error('❌ Firebase Admin initialization error:', error);
-  }
-}
-
-let db: admin.firestore.Firestore | null = null;
-try {
-  db = admin.firestore();
-} catch (error: any) {
-  console.error('❌ Firestore initialization error:', error);
-}
+// NO Firestore - Pure D365 API like orange-dashboard
 
 interface D365Transaction {
   OperatingUnitNumber: string;
@@ -210,21 +180,7 @@ async function loadStoreMapping(): Promise<Map<string, string>> {
     console.log(`✅ Loaded ${mapping.size} store mappings from orange-dashboard`);
   } catch (error: any) {
     console.error('❌ Error loading store mapping from orange-dashboard:', error.message);
-    // Fallback: Try Firestore if orange-dashboard fails (for backward compatibility)
-    if (db) {
-      try {
-        const storesSnapshot = await db.collection('stores').get();
-        storesSnapshot.forEach((doc) => {
-          const data = doc.data();
-          const storeId = String(data?.store_id || data?.id || doc.id).trim();
-          const storeName = data?.name || data?.store_name || storeId;
-          mapping.set(storeId, storeName);
-        });
-        console.log(`✅ Fallback: Loaded ${mapping.size} stores from Firestore`);
-      } catch (firestoreError) {
-        console.error('❌ Firestore fallback also failed:', firestoreError);
-      }
-    }
+    // NO Firestore fallback - pure orange-dashboard approach
   }
 
   return mapping;
@@ -278,25 +234,7 @@ function prepareLiveSalesJSON(
   };
 }
 
-// Optional: Save to Firestore as backup (for historical reference)
-async function saveLiveSalesToFirestore(
-  todayData: Array<{ outlet: string; sales: number }>,
-  yesterdayData: Array<{ outlet: string; sales: number }>
-): Promise<void> {
-  if (!db) {
-    console.warn('⚠️ Firestore not initialized, skipping Firestore backup');
-    return;
-  }
-  
-  try {
-    const now = new Date();
-    const docRef = db.collection('liveSales').doc('today');
-    
-    await docRef.set({
-      date: admin.firestore.Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth(), now.getDate())),
-      lastUpdate: admin.firestore.FieldValue.serverTimestamp(),
-      lastUpdateTime: now.toTimeString().slice(0, 5), // HH:MM format
-      today: todayData,
+// NO Firestore - Pure JSON response like orange-dashboard
       yesterday: yesterdayData,
     }, { merge: true });
     console.log('✅ Saved to Firestore (backup)');
@@ -350,13 +288,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // GET requests are allowed without authentication (for client-side polling)
 
   try {
-    // Note: Firebase is optional for Live Sales (we use local JSON like dailysales)
-    // Only needed for optional Firestore backup
-    if (!db) {
-      console.warn('⚠️ Firebase not initialized - Live Sales will work but Firestore backup will be skipped');
-    }
-
-    console.log('🚀 Starting live sales sync...');
+    // NO Firestore - Pure D365 API like orange-dashboard
+    console.log('🚀 Starting live sales sync (orange-dashboard style, NO Firestore)...');
 
     // 1. Get access token
     const token = await getAccessToken();
@@ -376,11 +309,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`✅ Aggregated ${todaySales.length} stores today, ${yesterdaySales.length} stores yesterday`);
 
     // 5. Prepare JSON data (like dailysales) - for local storage
+    // NO Firestore - Pure JSON response like orange-dashboard
     const jsonData = prepareLiveSalesJSON(todaySales, yesterdaySales);
-    console.log('✅ Prepared JSON data');
-    
-    // 5b. Optional: Save to Firestore as backup (for historical reference)
-    await saveLiveSalesToFirestore(todaySales, yesterdaySales);
+    console.log('✅ Prepared JSON data (NO Firestore)');
 
     return res.status(200).json({
       success: true,

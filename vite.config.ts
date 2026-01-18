@@ -36,6 +36,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_FIREBASE_APP_ID': JSON.stringify(env.VITE_FIREBASE_APP_ID),
       'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
       'import.meta.env.VITE_VERCEL_API_URL': JSON.stringify(env.VITE_VERCEL_API_URL),
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL || ''),
       '__BUILD_ID__': JSON.stringify(Date.now().toString()) // لكسر الكاش
     },
     envPrefix: 'VITE_',
