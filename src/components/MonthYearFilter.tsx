@@ -12,7 +12,12 @@ interface MonthYearFilterProps {
 const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFilter, allData, forceRangeOnly = false }) => {
   const { t, locale } = useLocale();
   const years = useMemo(() => {
-    const yearSet = new Set<number>();
+    // Always show 2024, 2025, 2026 regardless of loaded data
+    // This ensures users can select these years even if data hasn't loaded yet
+    const hardcodedYears = [2024, 2025, 2026];
+    
+    // Also add any additional years found in data (for backward compatibility)
+    const yearSet = new Set<number>(hardcodedYears);
     allData.forEach(d => {
       // Handle both potential date property names, now as Timestamps
       const dateTimestamp = ('date' in d ? d.date : d['Bill Dt.']) as any;
@@ -24,8 +29,7 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
         }
       }
     });
-    const currentYear = new Date().getFullYear();
-    yearSet.add(currentYear);
+    
     const validYears = Array.from(yearSet).filter(y => !isNaN(y));
     const sorted = validYears.sort((a, b) => b - a);
     return forceRangeOnly ? sorted : ['all', ...sorted];

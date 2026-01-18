@@ -333,8 +333,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
           success: result.success, 
           source: result.debug?.source || 'unknown',
           byStore: result.byStore?.length || 0, 
-          byEmployee: result.byEmployee?.length || 0 
+          byEmployee: result.byEmployee?.length || 0,
+          byDay: result.byDay?.length || 0
         });
+        
+        // Debug: Log sample data to verify structure
+        if (result.success && result.byStore && result.byStore.length > 0) {
+          console.log(`📋 Fetched Data Sample (byStore[0]):`, result.byStore[0]);
+        }
+        if (result.success && result.byDay && result.byDay.length > 0) {
+          console.log(`📋 Fetched Data Sample (byDay[0]):`, result.byDay[0]);
+        }
         
         if (result.success) {
           // Convert normalized response to DailyMetric[] format for compatibility
@@ -452,7 +461,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
           
           console.log(`📊 Converted ${apiMetrics.length} metrics from ${result.debug?.source || 'hybrid'}`);
           console.log(`✅ Setting ${apiMetrics.length} metrics (${result.debug?.source || 'hybrid'})`);
-          console.log(`📋 Sample metrics:`, apiMetrics.slice(0, 3).map(m => ({ store: m.store, sales: m.totalSales, transactions: m.transactionCount })));
+          if (apiMetrics.length > 0) {
+            console.log(`📋 Sample metrics:`, apiMetrics.slice(0, 3).map(m => ({ 
+              id: m.id, 
+              store: m.store, 
+              sales: m.totalSales, 
+              transactions: m.transactionCount,
+              date: m.date?.toDate ? m.date.toDate().toISOString().split('T')[0] : m.date
+            })));
+          } else {
+            console.warn(`⚠️ No metrics converted! Result structure:`, {
+              hasByDay: !!result.byDay,
+              hasByStore: !!result.byStore,
+              hasByEmployee: !!result.byEmployee,
+              byDayLength: result.byDay?.length || 0,
+              byStoreLength: result.byStore?.length || 0,
+            });
+          }
           setDailyMetrics(apiMetrics);
         } else {
           console.warn('⚠️ Hybrid provider returned error:', result);
