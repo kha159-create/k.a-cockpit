@@ -8,6 +8,7 @@ import { useDataProcessing } from '@/hooks/useDataProcessing';
 import { useSmartUploader } from '@/hooks/useSmartUploader';
 import { useLocale } from '@/context/LocaleContext';
 import { getSalesData, getStores } from '@/data/dataProvider';
+import { apiUrl } from '@/utils/apiBase';
 
 import Dashboard from '@/pages/Dashboard';
 import StoresPage from '@/pages/StoresPage';
@@ -249,10 +250,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         }
         
         // For 2026+, load from API
-        // @ts-ignore
-        const API = import.meta.env.VITE_API_BASE_URL || '';
-        const apiUrl = API ? `${API}/api/get-employees` : '/api/get-employees';
-        const response = await fetch(apiUrl);
+        const url = apiUrl('/api/get-employees');
+        const response = await fetch(url);
         
         if (response.ok) {
           const result = await response.json();
