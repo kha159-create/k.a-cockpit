@@ -336,22 +336,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     };
 }, [profile]);
 
-  // Fetch metrics from API for 2026+ (new system, like orange-dashboard)
+  // Fetch metrics from API for 2024+ (hybrid: legacy for 2024/2025, D365 for 2026+)
   useEffect(() => {
     if (!profile) return;
     
     const year = typeof dateFilter.year === 'number' ? dateFilter.year : new Date().getFullYear();
-    const month = typeof dateFilter.month === 'number' ? dateFilter.month : new Date().getMonth();
+    const month = typeof dateFilter.month === 'number' ? dateFilter.month : (dateFilter.month === 'all' ? undefined : new Date().getMonth());
     
     // Fetch from API for 2024+ (like orange-dashboard)
     // Firestore only for old data (< 2024) or as fallback
-    if (year < 2024) {
+    if (typeof year !== 'number' || year < 2024) {
+      console.log(`⚠️ Skipping API fetch: year=${year} (< 2024 or invalid)`);
       return;
     }
 
     const fetchMetricsHybrid = async () => {
       try {
-        console.log(`📊 Fetching metrics for year ${year} (${year <= 2025 ? 'legacy' : 'D365'})...`);
+        console.log(`📊 Fetching metrics for year ${year}, month ${month !== undefined ? month : 'all'} (${year <= 2025 ? 'legacy' : 'D365'})...`);
         
         const result = await getSalesData({ year, month });
         
@@ -421,6 +422,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
           
           console.log(`📊 Converted ${apiMetrics.length} metrics from ${result.debug?.source || 'hybrid'}`);
           console.log(`✅ Setting ${apiMetrics.length} metrics (${result.debug?.source || 'hybrid'})`);
+          console.log(`📋 Sample metrics:`, apiMetrics.slice(0, 3).map(m => ({ store: m.store, sales: m.totalSales, transactions: m.transactionCount })));
           setDailyMetrics(apiMetrics);
         } else {
           console.warn('⚠️ Hybrid provider returned error:', result);
