@@ -74,6 +74,51 @@ let cachedData: ManagementData | null = null;
 let loadingPromise: Promise<ManagementData> | null = null;
 let cachedStoreMapping: Map<string, string> | null = null;
 
+// Load targets and visitors from orange-dashboard's management_data.json (for 2024/2025)
+// This ensures consistency across all years (2024, 2025, 2026)
+interface OrangeDashboardManagementData {
+  targets?: {
+    [year: string]: {
+      [storeId: string]: {
+        [month: string]: number; // month: "1", "2", ... "12"
+      };
+    };
+  };
+  visitors?: Array<[string, string, number]>; // ["YYYY-MM-DD", "STORE_ID", count]
+}
+
+let cachedOrangeDashboardData: OrangeDashboardManagementData | null = null;
+
+async function loadTargetsAndVisitorsFromOrangeDashboard(): Promise<{ targets: OrangeDashboardManagementData['targets']; visitors: OrangeDashboardManagementData['visitors'] }> {
+  if (cachedOrangeDashboardData) {
+    return {
+      targets: cachedOrangeDashboardData.targets || {},
+      visitors: cachedOrangeDashboardData.visitors || [],
+    };
+  }
+
+  try {
+    console.log('📥 Loading targets and visitors from orange-dashboard management_data.json (for 2024/2025)...');
+    const response: Response = await fetch('https://raw.githubusercontent.com/ALAAWF2/orange-dashboard/main/management_data.json');
+    
+    if (!response.ok) {
+      console.warn('⚠️ Could not fetch management_data.json from orange-dashboard');
+      return { targets: {}, visitors: [] };
+    }
+    
+    const data: OrangeDashboardManagementData = await response.json();
+    cachedOrangeDashboardData = data;
+    console.log(`✅ Loaded targets for ${Object.keys(data.targets || {}).length} years, ${(data.visitors || []).length} visitor entries from orange-dashboard`);
+    return {
+      targets: data.targets || {},
+      visitors: data.visitors || [],
+    };
+  } catch (error: any) {
+    console.error('❌ Error loading targets/visitors from orange-dashboard:', error.message);
+    return { targets: {}, visitors: [] };
+  }
+}
+
 // Load store mapping from orange-dashboard (same as api/get-stores.ts)
 // This maps OperatingUnitNumber (storeId) to store names
 async function loadStoreMapping(): Promise<Map<string, string>> {
@@ -179,11 +224,16 @@ export async function getLegacyMetrics(params: LegacyMetricsParams): Promise<Leg
   ));
 
   try {
-    // Load data and store mapping in parallel
-    const [data, storeMapping] = await Promise.all([
+    // Load data, store mapping, and targets/visitors from orange-dashboard in parallel
+    const [data, storeMapping, targetsVisitors] = await Promise.all([
       loadManagementData(),
       loadStoreMapping(),
+      loadTargetsAndVisitorsFromOrangeDashboard(),
     ]);
+    
+    // Extract targets and visitors from orange-dashboard (ensures consistency with 2026+)
+    const targets = targetsVisitors.targets || {};
+    const orangeDashboardVisitors = targetsVisitors.visitors || [];
 
     // Build Maps for fast lookup
     const salesMap = new Map<string, number>(); // key: "YYYY-MM-DD_STORE_ID"
@@ -273,7 +323,26 @@ export async function getLegacyMetrics(params: LegacyMetricsParams): Promise<Leg
       agg.invoices += transactionsMap.get(key) || 0;
     });
 
+    // Merge visitors from orange-dashboard with local data (prefer orange-dashboard for consistency)
+    // Calculate monthly visitors from orange-dashboard's visitors array (filter by date range)
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    const monthlyVisitorsFromOrange = new Map<string, number>(); // Key: storeId
+    
+    orangeDashboardVisitors.forEach((entry) => {
+      if (!Array.isArray(entry) || entry.length < 3) return;
+      const [entryDateStr, entryStoreId, count] = entry;
+      
+      // Filter by date range
+      if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
+      if (storeId && entryStoreId !== storeId) return;
+      
+      const currentCount = monthlyVisitorsFromOrange.get(entryStoreId) || 0;
+      monthlyVisitorsFromOrange.set(entryStoreId, currentCount + (Number(count) || 0));
+    });
+
     // Build byStore array using store mapping (from orange-dashboard)
+    // Merge local sales with targets & visitors from orange-dashboard (ensures consistency with 2026+)
     const storeMeta = data.store_meta || {};
     const byStore = Array.from(storeAggregates.entries()).map(([storeId, agg]) => {
       // Priority: storeMapping (from orange-dashboard API) > store_meta > storeId
@@ -281,16 +350,25 @@ export async function getLegacyMetrics(params: LegacyMetricsParams): Promise<Leg
       const meta = storeMeta[storeId] || {};
       const storeName = mappedName || meta.store_name || meta.outlet || storeId;
       
+      // Get target for this store/month from orange-dashboard (same as 2026+)
+      const yearKey = String(year);
+      const monthKey = month !== undefined ? String(month + 1) : 'all'; // month is 0-11, target uses 1-12
+      const targetValue = targets?.[yearKey]?.[storeId]?.[monthKey] || 0;
+      
+      // Use visitors from orange-dashboard (if available), otherwise fall back to local data
+      const monthlyVisitors = monthlyVisitorsFromOrange.get(storeId) || agg.visitors || 0;
+      
       // Calculate KPIs (prevent NaN/Infinity)
       const atv = agg.invoices > 0 ? agg.salesAmount / agg.invoices : 0;
-      const conversion = agg.visitors > 0 ? (agg.invoices / agg.visitors) * 100 : 0;
+      const conversion = monthlyVisitors > 0 ? (agg.invoices / monthlyVisitors) * 100 : 0;
       
       return {
         storeId,
         storeName,
         salesAmount: Number.isFinite(agg.salesAmount) ? agg.salesAmount : 0,
-        visitors: Number.isFinite(agg.visitors) ? agg.visitors : 0,
+        visitors: Number.isFinite(monthlyVisitors) ? monthlyVisitors : 0, // From orange-dashboard
         invoices: Number.isFinite(agg.invoices) ? agg.invoices : 0,
+        target: Number(targetValue) || 0, // From orange-dashboard targets
         atv: Number.isFinite(atv) ? atv : 0,
         conversion: Number.isFinite(conversion) ? conversion : 0,
       };
@@ -345,7 +423,23 @@ export async function getLegacyMetrics(params: LegacyMetricsParams): Promise<Leg
       dayStoreData.invoices += transactionsMap.get(key) || 0;
     });
 
+    // Calculate daily visitors from orange-dashboard's visitors array (for daily breakdown)
+    const dailyVisitorsFromOrange = new Map<string, number>(); // Key: "YYYY-MM-DD_STORE_ID"
+    orangeDashboardVisitors.forEach((entry) => {
+      if (!Array.isArray(entry) || entry.length < 3) return;
+      const [entryDateStr, entryStoreId, count] = entry;
+      
+      // Filter by date range
+      if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
+      if (storeId && entryStoreId !== storeId) return;
+      
+      const dailyKey = `${entryDateStr}_${entryStoreId}`;
+      const currentCount = dailyVisitorsFromOrange.get(dailyKey) || 0;
+      dailyVisitorsFromOrange.set(dailyKey, currentCount + (Number(count) || 0));
+    });
+
     // Convert to byDay array format using store mapping (from orange-dashboard)
+    // Merge daily visitors from orange-dashboard with local data
     const byDay = Array.from(dailyByDate.entries()).map(([dateStr, dayStoresMap]) => {
       const storeMeta = data.store_meta || {};
       return {
@@ -355,14 +449,19 @@ export async function getLegacyMetrics(params: LegacyMetricsParams): Promise<Leg
           const mappedName = storeMapping.get(storeId);
           const meta = storeMeta[storeId] || {};
           const storeName = mappedName || meta.store_name || meta.outlet || storeId;
+          
+          // Use visitors from orange-dashboard (if available), otherwise fall back to local data
+          const dailyKey = `${dateStr}_${storeId}`;
+          const dailyVisitors = dailyVisitorsFromOrange.get(dailyKey) || dayData.visitors || 0;
+          
           const atv = dayData.invoices > 0 ? dayData.salesAmount / dayData.invoices : 0;
-          const conversion = dayData.visitors > 0 ? (dayData.invoices / dayData.visitors) * 100 : 0;
+          const conversion = dailyVisitors > 0 ? (dayData.invoices / dailyVisitors) * 100 : 0;
           
           return {
             storeId,
             storeName,
             salesAmount: Number.isFinite(dayData.salesAmount) ? dayData.salesAmount : 0,
-            visitors: Number.isFinite(dayData.visitors) ? dayData.visitors : 0,
+            visitors: Number.isFinite(dailyVisitors) ? dailyVisitors : 0, // From orange-dashboard
             invoices: Number.isFinite(dayData.invoices) ? dayData.invoices : 0,
             atv: Number.isFinite(atv) ? atv : 0,
             conversion: Number.isFinite(conversion) ? conversion : 0,
