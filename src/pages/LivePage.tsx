@@ -165,7 +165,10 @@ const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
   }
 
   // Get available area managers (for admin/general_manager only)
-  const showAreaManagerFilter = profile?.role === 'admin' || profile?.role === 'general_manager';
+  const showAreaManagerFilter = useMemo(() => {
+    return profile?.role === 'admin' || profile?.role === 'general_manager';
+  }, [profile?.role]);
+  
   const availableAreaManagers = useMemo(() => {
     if (!showAreaManagerFilter) return [];
     const managers = new Set(stores.map(s => s.areaManager).filter(Boolean));
