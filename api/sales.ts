@@ -153,8 +153,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const storeId = req.query.storeId as string | undefined;
     const employeeId = req.query.employeeId as string | undefined;
 
+    console.log(`📊 /api/sales request: year=${year}, month=${month}, day=${day}, storeId=${storeId}, employeeId=${employeeId}`);
+
     // Only support 2026+ (legacy handled in frontend)
     if (year < 2026) {
+      console.log(`✅ Year ${year} < 2026, returning empty response (legacy handled in frontend)`);
       return res.status(200).json({
         success: true,
         range: {
@@ -177,9 +180,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       23, 59, 59
     ));
 
+    console.log(`📅 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+    console.log('🔐 Getting access token...');
     const token = await getAccessToken();
+    console.log('✅ Access token obtained');
+
+    console.log('🗺️ Loading store mapping...');
     const storeMapping = await loadStoreMapping();
+    console.log(`✅ Loaded ${storeMapping.size} store mappings`);
+
+    console.log('📦 Fetching D365 transactions...');
     const { transactions, pages } = await fetchD365Transactions(token, startDate, endDate, storeId, employeeId);
+    console.log(`✅ Fetched ${transactions.length} transactions in ${pages} pages`);
 
     // Aggregate by store
     const storeMap = new Map<string, { salesAmount: number; invoices: number }>();
@@ -270,7 +283,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error: any) {
     console.error('❌ Error in /api/sales:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const errorMessage = error.message || String(error);
+    const errorStack = error.stack || '';
     return res.status(500).json({
       success: false,
       range: {
@@ -281,7 +301,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       byStore: [],
       byEmployee: [],
       totals: { salesAmount: 0, invoices: 0, kpis: { atv: 0, customerValue: 0 } },
-      debug: { source: 'd365', notes: [`Error: ${error.message}`] },
+      debug: { 
+        source: 'd365', 
+        notes: [
+          `Error: ${errorMessage}`,
+          ...(errorStack ? [`Stack: ${errorStack.split('\n').slice(0, 3).join(' ')}`] : [])
+        ] 
+      },
     });
   }
 }
