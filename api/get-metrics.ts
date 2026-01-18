@@ -323,18 +323,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    console.log(`📊 Fetching metrics for ${year}-${month + 1}`);
+    console.log(`📊 Fetching metrics for ${year}-${month + 1} from orange-dashboard...`);
 
     // Load store mapping
     const storeMapping = await loadStoreMapping();
+    console.log(`✅ Loaded ${storeMapping.size} store mappings`);
 
     // PRIMARY METHOD: Use employees_data.json from orange-dashboard (same structure)
     // This ensures we get employee-level data exactly as orange-dashboard provides it
     const employeesData = await loadEmployeesData();
+    console.log(`✅ Loaded employees_data.json with ${Object.keys(employeesData).length} stores`);
+    
     let metrics: any[] = [];
 
     if (Object.keys(employeesData).length > 0) {
       // Use employees_data.json (primary method - same as orange-dashboard)
+      console.log(`✅ Using employees_data.json for metrics (${year}-${month + 1})`);
       metrics = transformEmployeesDataToMetrics(employeesData, storeMapping, year, month);
       console.log(`✅ Transformed ${metrics.length} metrics from employees_data.json`);
     } else {

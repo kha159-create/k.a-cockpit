@@ -368,26 +368,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                 return [...firestoreMetrics, ...apiMetrics];
             });
             
-            if (unsubscribers.length > 0 && loadedCount < collectionKeys.length) {
-                loadedCount++;
-                if (loadedCount === collectionKeys.length) {
-                    setDataLoading(false);
-                }
-            }
-        },
-        (err) => {
-            console.error('Error fetching dailyMetrics:', err);
-            if (unsubscribers.length > 0 && loadedCount < collectionKeys.length) {
-                loadedCount++;
-                if (loadedCount === collectionKeys.length) {
-                    setDataLoading(false);
-                }
-            }
-        }
-    );
-    
-    // Add dailyMetrics unsubscriber to cleanup
-    unsubscribers.push(dailyMetricsUnsubscriber);
+    // NO Firestore listener for dailyMetrics - ALL data from API (orange-dashboard)
+    // Firestore is completely removed for new data (2024+)
+    // Only use API (like orange-dashboard - local JSON)
+    console.log('📊 DailyMetrics: Using API only (orange-dashboard) - NO Firestore');
     
     let tasksUnsubscriber: () => void = () => {};
     if (profile?.employeeId) {
