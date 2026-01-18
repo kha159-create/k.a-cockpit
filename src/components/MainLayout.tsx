@@ -7,6 +7,7 @@ import firebase from 'firebase/app';
 import { useDataProcessing } from '@/hooks/useDataProcessing';
 import { useSmartUploader } from '@/hooks/useSmartUploader';
 import { useLocale } from '@/context/LocaleContext';
+import { useData } from '@/context/DataProvider';
 import { getSalesData, getStores } from '@/data/dataProvider';
 import { apiUrl } from '@/utils/apiBase';
 
@@ -181,6 +182,7 @@ interface MainLayoutProps {
 
 const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   const { t, locale, setLocale } = useLocale();
+  const { allSalesData, loading: dataPreloading } = useData(); // Get preloaded data from DataProvider
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
@@ -309,15 +311,173 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     };
 }, [profile, dateFilter.year]); // Add dateFilter.year to reload stores/employees when year changes
 
-  // Fetch metrics from API for 2024+ (hybrid: legacy for 2024/2025, D365 for 2026+)
+  // Convert preloaded NormalizedSalesResponse to DailyMetric[] format (like orange-dashboard)
+  // This reads from allSalesData (preloaded at startup) and filters by month locally
+  const dailyMetricsFromPreloaded = useMemo(() => {
+    if (!profile || dataPreloading || !allSalesData) {
+      return [];
+    }
+    
+    const year = typeof dateFilter.year === 'number' ? dateFilter.year : new Date().getFullYear();
+    const month = typeof dateFilter.month === 'number' ? dateFilter.month : (dateFilter.month === 'all' ? undefined : new Date().getMonth());
+    
+    if (typeof year !== 'number' || year < 2024 || year > 2026) {
+      return [];
+    }
+    
+    // Get preloaded data for this year (already loaded at startup)
+    const result = allSalesData[year];
+    if (!result || !result.success) {
+      console.warn(`⚠️ No preloaded data for year ${year}`);
+      return [];
+    }
+    
+    // Build mapping: storeId -> storeName from current stores list (for proper matching)
+    const storeNameMap = new Map<string, string>();
+    stores.forEach(s => {
+      const storeId = (s as any).store_id || s.id || s.name;
+      storeNameMap.set(storeId, s.name);
+    });
+    
+    const apiMetrics: DailyMetric[] = [];
+    
+    // Filter byDay by month (client-side filtering - no API call)
+    if (Array.isArray(result.byDay) && result.byDay.length > 0) {
+      result.byDay.forEach((dayData: any) => {
+        const dateStr = dayData.date; // "YYYY-MM-DD"
+        const dateObj = new Date(dateStr + 'T00:00:00Z');
+        
+        // Filter by month if specified
+        if (month !== undefined && dateObj.getUTCMonth() !== month) {
+          return; // Skip days outside the selected month
+        }
+        
+        // Add store-level metrics for this day
+        if (Array.isArray(dayData.byStore)) {
+          dayData.byStore.forEach((store: any) => {
+            const storeId = store.storeId || store.storeName;
+            const storeName = storeNameMap.get(storeId) || store.storeName || storeId;
+            
+            // Check if this store has employee metrics for this day
+            const hasEmployees = apiMetrics.some(m => 
+              m.store === storeName && 
+              m.date && 
+              m.date.toDate().toISOString().split('T')[0] === dateStr &&
+              m.employee
+            );
+            
+            // Only add store-level if no employee-level exists for this day+store
+            if (!hasEmployees || year <= 2025) {
+              const id = `${dateStr}_${storeName}`;
+              apiMetrics.push({
+                id,
+                date: firebase.firestore.Timestamp.fromDate(dateObj),
+                store: storeName,
+                totalSales: store.salesAmount || 0,
+                transactionCount: store.invoices || 0,
+                visitors: store.visitors,
+              });
+            }
+          });
+        }
+      });
+      
+      // Add employee-level metrics from monthly byEmployee (employees_data.json doesn't have daily breakdown)
+      // Use first day of month as date for employee metrics (they're monthly totals)
+      if (Array.isArray(result.byEmployee) && result.byEmployee.length > 0) {
+        const firstDayStr = result.range?.from || new Date().toISOString().split('T')[0];
+        const firstDayObj = new Date(firstDayStr + 'T00:00:00Z');
+        
+        // Filter by month if specified
+        if (month === undefined || firstDayObj.getUTCMonth() === month) {
+          result.byEmployee.forEach((emp: any) => {
+            const storeId = emp.storeId || emp.storeName;
+            const storeName = storeNameMap.get(storeId) || emp.storeName || storeId;
+            const id = `${firstDayStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
+            apiMetrics.push({
+              id,
+              date: firebase.firestore.Timestamp.fromDate(firstDayObj),
+              store: storeName,
+              employee: emp.employeeName,
+              employeeId: emp.employeeId,
+              totalSales: emp.salesAmount || 0,
+              transactionCount: emp.invoices || 0,
+            });
+          });
+        }
+      }
+    } else {
+      // Fallback: Monthly aggregation (legacy or when byDay not available)
+      const dateStr = result.range?.from || new Date().toISOString().split('T')[0];
+      const dateObj = new Date(dateStr + 'T00:00:00Z');
+      
+      // Filter by month if specified
+      if (month === undefined || dateObj.getUTCMonth() === month) {
+        // Add employee-level metrics (byEmployee from API/D365, empty for legacy)
+        if (Array.isArray(result.byEmployee)) {
+          result.byEmployee.forEach((emp: any) => {
+            const storeId = emp.storeId || emp.storeName;
+            const storeName = storeNameMap.get(storeId) || emp.storeName || storeId;
+            const id = `${dateStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
+            apiMetrics.push({
+              id,
+              date: firebase.firestore.Timestamp.fromDate(dateObj),
+              store: storeName,
+              employee: emp.employeeName,
+              employeeId: emp.employeeId,
+              totalSales: emp.salesAmount || 0,
+              transactionCount: emp.invoices || 0,
+            });
+          });
+        }
+        
+        // Add store-level metrics (byStore from legacy or D365)
+        if (Array.isArray(result.byStore)) {
+          result.byStore.forEach((store: any) => {
+            const storeId = store.storeId || store.storeName;
+            const storeName = storeNameMap.get(storeId) || store.storeName || storeId;
+            
+            const hasEmployees = apiMetrics.some(m => m.store === storeName);
+            if (!hasEmployees || year <= 2025) {
+              const id = `${dateStr}_${storeName}`;
+              apiMetrics.push({
+                id,
+                date: firebase.firestore.Timestamp.fromDate(dateObj),
+                store: storeName,
+                totalSales: store.salesAmount || 0,
+                transactionCount: store.invoices || 0,
+                visitors: store.visitors,
+              });
+            }
+          });
+        }
+      }
+    }
+    
+    console.log(`📊 Converted ${apiMetrics.length} metrics from preloaded data for year ${year} (${month !== undefined ? `month ${month + 1}` : 'all months'})`);
+    return apiMetrics;
+  }, [profile, allSalesData, dataPreloading, dateFilter.year, dateFilter.month, stores]);
+
+  // Use preloaded data instead of fetching (like orange-dashboard)
+  useEffect(() => {
+    if (!profile || dataPreloading) {
+      return;
+    }
+    
+    // Update dailyMetrics from preloaded data (client-side filtering only)
+    setDailyMetrics(dailyMetricsFromPreloaded);
+  }, [profile, dataPreloading, dailyMetricsFromPreloaded]);
+
+  // OLD: Fetch metrics from API (DISABLED - now using preloaded data from DataProvider)
+  // Data is now loaded at startup via DataProvider and filtered client-side (like orange-dashboard)
+  // This useEffect is disabled to prevent redundant API calls
+  /*
   useEffect(() => {
     if (!profile) return;
     
     const year = typeof dateFilter.year === 'number' ? dateFilter.year : new Date().getFullYear();
     const month = typeof dateFilter.month === 'number' ? dateFilter.month : (dateFilter.month === 'all' ? undefined : new Date().getMonth());
     
-    // Fetch from API for 2024+ (like orange-dashboard)
-    // Firestore only for old data (< 2024) or as fallback
     if (typeof year !== 'number' || year < 2024) {
       console.log(`⚠️ Skipping API fetch: year=${year} (< 2024 or invalid)`);
       return;
@@ -491,6 +651,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
 
     fetchMetricsHybrid();
   }, [profile, dateFilter.year, dateFilter.month, stores]); // Add stores dependency for proper store name mapping
+  */
 
   useEffect(() => {
     if (profile?.role !== 'admin' && profile?.role !== 'general_manager') {
