@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { db, auth } from '@/services/firebase';
+import { auth } from '@/services/firebase';
+import { getStores } from '@/data/dataProvider';
+import { apiUrl } from '@/utils/apiBase';
 
 type MapRec = Record<string, string>;
 
@@ -42,75 +44,83 @@ export const DirectoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     let cancelled = false;
-    let unsubStores: (() => void) | null = null;
-    let unsubEmployees: (() => void) | null = null;
 
-    const startListeners = () => {
-      setLoading(true);
-      unsubStores = db.collection('stores').onSnapshot(
-        (snap) => {
-          const sMap: MapRec = {};
-          snap.docs.map((doc) => {
-            const data = doc.data();
-            const key = String(data?.store_id ?? data?.id ?? doc.id).trim();
-            sMap[key] = pickStoreName(data, key);
-            return null;
-          });
-          if (!cancelled) setStoreMap(sMap);
-          if (!cancelled) setLoading(false);
-        },
-        (err) => {
-          console.error('DirectoryProvider stores listener error:', err);
-          if (!cancelled) setError(err?.message || 'Missing or insufficient permissions');
-          if (!cancelled) setLoading(false);
-        }
-      );
-
-      unsubEmployees = db.collection('employees').onSnapshot(
-        (snap) => {
-          const eMap: MapRec = {};
-          snap.docs.map((doc) => {
-            const data = doc.data();
-            const key = String(data?.employee_id ?? data?.id ?? doc.id).trim();
-            eMap[key] = pickEmployeeName(data, key);
-            return null;
-          });
-          if (!cancelled) setEmployeeMap(eMap);
-          if (!cancelled) setLoading(false);
-        },
-        (err) => {
-          console.error('DirectoryProvider employees listener error:', err);
-          if (!cancelled) setError(err?.message || 'Missing or insufficient permissions');
-          if (!cancelled) setLoading(false);
-        }
-      );
+    const loadStores = async () => {
+      try {
+        setLoading(true);
+        // Get current year for stores (or use 2026 as default for D365)
+        const currentYear = new Date().getFullYear();
+        const storesList = await getStores(currentYear);
+        
+        if (cancelled) return;
+        
+        const sMap: MapRec = {};
+        storesList.forEach((store) => {
+          const key = String((store as any).store_id ?? store.id ?? store.name).trim();
+          sMap[key] = pickStoreName(store, key);
+        });
+        
+        setStoreMap(sMap);
+        console.log(`✅ DirectoryProvider: Loaded ${Object.keys(sMap).length} stores`);
+      } catch (err: any) {
+        console.error('❌ DirectoryProvider stores load error:', err);
+        if (!cancelled) setError(err?.message || 'Failed to load stores');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
 
-    const stopListeners = () => {
-      if (unsubStores) unsubStores();
-      if (unsubEmployees) unsubEmployees();
-      unsubStores = null;
-      unsubEmployees = null;
-      if (!cancelled) {
-        setStoreMap({});
-        setEmployeeMap({});
+    const loadEmployees = async () => {
+      try {
+        // Load employees from API (2026+ only)
+        const currentYear = new Date().getFullYear();
+        if (currentYear <= 2025) {
+          // Legacy years have no employee data
+          if (!cancelled) setEmployeeMap({});
+          return;
+        }
+        
+        const url = apiUrl('/api/get-employees');
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          if (!cancelled) setEmployeeMap({});
+          return;
+        }
+        
+        const result: any = await response.json();
+        if (cancelled) return;
+        
+        const eMap: MapRec = {};
+        if (result.success && Array.isArray(result.employees)) {
+          result.employees.forEach((emp: any) => {
+            const key = String(emp.employeeId ?? emp.id ?? emp.name).trim();
+            eMap[key] = pickEmployeeName(emp, key);
+          });
+        }
+        
+        setEmployeeMap(eMap);
+        console.log(`✅ DirectoryProvider: Loaded ${Object.keys(eMap).length} employees`);
+      } catch (err: any) {
+        console.error('❌ DirectoryProvider employees load error:', err);
+        if (!cancelled) setEmployeeMap({});
       }
     };
 
     const unsubAuth = auth.onAuthStateChanged((user) => {
       if (cancelled) return;
       if (user) {
-        startListeners();
+        loadStores();
+        loadEmployees();
       } else {
-        stopListeners();
+        setStoreMap({});
+        setEmployeeMap({});
         setLoading(false);
       }
     });
 
     return () => {
       cancelled = true;
-      stopListeners();
-      unsubAuth();
     };
   }, []);
 

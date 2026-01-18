@@ -42,11 +42,16 @@ const StoresPage: React.FC<StoresPageProps> = ({
   const canAddVisitors = ['admin', 'general_manager', 'area_manager', 'store_manager'].includes(profile?.role || '');
 
   const columns: Column<StoreSummary>[] = [
-    { key: 'name', label: t('store'), sortable: true, render: (_value, record) => (
-      <span onClick={() => onSelectStore(record)} className="cursor-pointer font-medium text-blue-600 hover:underline">
-        <StoreName id={(record as any).store_id ?? (record as any).id ?? record.name} fallback={record.name} />
-      </span>
-    ) },
+    { key: 'name', label: t('store'), sortable: true, render: (_value, record) => {
+      // Use store.name directly (it should already be the correct name from stores list)
+      // StoreName component is a fallback, but record.name should already be correct
+      const displayName = record.name || (record as any).store_name || (record as any).store_id || (record as any).id || 'Unknown';
+      return (
+        <span onClick={() => onSelectStore(record)} className="cursor-pointer font-medium text-blue-600 hover:underline">
+          <StoreName id={(record as any).store_id ?? (record as any).id ?? record.name} fallback={displayName} />
+        </span>
+      );
+    } },
     { key: 'totalSales', label: t('total_sales'), sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'effectiveTarget', label: t('sales_target'), sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
     { key: 'targetAchievement', label: t('achievement'), sortable: true, render: (_value, record) => <AchievementBar percentage={record.targetAchievement ?? 0} /> },
