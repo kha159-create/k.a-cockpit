@@ -101,6 +101,8 @@ async function fetchD365Transactions(
 
   const selectFields = 'OperatingUnitNumber,PaymentAmount,TransactionDate,StaffId,StaffName';
   const queryUrl = `${baseUrl}?$filter=${encodeURIComponent(filter)}&$select=${selectFields}&$orderby=TransactionDate`;
+  
+  console.log(`🔍 D365 query URL: ${queryUrl.substring(0, 200)}...`);
 
   const allTransactions: D365Transaction[] = [];
   let nextLink: string | null = queryUrl;
@@ -122,6 +124,16 @@ async function fetchD365Transactions(
     }
 
     const data: any = await response.json();
+    
+    if (!data) {
+      throw new Error('D365 API returned empty response');
+    }
+    
+    if (!Array.isArray(data.value)) {
+      console.error('❌ D365 response format error:', { hasValue: 'value' in data, dataKeys: Object.keys(data) });
+      throw new Error(`D365 API returned invalid response format. Expected 'value' array, got: ${JSON.stringify(Object.keys(data))}`);
+    }
+    
     allTransactions.push(...(data.value || []));
     nextLink = data['@odata.nextLink'] || null;
   }
