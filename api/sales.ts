@@ -358,12 +358,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Step 2: Load store mapping, employees data, and targets/visitors in parallel (optimize loading time)
-    console.log('🔄 Loading store mapping, employees data, and targets/visitors in parallel...');
-    const [storeMappingResult, employeesDataResult, targetsVisitorsResult] = await Promise.allSettled([
+    // Step 2: Load store mapping and employees data in parallel (targets/visitors moved to frontend to reduce API load)
+    console.log('🔄 Loading store mapping and employees data in parallel...');
+    const [storeMappingResult, employeesDataResult] = await Promise.allSettled([
       loadStoreMapping(),
       loadEmployeesData(),
-      loadTargetsAndVisitors(),
     ]);
     
     // Extract store mapping (non-critical)
@@ -384,19 +383,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       console.warn('⚠️ Failed to load employees data, employee aggregation will be empty:', employeesDataResult.reason?.message);
       employeesData = {};
-    }
-    
-    // Extract targets and visitors (for 2026+ - D365 doesn't provide them, fetch from orange-dashboard)
-    let targets: ManagementData['targets'] = {};
-    let visitors: Array<[string, string, number]> = [];
-    if (targetsVisitorsResult.status === 'fulfilled') {
-      targets = targetsVisitorsResult.value.targets || {};
-      visitors = targetsVisitorsResult.value.visitors || [];
-      console.log(`✅ Loaded targets for ${Object.keys(targets).length} years, ${visitors.length} visitor entries`);
-    } else {
-      console.warn('⚠️ Failed to load targets/visitors from orange-dashboard, using empty data:', targetsVisitorsResult.reason?.message);
-      targets = {};
-      visitors = [];
     }
 
     // Step 3: Fetch D365 aggregated groups (server-side aggregation - MUCH faster)
@@ -480,47 +466,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     });
 
-    // Calculate monthly visitors from orange-dashboard's visitors array (filter by date range)
-    const monthlyVisitorsMap = new Map<string, number>(); // Key: storeId
+    // Build monthly store response (for backward compatibility and totals)
+    // Targets & Visitors moved to frontend to reduce API workload
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
-    visitors.forEach((entry) => {
-      if (!Array.isArray(entry) || entry.length < 3) return;
-      const [entryDateStr, entryStoreId, count] = entry;
-      
-      // Filter by date range
-      if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
-      if (storeId && entryStoreId !== storeId) return;
-      
-      const currentCount = monthlyVisitorsMap.get(entryStoreId) || 0;
-      monthlyVisitorsMap.set(entryStoreId, currentCount + (Number(count) || 0));
-    });
-
-    // Build monthly store response (for backward compatibility and totals)
-    // Merge D365 sales data with targets/visitors from orange-dashboard
     const byStore = Array.from(monthlyStoreMap.entries()).map(([storeId, data]) => {
       const storeName = storeMapping?.get(storeId) || storeId;
       const atv = data.invoices > 0 ? data.salesAmount / data.invoices : 0;
       
-      // Get target for this store/month from orange-dashboard
-      const yearKey = String(year);
-      const monthKey = month !== undefined ? String(month + 1) : 'all'; // month is 0-11, target uses 1-12
-      const targetValue = targets?.[yearKey]?.[storeId]?.[monthKey] || 0;
-      
-      // Get visitors for this store (monthly total from filtered visitors array)
-      const monthlyVisitors = monthlyVisitorsMap.get(storeId) || 0;
-      const conversion = monthlyVisitors > 0 ? (data.invoices / monthlyVisitors) * 100 : 0;
-      
+      // Targets & Visitors will be merged on the frontend (reduces API processing time)
       return {
         storeId: storeId || 'Unknown',
         storeName: storeName || storeId || 'Unknown',
         salesAmount: Number(data.salesAmount) || 0,
         invoices: Number(data.invoices) || 0,
-        visitors: monthlyVisitors, // From orange-dashboard visitors array
-        target: Number(targetValue) || 0, // From orange-dashboard targets
+        // visitors and target will be added on frontend (not included here to reduce API load)
         kpis: {
           atv: Number.isFinite(atv) ? atv : 0,
-          conversion: Number.isFinite(conversion) ? conversion : 0,
+          // conversion will be calculated on frontend (requires visitors)
           customerValue: Number.isFinite(atv) ? atv : 0,
         },
       };
@@ -528,28 +491,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Build daily store data (for daily breakdown in MainLayout)
     // Group by date first, then by store
-    // Also calculate daily visitors from orange-dashboard's visitors array
-    const dailyVisitorsMap = new Map<string, number>(); // Key: "YYYY-MM-DD_STORE_ID"
-    visitors.forEach((entry) => {
-      if (!Array.isArray(entry) || entry.length < 3) return;
-      const [entryDateStr, entryStoreId, count] = entry;
-      
-      // Filter by date range
-      if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
-      if (storeId && entryStoreId !== storeId) return;
-      
-      const dailyKey = `${entryDateStr}_${entryStoreId}`;
-      const currentCount = dailyVisitorsMap.get(dailyKey) || 0;
-      dailyVisitorsMap.set(dailyKey, currentCount + (Number(count) || 0));
-    });
-    
-    const dailyByDate = new Map<string, Array<{ storeId: string; storeName: string; salesAmount: number; invoices: number; visitors?: number }>>();
+    // Visitors will be merged on the frontend (reduces API processing time)
+    const dailyByDate = new Map<string, Array<{ storeId: string; storeName: string; salesAmount: number; invoices: number }>>();
     dailyStoreMap.forEach((data, key) => {
       const [dateStr, storeId] = key.split('_');
       const storeName = storeMapping?.get(storeId) || storeId;
-      
-      // Get daily visitors for this store/date
-      const dailyVisitors = dailyVisitorsMap.get(key) || 0;
       
       if (!dailyByDate.has(dateStr)) {
         dailyByDate.set(dateStr, []);
@@ -559,7 +505,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         storeName,
         salesAmount: Number(data.salesAmount) || 0,
         invoices: Number(data.invoices) || 0,
-        visitors: dailyVisitors, // From orange-dashboard visitors array
+        // visitors will be added on frontend (not included here to reduce API load)
       });
     });
 
@@ -656,11 +602,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Calculate totals with safe defaults (optional chaining)
+    // Visitors/conversion totals will be calculated on frontend (reduces API processing time)
     const totalSales = byStore.reduce((sum, s) => sum + (Number(s?.salesAmount) || 0), 0);
     const totalInvoices = byStore.reduce((sum, s) => sum + (Number(s?.invoices) || 0), 0);
-    const totalVisitors = byStore.reduce((sum, s) => sum + (Number(s?.visitors) || 0), 0);
     const totalAtv = totalInvoices > 0 && totalInvoices !== 0 ? totalSales / totalInvoices : 0;
-    const totalConversion = totalVisitors > 0 ? (totalInvoices / totalVisitors) * 100 : 0;
 
     // Build byDay array (for daily breakdown in MainLayout)
     // Format: [{ date: "YYYY-MM-DD", byStore: [...], byEmployee: [...] }, ...]
@@ -671,17 +616,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         byStore: stores.map(store => {
           const storeName = dayStoreName.get(store.storeId) || store.storeName;
           const atv = store.invoices > 0 ? store.salesAmount / store.invoices : 0;
-          const dailyVisitors = store.visitors || 0;
-          const conversion = dailyVisitors > 0 ? (store.invoices / dailyVisitors) * 100 : 0;
+          // visitors and conversion will be calculated on frontend (not included here to reduce API load)
           return {
             storeId: store.storeId,
             storeName: storeName || store.storeId,
             salesAmount: store.salesAmount,
             invoices: store.invoices,
-            visitors: dailyVisitors, // From orange-dashboard visitors array
+            // visitors will be added on frontend (not included here to reduce API load)
             kpis: {
               atv: Number.isFinite(atv) ? atv : 0,
-              conversion: Number.isFinite(conversion) ? conversion : 0,
+              // conversion will be calculated on frontend (requires visitors)
               customerValue: Number.isFinite(atv) ? atv : 0,
             },
           };
@@ -708,10 +652,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totals: {
         salesAmount: totalSales,
         invoices: totalInvoices,
-        visitors: totalVisitors, // Total visitors from orange-dashboard
+        // visitors and conversion will be calculated on frontend (not included here to reduce API load)
         kpis: {
           atv: Number.isFinite(totalAtv) ? totalAtv : 0,
-          conversion: Number.isFinite(totalConversion) ? totalConversion : 0,
+          // conversion will be calculated on frontend (requires visitors)
           customerValue: Number.isFinite(totalAtv) ? totalAtv : 0,
         },
       },
