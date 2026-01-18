@@ -72,6 +72,62 @@ interface LegacyResponse {
 
 let cachedData: ManagementData | null = null;
 let loadingPromise: Promise<ManagementData> | null = null;
+let cachedStoreMapping: Map<string, string> | null = null;
+
+// Load store mapping from orange-dashboard (same as api/get-stores.ts)
+// This maps OperatingUnitNumber (storeId) to store names
+async function loadStoreMapping(): Promise<Map<string, string>> {
+  if (cachedStoreMapping) {
+    return cachedStoreMapping;
+  }
+
+  const mapping = new Map<string, string>();
+  
+  try {
+    // Try to load from api/get-stores endpoint first (uses mapping.xlsx from dailysales)
+    const apiUrl = typeof window !== 'undefined' ? 
+      (import.meta.env.VITE_API_BASE_URL || '') : 
+      '';
+    const storesUrl = `${apiUrl}/api/get-stores`;
+    
+    const response = await fetch(storesUrl);
+    if (response.ok) {
+      const result: any = await response.json();
+      if (result.success && Array.isArray(result.stores)) {
+        result.stores.forEach((store: any) => {
+          const storeId = store.store_id || store.id || '';
+          const storeName = store.name || '';
+          if (storeId && storeName) {
+            mapping.set(storeId, storeName);
+          }
+        });
+        cachedStoreMapping = mapping;
+        console.log(`✅ Loaded ${mapping.size} store mappings from API for legacy data`);
+        return mapping;
+      }
+    }
+  } catch (error: any) {
+    console.warn('⚠️ Failed to load store mapping from API, falling back to management_data.json:', error.message);
+  }
+  
+  // Fallback: Use store_meta from management_data.json (if it has store_name)
+  try {
+    const data = await loadManagementData();
+    const storeMeta = data.store_meta || {};
+    Object.entries(storeMeta).forEach(([storeId, meta]) => {
+      const storeName = meta.store_name || meta.outlet;
+      if (storeName && storeName !== storeId) {
+        mapping.set(storeId, storeName);
+      }
+    });
+    cachedStoreMapping = mapping;
+    console.log(`✅ Loaded ${mapping.size} store mappings from management_data.json (fallback)`);
+  } catch (error: any) {
+    console.warn('⚠️ Failed to load store mapping from management_data.json:', error.message);
+  }
+  
+  return mapping;
+}
 
 async function loadManagementData(): Promise<ManagementData> {
   if (cachedData) {
@@ -123,7 +179,11 @@ export async function getLegacyMetrics(params: LegacyMetricsParams): Promise<Leg
   ));
 
   try {
-    const data = await loadManagementData();
+    // Load data and store mapping in parallel
+    const [data, storeMapping] = await Promise.all([
+      loadManagementData(),
+      loadStoreMapping(),
+    ]);
 
     // Build Maps for fast lookup
     const salesMap = new Map<string, number>(); // key: "YYYY-MM-DD_STORE_ID"
@@ -213,11 +273,13 @@ export async function getLegacyMetrics(params: LegacyMetricsParams): Promise<Leg
       agg.invoices += transactionsMap.get(key) || 0;
     });
 
-    // Build byStore array
+    // Build byStore array using store mapping (from orange-dashboard)
     const storeMeta = data.store_meta || {};
     const byStore = Array.from(storeAggregates.entries()).map(([storeId, agg]) => {
+      // Priority: storeMapping (from orange-dashboard API) > store_meta > storeId
+      const mappedName = storeMapping.get(storeId);
       const meta = storeMeta[storeId] || {};
-      const storeName = meta.store_name || meta.outlet || storeId;
+      const storeName = mappedName || meta.store_name || meta.outlet || storeId;
       
       // Calculate KPIs (prevent NaN/Infinity)
       const atv = agg.invoices > 0 ? agg.salesAmount / agg.invoices : 0;
@@ -283,14 +345,16 @@ export async function getLegacyMetrics(params: LegacyMetricsParams): Promise<Leg
       dayStoreData.invoices += transactionsMap.get(key) || 0;
     });
 
-    // Convert to byDay array format
+    // Convert to byDay array format using store mapping (from orange-dashboard)
     const byDay = Array.from(dailyByDate.entries()).map(([dateStr, dayStoresMap]) => {
       const storeMeta = data.store_meta || {};
       return {
         date: dateStr,
         byStore: Array.from(dayStoresMap.entries()).map(([storeId, dayData]) => {
+          // Priority: storeMapping (from orange-dashboard API) > store_meta > storeId
+          const mappedName = storeMapping.get(storeId);
           const meta = storeMeta[storeId] || {};
-          const storeName = meta.store_name || meta.outlet || storeId;
+          const storeName = mappedName || meta.store_name || meta.outlet || storeId;
           const atv = dayData.invoices > 0 ? dayData.salesAmount / dayData.invoices : 0;
           const conversion = dayData.visitors > 0 ? (dayData.invoices / dayData.visitors) * 100 : 0;
           
