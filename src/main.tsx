@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import { LocaleProvider } from './context/LocaleContext';
 import { DirectoryProvider } from '@/context/DirectoryProvider';
+import { DataProvider } from '@/context/DataProvider';
 
 // Register Service Worker for PWA (disabled for GitHub Pages)
 // if ('serviceWorker' in navigator) {
@@ -28,7 +29,9 @@ root.render(
   <React.StrictMode>
     <LocaleProvider>
       <DirectoryProvider>
-        <App />
+        <DataProvider>
+          <App />
+        </DataProvider>
       </DirectoryProvider>
     </LocaleProvider>
   </React.StrictMode>
