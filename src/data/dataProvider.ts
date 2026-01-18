@@ -38,6 +38,17 @@ interface NormalizedSalesResponse {
     invoices: number;
     kpis: { atv: number };
   }>;
+  byDay?: Array<{
+    date: string; // "YYYY-MM-DD"
+    byStore: Array<{
+      storeId: string;
+      storeName?: string;
+      salesAmount: number;
+      invoices: number;
+      kpis: { atv: number; customerValue?: number };
+    }>;
+    byEmployee?: Array<any>;
+  }>;
   totals: {
     salesAmount: number;
     invoices: number;

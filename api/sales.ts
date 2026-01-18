@@ -346,28 +346,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Aggregate by store (matching api/live-sales.ts pattern with optional chaining)
-    const storeMap = new Map<string, { salesAmount: number; invoices: number }>();
+    // Aggregate by store AND by date (for daily breakdown) - matching legacyProvider pattern
+    // Key: "YYYY-MM-DD_STORE_ID" for daily aggregation
+    const dailyStoreMap = new Map<string, { salesAmount: number; invoices: number }>();
+    // Also aggregate monthly total (for backward compatibility)
+    const monthlyStoreMap = new Map<string, { salesAmount: number; invoices: number }>();
+    
     transactions.forEach((tx) => {
       // Use optional chaining to prevent crashes if fields are missing
       const id = tx?.OperatingUnitNumber?.toString()?.trim();
       const amount = Number(tx?.PaymentAmount) || 0;
+      const txDate = tx?.TransactionDate;
       
       if (!id) {
         console.warn('⚠️ Transaction missing OperatingUnitNumber:', tx);
         return; // Skip transactions without store ID
       }
       
-      if (!storeMap.has(id)) {
-        storeMap.set(id, { salesAmount: 0, invoices: 0 });
+      // Extract date from TransactionDate (format: ISO string)
+      let dateStr = '';
+      if (txDate) {
+        try {
+          const dateObj = new Date(txDate);
+          if (!isNaN(dateObj.getTime())) {
+            dateStr = dateObj.toISOString().split('T')[0]; // "2026-01-17"
+          }
+        } catch (e) {
+          console.warn('⚠️ Invalid TransactionDate:', txDate);
+        }
       }
-      const data = storeMap.get(id)!;
-      data.salesAmount += amount;
-      data.invoices += 1;
+      
+      // Monthly aggregation (for totals)
+      if (!monthlyStoreMap.has(id)) {
+        monthlyStoreMap.set(id, { salesAmount: 0, invoices: 0 });
+      }
+      const monthlyData = monthlyStoreMap.get(id)!;
+      monthlyData.salesAmount += amount;
+      monthlyData.invoices += 1;
+      
+      // Daily aggregation (for daily breakdown)
+      if (dateStr) {
+        const dailyKey = `${dateStr}_${id}`;
+        if (!dailyStoreMap.has(dailyKey)) {
+          dailyStoreMap.set(dailyKey, { salesAmount: 0, invoices: 0 });
+        }
+        const dailyData = dailyStoreMap.get(dailyKey)!;
+        dailyData.salesAmount += amount;
+        dailyData.invoices += 1;
+      }
     });
 
-    // Build store response with optional chaining and safe defaults
-    const byStore = Array.from(storeMap.entries()).map(([storeId, data]) => {
+    // Build monthly store response (for backward compatibility and totals)
+    const byStore = Array.from(monthlyStoreMap.entries()).map(([storeId, data]) => {
       const storeName = storeMapping?.get(storeId) || storeId;
       const atv = data.invoices > 0 ? data.salesAmount / data.invoices : 0;
       return {
@@ -380,6 +410,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           customerValue: Number.isFinite(atv) ? atv : 0,
         },
       };
+    });
+    
+    // Build daily store data (for daily breakdown in MainLayout)
+    // Group by date first, then by store
+    const dailyByDate = new Map<string, Array<{ storeId: string; storeName: string; salesAmount: number; invoices: number }>>();
+    dailyStoreMap.forEach((data, key) => {
+      const [dateStr, storeId] = key.split('_');
+      const storeName = storeMapping?.get(storeId) || storeId;
+      
+      if (!dailyByDate.has(dateStr)) {
+        dailyByDate.set(dateStr, []);
+      }
+      dailyByDate.get(dateStr)!.push({
+        storeId,
+        storeName,
+        salesAmount: Number(data.salesAmount) || 0,
+        invoices: Number(data.invoices) || 0,
+      });
     });
 
     // Step 4: Aggregate by employee from employees_data.json (matching orange-dashboard pattern)
@@ -479,6 +527,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const totalInvoices = byStore.reduce((sum, s) => sum + (Number(s?.invoices) || 0), 0);
     const totalAtv = totalInvoices > 0 && totalInvoices !== 0 ? totalSales / totalInvoices : 0;
 
+    // Build byDay array (for daily breakdown in MainLayout)
+    // Format: [{ date: "YYYY-MM-DD", byStore: [...], byEmployee: [...] }, ...]
+    const byDay = Array.from(dailyByDate.entries()).map(([dateStr, stores]) => {
+      const dayStoreName = storeMapping || new Map();
+      return {
+        date: dateStr,
+        byStore: stores.map(store => {
+          const storeName = dayStoreName.get(store.storeId) || store.storeName;
+          const atv = store.invoices > 0 ? store.salesAmount / store.invoices : 0;
+          return {
+            storeId: store.storeId,
+            storeName: storeName || store.storeId,
+            salesAmount: store.salesAmount,
+            invoices: store.invoices,
+            kpis: {
+              atv: Number.isFinite(atv) ? atv : 0,
+              customerValue: Number.isFinite(atv) ? atv : 0,
+            },
+          };
+        }),
+        byEmployee: [], // Employee data is monthly from employees_data.json, not daily
+      };
+    }).sort((a, b) => a.date.localeCompare(b.date)); // Sort by date
+
+    console.log(`📅 Built ${byDay.length} days of data from ${transactions.length} transactions`);
+
     return res.status(200).json({
       success: true,
       range: {
@@ -488,8 +562,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...(month !== undefined && { month: month + 1 }),
         ...(day !== undefined && { day }),
       },
-      byStore,
-      byEmployee,
+      byStore, // Monthly totals (for backward compatibility)
+      byEmployee, // Monthly totals (from employees_data.json)
+      byDay, // Daily breakdown (NEW - for daily metrics in MainLayout)
       totals: {
         salesAmount: totalSales,
         invoices: totalInvoices,
@@ -502,7 +577,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         source: 'd365',
         pages,
         fetched: transactions.length,
-        notes: [`Fetched from D365 RetailTransactions API`],
+        dailyDays: byDay.length,
+        notes: [`Fetched from D365 RetailTransactions API`, `Daily breakdown: ${byDay.length} days`],
       },
     });
   } catch (error: any) {
