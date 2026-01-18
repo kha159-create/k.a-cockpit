@@ -37,6 +37,26 @@ async function getAccessToken(): Promise<string> {
   return result.accessToken;
 }
 
+// Load employees_data.json from orange-dashboard (same as api/get-employees.ts)
+async function loadEmployeesData(): Promise<{ [storeId: string]: any[][] }> {
+  try {
+    console.log('📥 Loading employees_data.json from orange-dashboard...');
+    const response: Response = await fetch('https://raw.githubusercontent.com/ALAAWF2/orange-dashboard/main/employees_data.json');
+    
+    if (!response.ok) {
+      console.warn('⚠️ Could not fetch employees_data.json from orange-dashboard');
+      return {};
+    }
+    
+    const data = await response.json();
+    console.log(`✅ Loaded employees data for ${Object.keys(data).length} stores`);
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error loading employees_data.json:', error.message);
+    return {};
+  }
+}
+
 async function loadStoreMapping(): Promise<Map<string, string>> {
   const mapping = new Map<string, string>();
   
@@ -282,6 +302,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       storeMapping = new Map();
     }
 
+    // Step 2b: Load employees data from orange-dashboard (for employee names)
+    let employeesData: { [storeId: string]: any[][] } = {};
+    try {
+      console.log('👥 Loading employees_data.json...');
+      employeesData = await loadEmployeesData();
+      console.log(`✅ Loaded employees data for ${Object.keys(employeesData).length} stores`);
+    } catch (error: any) {
+      console.warn('⚠️ Failed to load employees data, employee aggregation will be empty:', error.message);
+      employeesData = {};
+    }
+
     // Step 3: Fetch D365 transactions (with error isolation)
     let transactions: D365Transaction[];
     let pages: number;
@@ -346,17 +377,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     });
 
-    // Employee aggregation removed - StaffId/StaffName are NOT available in RetailTransactions entity
-    // Employee data must come from a different D365 endpoint or source
-    const byEmployee: Array<{
+    // Step 4: Aggregate by employee from employees_data.json (matching orange-dashboard pattern)
+    // employees_data.json format: { "storeId": [["date", "employeeName", sales, transactions, ...], ...], ... }
+    const employeeMap = new Map<string, {
       employeeId: string;
-      employeeName?: string;
-      storeId?: string;
-      storeName?: string;
+      employeeName: string;
+      storeId: string;
       salesAmount: number;
       invoices: number;
-      kpis: { atv: number };
-    }> = [];
+    }>();
+    
+    // Date range strings for filtering (YYYY-MM-DD format)
+    const startDateStr = startDate.toISOString().split('T')[0]; // "2026-01-01"
+    const endDateStr = endDate.toISOString().split('T')[0]; // "2026-01-31"
+    
+    // Process employees_data.json entries that match the date range
+    Object.entries(employeesData).forEach(([storeId, entries]) => {
+      if (!Array.isArray(entries)) return;
+      
+      // Filter by storeId if specified
+      if (storeId && storeId !== storeId) return;
+      
+      entries.forEach((entry) => {
+        if (!Array.isArray(entry) || entry.length < 4) return;
+        
+        const entryDateStr = String(entry[0] || '').trim(); // "2026-01-17"
+        const employeeName = String(entry[1] || '').trim(); // "4661-Fatima Albeshi"
+        const sales = Number(entry[2]) || 0; // sales amount
+        const transactions = Number(entry[3]) || 0; // transaction count
+        
+        if (!employeeName || !entryDateStr) return;
+        
+        // Check if date is within range
+        if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
+        
+        // Extract employeeId from name (e.g., "4661-Fatima Albeshi" -> "4661")
+        const employeeIdMatch = employeeName.match(/^(\d+)[-_\s]/);
+        const employeeId = employeeIdMatch ? employeeIdMatch[1] : employeeName.replace(/\s+/g, '_');
+        
+        // Key: employeeId + storeId (same employee can work at multiple stores)
+        const key = `${employeeId}_${storeId}`;
+        
+        if (!employeeMap.has(key)) {
+          employeeMap.set(key, {
+            employeeId,
+            employeeName,
+            storeId,
+            salesAmount: 0,
+            invoices: 0,
+          });
+        }
+        
+        const data = employeeMap.get(key)!;
+        data.salesAmount += sales;
+        data.invoices += transactions;
+      });
+    });
+    
+    // Build employee response with optional chaining
+    const byEmployee = Array.from(employeeMap.values()).map((emp) => {
+      const storeName = storeMapping?.get(emp.storeId) || emp.storeId;
+      const atv = emp.invoices > 0 ? emp.salesAmount / emp.invoices : 0;
+      return {
+        employeeId: emp.employeeId || 'Unknown',
+        employeeName: emp.employeeName || 'Unknown',
+        storeId: emp.storeId || 'Unknown',
+        storeName: storeName || emp.storeId || 'Unknown',
+        salesAmount: Number(emp.salesAmount) || 0,
+        invoices: Number(emp.invoices) || 0,
+        kpis: {
+          atv: Number.isFinite(atv) ? atv : 0,
+        },
+      };
+    });
+    
+    console.log(`✅ Aggregated ${byEmployee.length} employees from employees_data.json`);
 
     // Calculate totals with safe defaults (optional chaining)
     const totalSales = byStore.reduce((sum, s) => sum + (Number(s?.salesAmount) || 0), 0);
