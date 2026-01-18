@@ -158,6 +158,122 @@ const StoresPage: React.FC<StoresPageProps> = ({
                                     </div>
                                 </div>
                             )}
+                            
+                            {/* Monthly Sales Cards Grid - Detailed Store Cards */}
+                            <div className="mb-6">
+                                <h4 className="text-lg font-semibold text-gray-800 mb-4">
+                                    {t('monthly_sales_performance')} {dateFilter.month !== 'all' && typeof dateFilter.month === 'number' ? `- ${new Date(dateFilter.year as number, dateFilter.month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {stores.map((store) => {
+                                        const storeSales = store.totalSales || 0;
+                                        const storeTarget = store.effectiveTarget || 0;
+                                        const achievement = store.targetAchievement || 0;
+                                        const transactionCount = store.transactionCount || 0;
+                                        const visitors = store.visitors || 0;
+                                        const atv = store.atv || 0;
+                                        const visitorRate = store.visitorRate || 0;
+                                        const progress = storeTarget > 0 ? Math.min((storeSales / storeTarget) * 100, 100) : 0;
+                                        
+                                        return (
+                                            <div
+                                                key={store.id}
+                                                onClick={() => onSelectStore(store)}
+                                                className="rounded-xl shadow-sm border-l-4 p-5 hover:shadow-md transition-all duration-200 cursor-pointer bg-white border-orange-500 hover:bg-orange-50/30"
+                                            >
+                                                {/* Store Name & Manager */}
+                                                <div className="mb-3 pb-3 border-b border-gray-200">
+                                                    <div className="text-base font-semibold mb-1 truncate text-gray-900">
+                                                        {store.name}
+                                                    </div>
+                                                    {store.areaManager && (
+                                                        <div className="text-xs text-gray-600 truncate">
+                                                            {store.areaManager}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* Sales Amount */}
+                                                <div className="mb-4">
+                                                    <div className="text-2xl font-bold text-orange-900">
+                                                        {storeSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}
+                                                    </div>
+                                                    <div className="text-xs text-gray-600 mt-1">{t('total_sales')}</div>
+                                                </div>
+                                                
+                                                {/* Details Grid */}
+                                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                                    {/* Transactions Count */}
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-gray-800">
+                                                            {transactionCount.toLocaleString('en-US')}
+                                                        </div>
+                                                        <div className="text-xs text-gray-600">{t('total_transactions')}</div>
+                                                    </div>
+                                                    
+                                                    {/* ATV */}
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-gray-800">
+                                                            {atv.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}
+                                                        </div>
+                                                        <div className="text-xs text-gray-600">{t('avg_transaction_value')}</div>
+                                                    </div>
+                                                    
+                                                    {/* Visitors */}
+                                                    {visitors > 0 && (
+                                                        <>
+                                                            <div>
+                                                                <div className="text-sm font-semibold text-gray-800">
+                                                                    {visitors.toLocaleString('en-US')}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600">{t('visitors')}</div>
+                                                            </div>
+                                                            
+                                                            {/* Conversion Rate */}
+                                                            <div>
+                                                                <div className="text-sm font-semibold text-gray-800">
+                                                                    {visitorRate.toFixed(1)}%
+                                                                </div>
+                                                                <div className="text-xs text-gray-600">{t('conversion_rate')}</div>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* Target & Achievement Progress */}
+                                                {storeTarget > 0 && (
+                                                    <div className="space-y-2 pt-3 border-t border-gray-200">
+                                                        <div className="flex items-center justify-between text-xs">
+                                                            <span className="text-gray-600">{t('sales_target')}:</span>
+                                                            <span className="font-semibold text-gray-800">{storeTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })}</span>
+                                                        </div>
+                                                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                                            <div 
+                                                                className={`h-2.5 rounded-full transition-all ${
+                                                                    achievement >= 100 ? 'bg-green-600' : 
+                                                                    achievement >= 80 ? 'bg-orange-500' : 
+                                                                    'bg-red-500'
+                                                                }`}
+                                                                style={{ width: `${progress}%` }}
+                                                            />
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <span className={`text-sm font-bold ${
+                                                                achievement >= 100 ? 'text-green-700' : 
+                                                                achievement >= 80 ? 'text-orange-700' : 
+                                                                'text-red-700'
+                                                            }`}>
+                                                                {achievement.toFixed(1)}% {t('achievement')}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            
                             {/* Stores Table */}
                             <Table columns={columns} data={stores} initialSortKey="totalSales" rowClassName={getRowClassName} />
                         </div>
