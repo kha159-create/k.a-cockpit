@@ -375,15 +375,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Also aggregate monthly total (for backward compatibility)
     const monthlyStoreMap = new Map<string, { salesAmount: number; invoices: number }>();
     
-    transactions.forEach((tx) => {
+    // Use aggregatedGroups (already aggregated on D365 server) instead of individual transactions
+    aggregatedGroups.forEach((group) => {
       // Use optional chaining to prevent crashes if fields are missing
-      const id = tx?.OperatingUnitNumber?.toString()?.trim();
-      const amount = Number(tx?.PaymentAmount) || 0;
-      const txDate = tx?.TransactionDate;
+      const id = group?.OperatingUnitNumber?.toString()?.trim();
+      const amount = Number(group?.TotalAmount) || 0; // Already aggregated sum
+      const invoiceCount = Number(group?.InvoiceCount) || 0; // Already aggregated count
+      const txDate = group?.TransactionDate;
       
       if (!id) {
-        console.warn('⚠️ Transaction missing OperatingUnitNumber:', tx);
-        return; // Skip transactions without store ID
+        console.warn('⚠️ Aggregated group missing OperatingUnitNumber:', group);
+        return; // Skip groups without store ID
       }
       
       // Extract date from TransactionDate (format: ISO string)
@@ -395,17 +397,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             dateStr = dateObj.toISOString().split('T')[0]; // "2026-01-17"
           }
         } catch (e) {
-          console.warn('⚠️ Invalid TransactionDate:', txDate);
+          console.warn('⚠️ Invalid TransactionDate in aggregated group:', txDate);
         }
       }
       
-      // Monthly aggregation (for totals)
+      // Monthly aggregation (for totals) - sum across all days
       if (!monthlyStoreMap.has(id)) {
         monthlyStoreMap.set(id, { salesAmount: 0, invoices: 0 });
       }
       const monthlyData = monthlyStoreMap.get(id)!;
-      monthlyData.salesAmount += amount;
-      monthlyData.invoices += 1;
+      monthlyData.salesAmount += amount; // TotalAmount already summed
+      monthlyData.invoices += invoiceCount; // InvoiceCount already counted
       
       // Daily aggregation (for daily breakdown)
       if (dateStr) {
@@ -414,8 +416,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           dailyStoreMap.set(dailyKey, { salesAmount: 0, invoices: 0 });
         }
         const dailyData = dailyStoreMap.get(dailyKey)!;
-        dailyData.salesAmount += amount;
-        dailyData.invoices += 1;
+        dailyData.salesAmount += amount; // TotalAmount for this day
+        dailyData.invoices += invoiceCount; // InvoiceCount for this day
       }
     });
 
