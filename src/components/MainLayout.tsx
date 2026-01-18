@@ -808,23 +808,7 @@ const handleNotificationClick = (notificationId: string) => {
         setIsProcessing(true);
         setAppMessage({ isOpen: true, text: `Task sent to ${taskData.recipientName} (local only - no Firestore).`, type: 'alert' });
         setIsProcessing(false);
-        return;
-        // Removed Firestore code:
-        /* try {
-            const newTask = {
-                ...taskData,
-                senderId: user.uid,
-                senderName: profile.name,
-                status: 'pending' as 'pending' | 'completed',
-                createdAt: Timestamp.now(),
-            };
-            await db.collection('tasks').add(newTask);
-        } catch (error: any) { 
-            setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' }); 
-        } finally { 
-            setIsProcessing(false); 
-            setModalState({ type: null }); 
-        }
+        setModalState({ type: null });
     };
 
     const handleUpdateTaskStatus = async (taskId: string, status: 'completed') => {
