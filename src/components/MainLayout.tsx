@@ -346,24 +346,24 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         )
     );
 
-    // Separate listener for dailyMetrics (only for < 2026 data from Firestore)
+    // Separate listener for dailyMetrics (only for < 2024 data from Firestore)
     const dailyMetricsUnsubscriber = db.collection('dailyMetrics').onSnapshot(
         (snapshot) => {
             const firestoreMetrics = snapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() }))
                 .filter((m: any) => {
-                    // Only include data from before 2026 (old system)
+                    // Only include data from before 2024 (old system before orange-dashboard)
                     if (!m.date || typeof m.date.toDate !== 'function') return true; // Include if date is invalid
                     const metricDate = m.date.toDate();
-                    return metricDate.getFullYear() < 2026;
+                    return metricDate.getFullYear() < 2024;
                 }) as DailyMetric[];
             
-            // Merge with API metrics (2026+) from separate state
+            // Merge with API metrics (2024+) from separate state
             setDailyMetrics(prevMetrics => {
                 const apiMetrics = prevMetrics.filter(m => {
                     if (!m.date || typeof m.date.toDate !== 'function') return false;
                     const metricDate = m.date.toDate();
-                    return metricDate.getFullYear() >= 2026;
+                    return metricDate.getFullYear() >= 2024;
                 });
                 return [...firestoreMetrics, ...apiMetrics];
             });
@@ -413,8 +413,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     const year = typeof dateFilter.year === 'number' ? dateFilter.year : new Date().getFullYear();
     const month = typeof dateFilter.month === 'number' ? dateFilter.month : new Date().getMonth();
     
-    // Only fetch from API if year >= 2026
-    if (year < 2026) {
+    // Fetch from API for 2024+ (like orange-dashboard)
+    // Firestore only for old data (< 2024) or as fallback
+    if (year < 2024) {
       return;
     }
 
@@ -456,14 +457,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
           
           console.log(`📊 Converted ${apiMetrics.length} metrics from API`);
           
-          // Merge with Firestore metrics (keep old data, replace new data)
+          // Merge with Firestore metrics (keep old data < 2024, replace new data 2024+)
           setDailyMetrics(prevMetrics => {
             const oldMetrics = prevMetrics.filter(m => {
               if (!m.date || typeof m.date.toDate !== 'function') return true;
               const metricDate = m.date.toDate();
-              return metricDate.getFullYear() < 2026;
+              return metricDate.getFullYear() < 2024; // Keep only old data before 2024
             });
-            console.log(`🔄 Merging: ${oldMetrics.length} old metrics + ${apiMetrics.length} new metrics`);
+            console.log(`🔄 Merging: ${oldMetrics.length} old metrics (before 2024) + ${apiMetrics.length} new metrics (2024+)`);
             return [...oldMetrics, ...apiMetrics];
           });
         } else {

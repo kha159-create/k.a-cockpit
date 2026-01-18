@@ -313,12 +313,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
     const month = parseInt(req.query.month as string) || new Date().getMonth();
     
-    // Only return data for 2026 and later (new system)
-    if (year < 2026) {
+    // Support 2024, 2025, 2026+ from orange-dashboard (like orange-dashboard system)
+    // Firestore is only for old data (< 2024) or as fallback
+    if (year < 2024) {
       return res.status(200).json({
         success: true,
         metrics: [],
-        message: 'Use Firestore for data before 2026',
+        message: 'Use Firestore for data before 2024, or orange-dashboard for 2024+',
       });
     }
 

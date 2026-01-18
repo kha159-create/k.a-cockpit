@@ -124,6 +124,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       entries.forEach((entry) => {
         if (!Array.isArray(entry) || entry.length < 2) return;
         
+        // Filter: Only include employees from 2026+ (as requested)
+        const dateStr = String(entry[0] || '').trim(); // "2026-01-17"
+        if (!dateStr) return;
+        
+        const entryDate = new Date(dateStr + 'T00:00:00Z'); // Parse YYYY-MM-DD as UTC
+        if (entryDate.getUTCFullYear() < 2026) {
+          return; // Skip employees from 2024 and 2025
+        }
+        
         const employeeName = String(entry[1] || '').trim(); // "4661-Fatima Albeshi"
         
         if (!employeeName) return;
