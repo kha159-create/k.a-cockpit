@@ -107,7 +107,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     Object.entries(storeMeta).forEach(([storeId, meta]) => {
       const manager = meta.manager?.trim();
-      const storeName = storeMapping.get(storeId) || meta.store_name || meta.outlet || storeId;
+      // Priority: mapping.xlsx > store_name > outlet > storeId (fallback to ID)
+      // If mapping failed, try store_name/outlet from management_data.json
+      let storeName = storeMapping.get(storeId);
+      if (!storeName) {
+        storeName = meta.store_name || meta.outlet || `Store ${storeId}`; // Better fallback than just ID
+      }
       const city = meta.city?.trim() || undefined;
       
       if (manager && manager.toLowerCase() !== 'unknown' && manager.toLowerCase() !== 'online') {
@@ -120,6 +125,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
     });
+    
+    // Log warning if mapping failed
+    if (storeMapping.size === 0) {
+      console.warn('⚠️ Store mapping is empty - stores may show IDs instead of names');
+      console.warn('📊 Sample stores:', stores.slice(0, 3).map(s => ({ id: s.id, name: s.name })));
+    }
     
     console.log(`✅ Returning ${stores.length} stores from orange-dashboard`);
     
