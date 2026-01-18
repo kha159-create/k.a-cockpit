@@ -213,8 +213,55 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
 
   useEffect(() => {
     if (!profile) return;
+    
+    // Load stores from API (like orange-dashboard) - NO Firestore needed for new data
+    const loadStoresFromAPI = async () => {
+      try {
+        console.log('📥 Loading stores from API (orange-dashboard)...');
+        const apiUrl = 'https://k-a-cockpit.vercel.app/api/get-stores';
+        const response = await fetch(apiUrl);
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && Array.isArray(result.stores)) {
+            console.log(`✅ Loaded ${result.stores.length} stores from API`);
+            setStores(result.stores as Store[]);
+          } else {
+            console.warn('⚠️ API returned no stores, falling back to Firestore');
+            // Fallback to Firestore if API fails
+            loadStoresFromFirestore();
+          }
+        } else {
+          console.warn('⚠️ API failed, falling back to Firestore');
+          loadStoresFromFirestore();
+        }
+      } catch (error: any) {
+        console.error('❌ Error loading stores from API:', error);
+        // Fallback to Firestore if API fails
+        loadStoresFromFirestore();
+      }
+    };
+    
+    // Fallback: Load stores from Firestore (for old data or if API fails)
+    const loadStoresFromFirestore = () => {
+      const unsubscriber = db.collection('stores').onSnapshot(
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Store[];
+          console.log(`📦 Loaded ${data.length} stores from Firestore (fallback)`);
+          setStores(data);
+        },
+        (err) => {
+          console.error('Error fetching stores from Firestore:', err);
+        }
+      );
+      return unsubscriber;
+    };
+    
+    // Try API first (like orange-dashboard), fallback to Firestore
+    loadStoresFromAPI();
+    
     const collectionsToWatch: { [key: string]: React.Dispatch<React.SetStateAction<any>> } = {
-        stores: setStores,
+        // stores: removed - now loaded from API
         employees: setEmployees,
         // dailyMetrics: handled separately (Firestore + API merge)
         kingDuvetSales: setKingDuvetSales,
