@@ -1019,7 +1019,7 @@ const handleNotificationClick = (notificationId: string) => {
          />
        );
      case 'live':
-        return <LivePage />;
+        return <LivePage stores={stores} profile={profile} />;
      case 'lfl':
         return <LFLPage allStores={stores} allMetrics={dailyMetrics} profile={profile}/>;
      case 'settings':

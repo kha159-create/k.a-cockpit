@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useLocale } from '@/context/LocaleContext';
 import { getLiveSales } from '@/data/dataProvider';
 import { apiUrl } from '@/utils/apiBase';
+import type { Store, UserProfile } from '@/types';
 
 interface LiveSalesData {
   date: string; // YYYY-MM-DD (from JSON) or firebase.firestore.Timestamp (from Firestore)
@@ -12,12 +13,18 @@ interface LiveSalesData {
   stores?: Array<{ outlet: string; sales: number }>;
 }
 
-const LivePage: React.FC = () => {
-  const { locale } = useLocale();
+interface LivePageProps {
+  stores: Store[];
+  profile: UserProfile | null;
+}
+
+const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
+  const { locale, t } = useLocale();
   const [liveData, setLiveData] = useState<LiveSalesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'today' | 'yesterday'>('today');
+  const [areaManagerFilter, setAreaManagerFilter] = useState<string>('All');
 
   const copy = useMemo(() => {
     if (locale === 'ar') {
@@ -30,18 +37,22 @@ const LivePage: React.FC = () => {
         loading: 'جاري التحميل...',
         noData: 'لا توجد بيانات متاحة',
         error: 'حدث خطأ في تحميل البيانات',
+        areaManager: 'مدير المنطقة',
+        allAreaManagers: 'جميع مديري المناطق',
       };
     }
-    return {
-      title: 'Live Sales',
-      date: 'Date',
-      lastUpdate: 'Last Update',
-      outlet: 'Outlet',
-      sales: 'Sales',
-      loading: 'Loading...',
-      noData: 'No sales data available',
-      error: 'Error loading data',
-    };
+      return {
+        title: 'Live Sales',
+        date: 'Date',
+        lastUpdate: 'Last Update',
+        outlet: 'Outlet',
+        sales: 'Sales',
+        loading: 'Loading...',
+        noData: 'No sales data available',
+        error: 'Error loading data',
+        areaManager: 'Area Manager',
+        allAreaManagers: 'All Area Managers',
+      };
   }, [locale]);
 
   useEffect(() => {
@@ -153,12 +164,44 @@ const LivePage: React.FC = () => {
     );
   }
 
+  // Get available area managers (for admin/general_manager only)
+  const showAreaManagerFilter = profile?.role === 'admin' || profile?.role === 'general_manager';
+  const availableAreaManagers = useMemo(() => {
+    if (!showAreaManagerFilter) return [];
+    const managers = new Set(stores.map(s => s.areaManager).filter(Boolean));
+    return ['All', ...Array.from(managers).sort()];
+  }, [stores, showAreaManagerFilter]);
+
   // Support both new format (today/yesterday) and legacy format (stores)
   const todayStores = liveData?.today || liveData?.stores || [];
   const yesterdayStores = liveData?.yesterday || [];
   
+  // Filter stores by area manager
+  const filteredTodayStores = useMemo(() => {
+    if (areaManagerFilter === 'All' || !showAreaManagerFilter) {
+      return todayStores;
+    }
+    // Match outlet names with store names to get areaManager
+    const storeMap = new Map(stores.map(s => [s.name, s]));
+    return todayStores.filter(item => {
+      const store = storeMap.get(item.outlet);
+      return store?.areaManager === areaManagerFilter;
+    });
+  }, [todayStores, areaManagerFilter, stores, showAreaManagerFilter]);
+
+  const filteredYesterdayStores = useMemo(() => {
+    if (areaManagerFilter === 'All' || !showAreaManagerFilter) {
+      return yesterdayStores;
+    }
+    const storeMap = new Map(stores.map(s => [s.name, s]));
+    return yesterdayStores.filter(item => {
+      const store = storeMap.get(item.outlet);
+      return store?.areaManager === areaManagerFilter;
+    });
+  }, [yesterdayStores, areaManagerFilter, stores, showAreaManagerFilter]);
+  
   // Get current view data
-  const currentStores = viewMode === 'today' ? todayStores : yesterdayStores;
+  const currentStores = viewMode === 'today' ? filteredTodayStores : filteredYesterdayStores;
   const totalSales = currentStores.reduce((sum, item) => sum + (item.sales || 0), 0);
 
   return (
@@ -167,6 +210,26 @@ const LivePage: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">{copy.title}</h1>
+          
+          {/* Area Manager Filter */}
+          {showAreaManagerFilter && availableAreaManagers.length > 1 && (
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <label className="font-semibold text-gray-700">
+                {copy.areaManager}:
+              </label>
+              <select
+                value={areaManagerFilter}
+                onChange={(e) => setAreaManagerFilter(e.target.value)}
+                className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              >
+                {availableAreaManagers.map(manager => (
+                  <option key={manager} value={manager}>
+                    {manager === 'All' ? copy.allAreaManagers : manager}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           
           {/* View Mode Toggle */}
           <div className="flex items-center justify-center gap-4 mb-4">
