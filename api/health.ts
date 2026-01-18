@@ -127,7 +127,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     }
 
-    // Check 3: Environment Variables
+    // Check 3: Can Fetch Live Sales (validate D365 RetailTransactions entity)
+    const liveSalesStartTime = Date.now();
+    try {
+      const token = await getAccessToken();
+      const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
+      const baseUrl = `${d365Url}/data/RetailTransactions`;
+      
+      // Test with a small query (last 1 day, top 1)
+      const endDate = new Date();
+      const startDate = new Date(endDate);
+      startDate.setUTCDate(startDate.getUTCDate() - 1);
+      
+      const testUrl = `${baseUrl}?$filter=PaymentAmount ne 0 and TransactionDate ge ${startDate.toISOString()}&$top=1`;
+      
+      const response = await fetch(testUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+      
+      const liveSalesDuration = Date.now() - liveSalesStartTime;
+      
+      if (response.ok) {
+        checks.canFetchLiveSales = {
+          status: 'ok',
+          message: 'D365 RetailTransactions entity accessible',
+          duration: liveSalesDuration,
+        };
+      } else {
+        const errorText = await response.text();
+        checks.canFetchLiveSales = {
+          status: 'error',
+          message: `Cannot access RetailTransactions: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`,
+          duration: liveSalesDuration,
+        };
+      }
+    } catch (error: any) {
+      checks.canFetchLiveSales = {
+        status: 'error',
+        message: `Live sales test failed: ${error.message}`,
+      };
+    }
+
+    // Check 4: Environment Variables
     const hasD365Creds = !!(
       process.env.D365_CLIENT_ID &&
       process.env.D365_CLIENT_SECRET &&
