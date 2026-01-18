@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    console.log('📥 Extracting employees from employees_data.json...');
+    console.log('📥 Extracting employees from employees_data.json (2026+ only)...');
     
     // Load store mapping
     const storeMapping = await loadStoreMapping();
@@ -98,6 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const employeesData = await loadEmployeesData();
     
     if (Object.keys(employeesData).length === 0) {
+      console.warn('⚠️ No employees data found in employees_data.json');
       return res.status(200).json({
         success: true,
         employees: [],
@@ -108,13 +109,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Extract unique employees from employees_data.json
     // employees_data.json format: { "storeId": [["date", "employeeName", sales, ...], ...], ... }
+    // Strategy: Collect ALL employees, then filter to only those with 2026+ activity
     const employeeMap = new Map<string, {
       id: string;
       employeeId: string | null;
       name: string;
       currentStore: string;
       status: 'active';
+      has2026Data: boolean; // Track if employee has any 2026+ entries
     }>();
+    
+    // First pass: Collect all employees and track if they have 2026+ data
+    let totalEntries = 0;
+    let entries2026Plus = 0;
     
     Object.entries(employeesData).forEach(([storeId, entries]) => {
       if (!Array.isArray(entries)) return;
@@ -124,21 +131,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       entries.forEach((entry) => {
         if (!Array.isArray(entry) || entry.length < 2) return;
         
+        totalEntries++;
         const dateStr = String(entry[0] || '').trim(); // "2026-01-17" or "2024-01-17"
         const employeeName = String(entry[1] || '').trim(); // "4661-Fatima Albeshi"
-        
-        // Filter: Only include employees from 2026+ (as requested)
-        if (dateStr) {
-          try {
-            const entryDate = new Date(dateStr + 'T00:00:00Z'); // Parse YYYY-MM-DD as UTC
-            if (entryDate.getUTCFullYear() < 2026) {
-              return; // Skip employees from 2024 and 2025
-            }
-          } catch (e) {
-            // If date parsing fails, skip this entry
-            return;
-          }
-        }
         
         if (!employeeName) return;
         
@@ -149,31 +144,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Use employeeId as key, or name if no ID
         const key = employeeId || employeeName;
         
+        // Check if date is 2026+
+        let is2026Data = false;
+        if (dateStr) {
+          try {
+            const entryDate = new Date(dateStr + 'T00:00:00Z'); // Parse YYYY-MM-DD as UTC
+            is2026Data = entryDate.getUTCFullYear() >= 2026;
+            if (is2026Data) entries2026Plus++;
+          } catch (e) {
+            // If date parsing fails, skip date check
+            console.warn(`⚠️ Failed to parse date: ${dateStr}`);
+          }
+        }
+        
+        // Add or update employee in map
         if (!employeeMap.has(key)) {
           employeeMap.set(key, {
             id: employeeId || employeeName.replace(/\s+/g, '_'),
             employeeId,
             name: employeeName,
-            currentStore: storeName, // Use last store seen (could be improved to track all stores)
+            currentStore: storeName,
             status: 'active',
+            has2026Data: is2026Data,
           });
         } else {
-          // Update store if this is more recent (simple approach: keep current store)
           const existing = employeeMap.get(key)!;
-          existing.currentStore = storeName; // Update to latest store
+          // Update store if this is more recent
+          existing.currentStore = storeName;
+          // If this entry is 2026+, mark employee as having 2026+ data
+          if (is2026Data) {
+            existing.has2026Data = true;
+          }
         }
       });
     });
     
-    // Convert to array (like Firestore employees collection)
-    const employees = Array.from(employeeMap.values());
+    // Filter: Only include employees who have 2026+ data
+    const employees = Array.from(employeeMap.values())
+      .filter(emp => emp.has2026Data) // Only employees with 2026+ activity
+      .map(({ has2026Data, ...emp }) => emp); // Remove has2026Data from output
     
-    console.log(`✅ Extracted ${employees.length} unique employees from employees_data.json`);
+    console.log(`📊 Total entries: ${totalEntries}, Entries 2026+: ${entries2026Plus}`);
+    console.log(`📊 Total employees in data: ${employeeMap.size}, Employees with 2026+ data: ${employees.length}`);
+    console.log(`✅ Extracted ${employees.length} unique employees from employees_data.json (2026+ only)`);
     
     return res.status(200).json({
       success: true,
       employees,
       count: employees.length,
+      debug: {
+        totalEntries,
+        entries2026Plus,
+        totalEmployeesInData: employeeMap.size,
+        employeesWith2026Data: employees.length,
+      },
     });
     
   } catch (error: any) {
