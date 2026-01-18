@@ -378,80 +378,96 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     // Step 4: Aggregate by employee from employees_data.json (matching orange-dashboard pattern)
-    // employees_data.json format: { "storeId": [["date", "employeeName", sales, transactions, ...], ...], ... }
-    const employeeMap = new Map<string, {
+    // Wrap in try-catch to ensure byStore data is still returned if employee aggregation fails
+    let byEmployee: Array<{
       employeeId: string;
-      employeeName: string;
-      storeId: string;
+      employeeName?: string;
+      storeId?: string;
+      storeName?: string;
       salesAmount: number;
       invoices: number;
-    }>();
+      kpis: { atv: number };
+    }> = [];
     
-    // Date range strings for filtering (YYYY-MM-DD format)
-    const startDateStr = startDate.toISOString().split('T')[0]; // "2026-01-01"
-    const endDateStr = endDate.toISOString().split('T')[0]; // "2026-01-31"
-    
-    // Process employees_data.json entries that match the date range
-    Object.entries(employeesData).forEach(([dataStoreId, entries]) => {
-      if (!Array.isArray(entries)) return;
+    try {
+      // employees_data.json format: { "storeId": [["date", "employeeName", sales, transactions, ...], ...], ... }
+      const employeeMap = new Map<string, {
+        employeeId: string;
+        employeeName: string;
+        storeId: string;
+        salesAmount: number;
+        invoices: number;
+      }>();
       
-      // Filter by storeId if specified (from request parameter)
-      if (storeId && dataStoreId !== storeId) return;
+      // Date range strings for filtering (YYYY-MM-DD format)
+      const startDateStr = startDate.toISOString().split('T')[0]; // "2026-01-01"
+      const endDateStr = endDate.toISOString().split('T')[0]; // "2026-01-31"
       
-      entries.forEach((entry) => {
-        if (!Array.isArray(entry) || entry.length < 4) return;
+      // Process employees_data.json entries that match the date range
+      Object.entries(employeesData).forEach(([dataStoreId, entries]) => {
+        if (!Array.isArray(entries)) return;
         
-        const entryDateStr = String(entry[0] || '').trim(); // "2026-01-17"
-        const employeeName = String(entry[1] || '').trim(); // "4661-Fatima Albeshi"
-        const sales = Number(entry[2]) || 0; // sales amount
-        const transactions = Number(entry[3]) || 0; // transaction count
+        // Filter by storeId if specified (from request parameter)
+        if (storeId && dataStoreId !== storeId) return;
         
-        if (!employeeName || !entryDateStr) return;
-        
-        // Check if date is within range
-        if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
-        
-        // Extract employeeId from name (e.g., "4661-Fatima Albeshi" -> "4661")
-        const employeeIdMatch = employeeName.match(/^(\d+)[-_\s]/);
-        const employeeId = employeeIdMatch ? employeeIdMatch[1] : employeeName.replace(/\s+/g, '_');
-        
-        // Key: employeeId + storeId (same employee can work at multiple stores)
-        const key = `${employeeId}_${dataStoreId}`;
-        
-        if (!employeeMap.has(key)) {
-          employeeMap.set(key, {
-            employeeId,
-            employeeName,
-            storeId: dataStoreId,
-            salesAmount: 0,
-            invoices: 0,
-          });
-        }
-        
-        const data = employeeMap.get(key)!;
-        data.salesAmount += sales;
-        data.invoices += transactions;
+        entries.forEach((entry) => {
+          if (!Array.isArray(entry) || entry.length < 4) return;
+          
+          const entryDateStr = String(entry[0] || '').trim(); // "2026-01-17"
+          const employeeName = String(entry[1] || '').trim(); // "4661-Fatima Albeshi"
+          const sales = Number(entry[2]) || 0; // sales amount
+          const transactions = Number(entry[3]) || 0; // transaction count
+          
+          if (!employeeName || !entryDateStr) return;
+          
+          // Check if date is within range
+          if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
+          
+          // Extract employeeId from name (e.g., "4661-Fatima Albeshi" -> "4661")
+          const employeeIdMatch = employeeName.match(/^(\d+)[-_\s]/);
+          const employeeId = employeeIdMatch ? employeeIdMatch[1] : employeeName.replace(/\s+/g, '_');
+          
+          // Key: employeeId + storeId (same employee can work at multiple stores)
+          const key = `${employeeId}_${dataStoreId}`;
+          
+          if (!employeeMap.has(key)) {
+            employeeMap.set(key, {
+              employeeId,
+              employeeName,
+              storeId: dataStoreId,
+              salesAmount: 0,
+              invoices: 0,
+            });
+          }
+          
+          const data = employeeMap.get(key)!;
+          data.salesAmount += sales;
+          data.invoices += transactions;
+        });
       });
-    });
-    
-    // Build employee response with optional chaining
-    const byEmployee = Array.from(employeeMap.values()).map((emp) => {
-      const storeName = storeMapping?.get(emp.storeId) || emp.storeId;
-      const atv = emp.invoices > 0 ? emp.salesAmount / emp.invoices : 0;
-      return {
-        employeeId: emp.employeeId || 'Unknown',
-        employeeName: emp.employeeName || 'Unknown',
-        storeId: emp.storeId || 'Unknown',
-        storeName: storeName || emp.storeId || 'Unknown',
-        salesAmount: Number(emp.salesAmount) || 0,
-        invoices: Number(emp.invoices) || 0,
-        kpis: {
-          atv: Number.isFinite(atv) ? atv : 0,
-        },
-      };
-    });
-    
-    console.log(`✅ Aggregated ${byEmployee.length} employees from employees_data.json`);
+      
+      // Build employee response with optional chaining
+      byEmployee = Array.from(employeeMap.values()).map((emp) => {
+        const storeName = storeMapping?.get(emp.storeId) || emp.storeId;
+        const atv = emp.invoices > 0 ? emp.salesAmount / emp.invoices : 0;
+        return {
+          employeeId: emp.employeeId || 'Unknown',
+          employeeName: emp.employeeName || 'Unknown',
+          storeId: emp.storeId || 'Unknown',
+          storeName: storeName || emp.storeId || 'Unknown',
+          salesAmount: Number(emp.salesAmount) || 0,
+          invoices: Number(emp.invoices) || 0,
+          kpis: {
+            atv: Number.isFinite(atv) ? atv : 0,
+          },
+        };
+      });
+      
+      console.log(`✅ Aggregated ${byEmployee.length} employees from employees_data.json`);
+    } catch (error: any) {
+      console.warn('⚠️ Error aggregating employee data, continuing with empty byEmployee array:', error.message);
+      byEmployee = []; // Default to empty array if aggregation fails
+    }
 
     // Calculate totals with safe defaults (optional chaining)
     const totalSales = byStore.reduce((sum, s) => sum + (Number(s?.salesAmount) || 0), 0);
