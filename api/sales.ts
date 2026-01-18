@@ -187,25 +187,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const startDate = new Date(Date.UTC(year, month || 0, day || 1, 0, 0, 0));
     
     // Calculate end date correctly: use last day of the month if day is not specified
-    let endMonth: number;
-    let endDay: number;
+    let endDate: Date;
     if (month !== undefined) {
       if (day !== undefined) {
-        // Specific day: use month + 1 and the specified day
-        endMonth = month + 1;
-        endDay = day;
+        // Specific day: end of that specific day
+        endDate = new Date(Date.UTC(year, month, day, 23, 59, 59));
       } else {
-        // Last day of month: use month + 1 and day 0 (which gives last day of month)
-        endMonth = month + 1;
-        endDay = 0;
+        // Last day of month: calculate last day of the month properly
+        // new Date(year, month + 1, 0) gives us the last day of the current month
+        const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0));
+        endDate = new Date(Date.UTC(
+          lastDayOfMonth.getUTCFullYear(),
+          lastDayOfMonth.getUTCMonth(),
+          lastDayOfMonth.getUTCDate(),
+          23, 59, 59
+        ));
       }
     } else {
       // Full year: use December 31
-      endMonth = 12;
-      endDay = 31;
+      endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59));
     }
-    
-    const endDate = new Date(Date.UTC(year, endMonth, endDay, 23, 59, 59));
 
     console.log(`📅 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
