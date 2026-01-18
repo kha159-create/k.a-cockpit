@@ -387,9 +387,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
 
     const fetchMetricsFromAPI = async () => {
       try {
-        // Always use absolute URL for API (works on both Vercel and GitHub Pages)
-        const vercelUrl = 'https://k-a-cockpit.vercel.app';
-        const apiUrl = `${vercelUrl}/api/get-metrics?year=${year}&month=${month}`;
+        // @ts-ignore
+        const API = import.meta.env.VITE_API_BASE_URL || '';
+        const apiUrl = API 
+          ? `${API}/api/get-metrics?year=${year}&month=${month}`
+          : `/api/get-metrics?year=${year}&month=${month}`;
         
         console.log(`🔗 Fetching metrics from API: ${apiUrl}`);
         
