@@ -45,62 +45,16 @@ const LivePage: React.FC = () => {
   }, [locale]);
 
   useEffect(() => {
-    // Function to load from API (Local JSON like dailysales)
-    const loadLiveDataFromAPI = async () => {
+    // Load live sales from D365 API (NO Firestore)
+    const loadLiveData = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        // @ts-ignore - Vite environment variables
-        const API = import.meta.env.VITE_API_BASE_URL || '';
-        const apiUrl = API ? `${API}/api/live-sales` : '/api/live-sales';
+        console.log('🔗 Fetching live sales from D365 API...');
         
-        console.log('🔗 Fetching from API URL:', apiUrl);
+        const result = await getLiveSales();
         
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        console.log('📡 Response status:', response.status, response.statusText);
-        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ Response error:', errorText);
-          throw new Error(`Failed to fetch live sales: ${response.status} ${response.statusText}`);
-        }
-
-        // Check if response has content
-        const contentType = response.headers.get('content-type');
-        console.log('📦 Content-Type:', contentType);
-
-        // Try to get response text first to check if it's empty
-        const responseText = await response.text();
-        console.log('📝 Response text length:', responseText.length);
-        
-        if (!responseText || responseText.trim().length === 0) {
-          console.warn('⚠️ Response is empty');
-          throw new Error('Response is empty');
-        }
-
-        // Parse JSON
-        let result;
-        try {
-          result = JSON.parse(responseText);
-        } catch (parseError: any) {
-          console.error('❌ JSON parse error:', parseError);
-          console.warn('⚠️ Response text:', responseText.substring(0, 500));
-          throw new Error('Failed to parse JSON response');
-        }
-        
-        console.log('📊 Parsed result:', result);
-        
-        // Check if API returned data (even if success is false, we can still try to use the data)
-        if (result.today || result.yesterday) {
-          // Convert API response to LiveSalesData format
+        if (result.success !== false && (result.today || result.yesterday)) {
           const data: LiveSalesData = {
             date: result.date || new Date().toISOString().split('T')[0],
             lastUpdate: result.lastUpdate || new Date().toTimeString().slice(0, 5),
@@ -110,61 +64,30 @@ const LivePage: React.FC = () => {
           setLiveData(data);
           setLoading(false);
           setError(null);
-          console.log('✅ Live data loaded successfully:', data);
-        } else if (result.success === false && result.error) {
-          // API returned explicit error
-          throw new Error(result.error);
+          console.log('✅ Live data loaded successfully from API');
         } else {
-          // No data and no explicit error - try Firestore fallback
-          console.warn('⚠️ API returned no data, trying Firestore fallback');
-          throw new Error('No data in API response');
+          throw new Error(result.error || 'No data in API response');
         }
       } catch (err: any) {
-        console.error('❌ Error loading live sales from API:', err);
-        console.log('🔄 Falling back to Firestore...');
-        // Fallback to Firestore if API fails (for backward compatibility)
-        loadLiveDataFromFirestore();
-      }
-    };
-
-    // Fallback: Load from Firestore (for historical data or if API fails)
-    const loadLiveDataFromFirestore = async () => {
-      try {
-        console.log('📦 Loading from Firestore...');
-        const doc = await db.collection('liveSales').doc('today').get();
-        
-        if (doc.exists) {
-          const firestoreData = doc.data() as any;
-          console.log('📦 Firestore data found:', firestoreData);
-          // Convert Firestore format to LiveSalesData format
-          const data: LiveSalesData = {
-            date: firestoreData.date?.toDate?.()?.toISOString()?.split('T')[0] || new Date().toISOString().split('T')[0],
-            lastUpdate: firestoreData.lastUpdateTime || firestoreData.lastUpdate?.toDate?.()?.toTimeString()?.slice(0, 5) || new Date().toTimeString().slice(0, 5),
-            today: firestoreData.today || firestoreData.stores || [],
-            yesterday: firestoreData.yesterday || [],
-          };
-          setLiveData(data);
-          setLoading(false);
-          setError(null);
-          console.log('✅ Firestore data loaded successfully:', data);
-        } else {
-          console.warn('⚠️ No data in Firestore either');
-          setError(copy.noData);
-          setLoading(false);
-        }
-      } catch (err: any) {
-        console.error('❌ Error loading live sales from Firestore:', err);
-        setError(err.message || copy.error);
+        console.error('❌ Error loading live sales:', err);
+        setError(locale === 'ar' ? 'فشل تحميل بيانات المبيعات المباشرة' : 'Failed to load live sales data');
         setLoading(false);
+        // Set empty data on error (don't crash)
+        setLiveData({
+          date: new Date().toISOString().split('T')[0],
+          lastUpdate: new Date().toTimeString().slice(0, 5),
+          today: [],
+          yesterday: [],
+        });
       }
     };
 
-    // Load immediately from API (Local JSON like dailysales)
-    loadLiveDataFromAPI();
+    // Load immediately from D365 API
+    loadLiveData();
 
-    // Auto-refresh API every 15 minutes (client-side polling)
+    // Auto-refresh every 15 minutes
     const refreshInterval = setInterval(() => {
-      loadLiveDataFromAPI();
+      loadLiveData();
     }, 15 * 60 * 1000); // 15 minutes
 
     return () => {
