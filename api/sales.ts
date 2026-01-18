@@ -340,17 +340,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       employeesData = {};
     }
 
-    // Step 3: Fetch D365 transactions (with error isolation)
-    let transactions: D365Transaction[];
+    // Step 3: Fetch D365 aggregated groups (server-side aggregation - MUCH faster)
+    // Uses $apply=groupby to aggregate on D365 server (reduces 57k+ records to ~100-500 rows)
+    let aggregatedGroups: D365AggregatedGroup[];
     let pages: number;
     try {
-      console.log('📦 Fetching D365 transactions...');
-      const result = await fetchD365Transactions(token, startDate, endDate, storeId);
-      transactions = result.transactions;
+      console.log('📦 Fetching D365 aggregated data (server-side groupby)...');
+      const result = await fetchD365Aggregated(token, startDate, endDate, storeId);
+      aggregatedGroups = result.groups;
       pages = result.pages;
-      console.log(`✅ Fetched ${transactions.length} transactions in ${pages} pages`);
+      console.log(`✅ Fetched ${aggregatedGroups.length} aggregated groups in ${pages} pages (already summed on server)`);
     } catch (error: any) {
-      console.error('❌ Failed to fetch D365 transactions:', error.message);
+      console.error('❌ Failed to fetch D365 aggregated data:', error.message);
       // Return 200 with empty data instead of 500 - no data is not an error
       return res.status(200).json({
         success: false,
@@ -573,7 +574,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     }).sort((a, b) => a.date.localeCompare(b.date)); // Sort by date
 
-    console.log(`📅 Built ${byDay.length} days of data from ${transactions.length} transactions`);
+    const totalTransactionsCount = aggregatedGroups.reduce((sum, g) => sum + g.InvoiceCount, 0);
+    console.log(`📅 Built ${byDay.length} days of data from ${aggregatedGroups.length} aggregated groups (~${totalTransactionsCount} transactions)`);
 
     return res.status(200).json({
       success: true,
