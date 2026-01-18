@@ -6,8 +6,8 @@ interface D365Transaction {
   OperatingUnitNumber: string;
   PaymentAmount: number;
   TransactionDate: string;
-  StaffId?: string;
-  StaffName?: string;
+  // Note: StaffId and StaffName are NOT available in RetailTransactions entity
+  // Employee data must come from a different source/endpoint if needed
   [key: string]: any;
 }
 
@@ -86,8 +86,8 @@ async function fetchD365Transactions(
   token: string,
   startDate: Date,
   endDate: Date,
-  storeId?: string,
-  employeeId?: string
+  storeId?: string
+  // Note: employeeId removed - StaffId is not available in RetailTransactions entity
 ): Promise<{ transactions: D365Transaction[]; pages: number }> {
   const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
   const baseUrl = `${d365Url}/data/RetailTransactions`;
@@ -95,11 +95,15 @@ async function fetchD365Transactions(
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
+  // Build filter - matching exact format from working api/live-sales.ts
   let filter = `PaymentAmount ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}`;
-  if (storeId) filter += ` and OperatingUnitNumber eq '${storeId}'`;
-  if (employeeId) filter += ` and StaffId eq '${employeeId}'`;
-
-  const selectFields = 'OperatingUnitNumber,PaymentAmount,TransactionDate,StaffId,StaffName';
+  if (storeId) {
+    filter += ` and OperatingUnitNumber eq '${storeId}'`;
+  }
+  // Note: employeeId filter removed - StaffId is not available in RetailTransactions entity
+  
+  // $select fields - EXACT match to working api/live-sales.ts (NO StaffId/StaffName)
+  const selectFields = 'OperatingUnitNumber,PaymentAmount,TransactionDate';
   const queryUrl = `${baseUrl}?$filter=${encodeURIComponent(filter)}&$select=${selectFields}&$orderby=TransactionDate`;
   
   console.log(`🔍 D365 query URL: ${queryUrl.substring(0, 200)}...`);
@@ -196,9 +200,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     const storeId = req.query.storeId as string | undefined;
-    const employeeId = req.query.employeeId as string | undefined;
-
-    console.log(`📊 /api/sales request: year=${year}, month=${month} (${month !== undefined ? month + 1 : 'all'}), day=${day}, storeId=${storeId}, employeeId=${employeeId}`);
+    // Note: employeeId parameter removed - employee filtering not supported (StaffId not in RetailTransactions entity)
+    
+    console.log(`📊 /api/sales request: year=${year}, month=${month !== undefined ? month + 1 : 'all'}, day=${day}, storeId=${storeId}`);
 
     // Only support 2026+ (legacy handled in frontend)
     if (year < 2026) {
@@ -283,7 +287,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let pages: number;
     try {
       console.log('📦 Fetching D365 transactions...');
-      const result = await fetchD365Transactions(token, startDate, endDate, storeId, employeeId);
+      const result = await fetchD365Transactions(token, startDate, endDate, storeId);
       transactions = result.transactions;
       pages = result.pages;
       console.log(`✅ Fetched ${transactions.length} transactions in ${pages} pages`);
@@ -306,41 +310,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Aggregate by store
+    // Aggregate by store (matching api/live-sales.ts pattern with optional chaining)
     const storeMap = new Map<string, { salesAmount: number; invoices: number }>();
     transactions.forEach((tx) => {
-      const id = tx.OperatingUnitNumber;
-      const amount = tx.PaymentAmount || 0;
-      if (!storeMap.has(id)) storeMap.set(id, { salesAmount: 0, invoices: 0 });
+      // Use optional chaining to prevent crashes if fields are missing
+      const id = tx?.OperatingUnitNumber?.toString()?.trim();
+      const amount = Number(tx?.PaymentAmount) || 0;
+      
+      if (!id) {
+        console.warn('⚠️ Transaction missing OperatingUnitNumber:', tx);
+        return; // Skip transactions without store ID
+      }
+      
+      if (!storeMap.has(id)) {
+        storeMap.set(id, { salesAmount: 0, invoices: 0 });
+      }
       const data = storeMap.get(id)!;
       data.salesAmount += amount;
       data.invoices += 1;
     });
 
-    // Aggregate by employee
-    const employeeMap = new Map<string, { salesAmount: number; invoices: number; storeId: string }>();
-    transactions.forEach((tx) => {
-      if (!tx.StaffId) return;
-      const key = `${tx.StaffId}_${tx.StaffName || 'Unknown'}`;
-      const amount = tx.PaymentAmount || 0;
-      const txStoreId = tx.OperatingUnitNumber;
-      if (!employeeMap.has(key)) {
-        employeeMap.set(key, { salesAmount: 0, invoices: 0, storeId: txStoreId });
-      }
-      const data = employeeMap.get(key)!;
-      data.salesAmount += amount;
-      data.invoices += 1;
-    });
-
-    // Build response
+    // Build store response with optional chaining and safe defaults
     const byStore = Array.from(storeMap.entries()).map(([storeId, data]) => {
-      const storeName = storeMapping.get(storeId) || storeId;
+      const storeName = storeMapping?.get(storeId) || storeId;
       const atv = data.invoices > 0 ? data.salesAmount / data.invoices : 0;
       return {
-        storeId,
-        storeName,
-        salesAmount: data.salesAmount,
-        invoices: data.invoices,
+        storeId: storeId || 'Unknown',
+        storeName: storeName || storeId || 'Unknown',
+        salesAmount: Number(data.salesAmount) || 0,
+        invoices: Number(data.invoices) || 0,
         kpis: {
           atv: Number.isFinite(atv) ? atv : 0,
           customerValue: Number.isFinite(atv) ? atv : 0,
@@ -348,24 +346,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     });
 
-    const byEmployee = Array.from(employeeMap.entries()).map(([key, data]) => {
-      const [employeeId, employeeName] = key.split('_');
-      const storeName = storeMapping.get(data.storeId) || data.storeId;
-      const atv = data.invoices > 0 ? data.salesAmount / data.invoices : 0;
-      return {
-        employeeId,
-        employeeName,
-        storeId: data.storeId,
-        storeName,
-        salesAmount: data.salesAmount,
-        invoices: data.invoices,
-        kpis: { atv: Number.isFinite(atv) ? atv : 0 },
-      };
-    });
+    // Employee aggregation removed - StaffId/StaffName are NOT available in RetailTransactions entity
+    // Employee data must come from a different D365 endpoint or source
+    const byEmployee: Array<{
+      employeeId: string;
+      employeeName?: string;
+      storeId?: string;
+      storeName?: string;
+      salesAmount: number;
+      invoices: number;
+      kpis: { atv: number };
+    }> = [];
 
-    const totalSales = byStore.reduce((sum, s) => sum + s.salesAmount, 0);
-    const totalInvoices = byStore.reduce((sum, s) => sum + s.invoices, 0);
-    const totalAtv = totalInvoices > 0 ? totalSales / totalInvoices : 0;
+    // Calculate totals with safe defaults (optional chaining)
+    const totalSales = byStore.reduce((sum, s) => sum + (Number(s?.salesAmount) || 0), 0);
+    const totalInvoices = byStore.reduce((sum, s) => sum + (Number(s?.invoices) || 0), 0);
+    const totalAtv = totalInvoices > 0 && totalInvoices !== 0 ? totalSales / totalInvoices : 0;
 
     return res.status(200).json({
       success: true,
