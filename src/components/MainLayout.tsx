@@ -346,28 +346,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         )
     );
 
-    // Separate listener for dailyMetrics (only for < 2024 data from Firestore)
-    const dailyMetricsUnsubscriber = db.collection('dailyMetrics').onSnapshot(
-        (snapshot) => {
-            const firestoreMetrics = snapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter((m: any) => {
-                    // Only include data from before 2024 (old system before orange-dashboard)
-                    if (!m.date || typeof m.date.toDate !== 'function') return true; // Include if date is invalid
-                    const metricDate = m.date.toDate();
-                    return metricDate.getFullYear() < 2024;
-                }) as DailyMetric[];
-            
-            // Merge with API metrics (2024+) from separate state
-            setDailyMetrics(prevMetrics => {
-                const apiMetrics = prevMetrics.filter(m => {
-                    if (!m.date || typeof m.date.toDate !== 'function') return false;
-                    const metricDate = m.date.toDate();
-                    return metricDate.getFullYear() >= 2024;
-                });
-                return [...firestoreMetrics, ...apiMetrics];
-            });
-            
     // NO Firestore listener for dailyMetrics - ALL data from API (orange-dashboard)
     // Firestore is completely removed for new data (2024+)
     // Only use API (like orange-dashboard - local JSON)
@@ -441,16 +419,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
           
           console.log(`📊 Converted ${apiMetrics.length} metrics from API`);
           
-          // Merge with Firestore metrics (keep old data < 2024, replace new data 2024+)
-          setDailyMetrics(prevMetrics => {
-            const oldMetrics = prevMetrics.filter(m => {
-              if (!m.date || typeof m.date.toDate !== 'function') return true;
-              const metricDate = m.date.toDate();
-              return metricDate.getFullYear() < 2024; // Keep only old data before 2024
-            });
-            console.log(`🔄 Merging: ${oldMetrics.length} old metrics (before 2024) + ${apiMetrics.length} new metrics (2024+)`);
-            return [...oldMetrics, ...apiMetrics];
-          });
+          // NO Firestore - ALL data from API (orange-dashboard)
+          // Replace all metrics with API data (like orange-dashboard - local JSON)
+          console.log(`✅ Setting ${apiMetrics.length} metrics from API (orange-dashboard)`);
+          setDailyMetrics(apiMetrics);
         } else {
           console.warn('⚠️ API returned no metrics:', result);
         }
