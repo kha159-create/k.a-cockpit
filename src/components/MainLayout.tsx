@@ -345,15 +345,21 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         
         if (result.success && Array.isArray(result.metrics)) {
           // Convert ISO date strings to Firestore Timestamps
-          const apiMetrics: DailyMetric[] = result.metrics.map((m: any) => ({
-            id: `${m.date}_${m.store}`,
-            date: firebase.firestore.Timestamp.fromDate(new Date(m.date)),
-            store: m.store,
-            totalSales: m.totalSales,
-            transactionCount: m.transactionCount,
-            employee: m.employee,
-            employeeId: m.employeeId,
-          }));
+          const apiMetrics: DailyMetric[] = result.metrics.map((m: any) => {
+            // Generate id consistent with API format: date_store_employee (or date_store if no employee)
+            const id = m.employee 
+              ? `${m.date}_${m.store}_${m.employee}` 
+              : `${m.date}_${m.store}`;
+            return {
+              id,
+              date: firebase.firestore.Timestamp.fromDate(new Date(m.date)),
+              store: m.store,
+              totalSales: m.totalSales,
+              transactionCount: m.transactionCount,
+              employee: m.employee,
+              employeeId: m.employeeId,
+            };
+          });
           
           console.log(`📊 Converted ${apiMetrics.length} metrics from API`);
           
