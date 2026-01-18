@@ -404,34 +404,60 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         }
         
         const result = await response.json();
-        console.log(`✅ API response:`, { success: result.success, count: result.count || result.metrics?.length || 0 });
+        console.log(`✅ API response:`, { success: result.success, byStore: result.byStore?.length || 0, byEmployee: result.byEmployee?.length || 0 });
         
-        if (result.success && Array.isArray(result.metrics)) {
-          // Convert ISO date strings to Firestore Timestamps
-          const apiMetrics: DailyMetric[] = result.metrics.map((m: any) => {
-            // Generate id consistent with API format: date_store_employee (or date_store if no employee)
-            const id = m.employee 
-              ? `${m.date}_${m.store}_${m.employee}` 
-              : `${m.date}_${m.store}`;
-            return {
-              id,
-              date: firebase.firestore.Timestamp.fromDate(new Date(m.date)),
-              store: m.store,
-              totalSales: m.totalSales,
-              transactionCount: m.transactionCount,
-              employee: m.employee,
-              employeeId: m.employeeId,
-            };
-          });
+        if (result.success) {
+          // /api/sales returns byStore and byEmployee, not metrics array
+          // Convert to DailyMetric[] format for compatibility
+          const apiMetrics: DailyMetric[] = [];
           
-          console.log(`📊 Converted ${apiMetrics.length} metrics from API`);
+          // Get date from range (use "from" date for the period)
+          const dateStr = result.range?.from || new Date().toISOString().split('T')[0];
+          const dateObj = new Date(dateStr);
+          
+          // Add employee-level metrics (byEmployee from API)
+          if (Array.isArray(result.byEmployee)) {
+            result.byEmployee.forEach((emp: any) => {
+              const id = `${dateStr}_${emp.storeName || emp.storeId}_${emp.employeeName || emp.employeeId}`;
+              apiMetrics.push({
+                id,
+                date: firebase.firestore.Timestamp.fromDate(dateObj),
+                store: emp.storeName || emp.storeId,
+                employee: emp.employeeName,
+                employeeId: emp.employeeId,
+                totalSales: emp.salesAmount || 0,
+                transactionCount: emp.invoices || 0,
+              });
+            });
+          }
+          
+          // Add store-level metrics (byStore from API) - only if no employees for that store
+          if (Array.isArray(result.byStore)) {
+            result.byStore.forEach((store: any) => {
+              // Only add if no employee metrics exist for this store
+              const hasEmployees = apiMetrics.some(m => (m.store === store.storeName || m.store === store.storeId));
+              if (!hasEmployees) {
+                const id = `${dateStr}_${store.storeName || store.storeId}`;
+                apiMetrics.push({
+                  id,
+                  date: firebase.firestore.Timestamp.fromDate(dateObj),
+                  store: store.storeName || store.storeId,
+                  totalSales: store.salesAmount || 0,
+                  transactionCount: store.invoices || 0,
+                  visitors: store.visitors,
+                });
+              }
+            });
+          }
+          
+          console.log(`📊 Converted ${apiMetrics.length} metrics from API (${result.byEmployee?.length || 0} employees + ${result.byStore?.length || 0} stores)`);
           
           // NO Firestore - ALL data from API (orange-dashboard)
           // Replace all metrics with API data (like orange-dashboard - local JSON)
           console.log(`✅ Setting ${apiMetrics.length} metrics from API (orange-dashboard)`);
           setDailyMetrics(apiMetrics);
         } else {
-          console.warn('⚠️ API returned no metrics:', result);
+          console.warn('⚠️ API returned error:', result);
         }
       } catch (error: any) {
         console.error('❌ Error fetching metrics from API:', error.message || error);
