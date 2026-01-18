@@ -433,7 +433,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     };
 
     fetchMetricsHybrid();
-  }, [profile, dateFilter.year, dateFilter.month]);
+  }, [profile, dateFilter.year, dateFilter.month, stores]); // Add stores dependency for proper store name mapping
 
   useEffect(() => {
     if (profile?.role !== 'admin' && profile?.role !== 'general_manager') {
