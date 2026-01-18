@@ -9,16 +9,25 @@ if (!admin.apps.length) {
     const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
     if (!projectId || !clientEmail || !privateKey) {
-      console.error('❌ Missing Firebase credentials');
-    } else {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
+      console.error('❌ Missing Firebase credentials:', {
+        hasProjectId: !!projectId,
+        hasClientEmail: !!clientEmail,
+        hasPrivateKey: !!privateKey,
       });
-      console.log('✅ Firebase Admin initialized');
+    } else {
+      try {
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId,
+            clientEmail,
+            privateKey,
+          }),
+        });
+        console.log('✅ Firebase Admin initialized successfully');
+      } catch (initError: any) {
+        console.error('❌ Firebase Admin initialization failed:', initError.message);
+        throw initError;
+      }
     }
   } catch (error: any) {
     console.error('❌ Firebase Admin initialization error:', error);
@@ -61,7 +70,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!db) {
-    return res.status(500).json({ error: 'Firestore not initialized' });
+    const errorMsg = 'Firestore not initialized. Check Firebase credentials in Vercel Environment Variables.';
+    console.error('❌', errorMsg, {
+      hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      appsLength: admin.apps.length,
+    });
+    return res.status(500).json({ 
+      error: errorMsg,
+      details: 'Ensure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set in Vercel and redeploy.'
+    });
   }
 
   try {
