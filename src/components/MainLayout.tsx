@@ -7,6 +7,7 @@ import firebase from 'firebase/app';
 import { useDataProcessing } from '@/hooks/useDataProcessing';
 import { useSmartUploader } from '@/hooks/useSmartUploader';
 import { useLocale } from '@/context/LocaleContext';
+import { getSalesData, getStores } from '@/data/dataProvider';
 
 import Dashboard from '@/pages/Dashboard';
 import StoresPage from '@/pages/StoresPage';
@@ -214,58 +215,40 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   useEffect(() => {
     if (!profile) return;
     
-    // Load stores from API (like orange-dashboard) - NO Firestore needed for new data
-    const loadStoresFromAPI = async () => {
+    // Load stores using hybrid provider (legacy for 2024/2025, API for 2026+)
+    const loadStoresHybrid = async () => {
       try {
-        console.log('📥 Loading stores from API (orange-dashboard)...');
-        // @ts-ignore
-        const API = import.meta.env.VITE_API_BASE_URL || '';
-        const apiUrl = API ? `${API}/api/get-stores` : '/api/get-stores';
-        const response = await fetch(apiUrl);
+        const year = typeof dateFilter.year === 'number' ? dateFilter.year : new Date().getFullYear();
+        const storesList = await getStores(year);
         
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && Array.isArray(result.stores)) {
-            console.log(`✅ Loaded ${result.stores.length} stores from API`);
-            setStores(result.stores as Store[]);
-          } else {
-            console.warn('⚠️ API returned no stores, falling back to Firestore');
-            // Fallback to Firestore if API fails
-            loadStoresFromFirestore();
-          }
+        if (storesList.length > 0) {
+          console.log(`✅ Loaded ${storesList.length} stores from ${year <= 2025 ? 'legacy' : 'API'}`);
+          setStores(storesList as Store[]);
         } else {
-          console.warn('⚠️ API failed, falling back to Firestore');
-          loadStoresFromFirestore();
+          console.warn('⚠️ No stores loaded - returning empty array');
+          setStores([]);
         }
       } catch (error: any) {
-        console.error('❌ Error loading stores from API:', error);
-        // Fallback to Firestore if API fails
-        loadStoresFromFirestore();
+        console.error('❌ Error loading stores:', error);
+        setStores([]);
       }
     };
     
-    // Fallback: Load stores from Firestore (for old data or if API fails)
-    const loadStoresFromFirestore = () => {
-      const unsubscriber = db.collection('stores').onSnapshot(
-        (snapshot) => {
-          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Store[];
-          console.log(`📦 Loaded ${data.length} stores from Firestore (fallback)`);
-          setStores(data);
-        },
-        (err) => {
-          console.error('Error fetching stores from Firestore:', err);
-        }
-      );
-      return unsubscriber;
-    };
+    loadStoresHybrid();
     
-    // Try API first (like orange-dashboard), fallback to Firestore
-    loadStoresFromAPI();
-    
-    // Load employees from API (like orange-dashboard) - NO Firestore needed for new data
+    // Load employees from API (2026+ only, empty for legacy years)
     const loadEmployeesFromAPI = async () => {
       try {
-        console.log('📥 Loading employees from API (orange-dashboard)...');
+        const year = typeof dateFilter.year === 'number' ? dateFilter.year : new Date().getFullYear();
+        
+        // Legacy years (2024/2025) have no employee data
+        if (year <= 2025) {
+          console.log(`📊 Legacy year ${year} - no employee data available`);
+          setEmployees([]);
+          return;
+        }
+        
+        // For 2026+, load from API
         // @ts-ignore
         const API = import.meta.env.VITE_API_BASE_URL || '';
         const apiUrl = API ? `${API}/api/get-employees` : '/api/get-employees';
@@ -277,37 +260,19 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             console.log(`✅ Loaded ${result.employees.length} employees from API`);
             setEmployees(result.employees as Employee[]);
           } else {
-            console.warn('⚠️ API returned no employees, falling back to Firestore');
-            // Fallback to Firestore if API fails
-            loadEmployeesFromFirestore();
+            console.warn('⚠️ API returned no employees');
+            setEmployees([]);
           }
         } else {
-          console.warn('⚠️ API failed, falling back to Firestore');
-          loadEmployeesFromFirestore();
+          console.warn('⚠️ API failed for employees');
+          setEmployees([]);
         }
       } catch (error: any) {
         console.error('❌ Error loading employees from API:', error);
-        // Fallback to Firestore if API fails
-        loadEmployeesFromFirestore();
+        setEmployees([]);
       }
     };
     
-    // Fallback: Load employees from Firestore (for old data or if API fails)
-    const loadEmployeesFromFirestore = () => {
-      const unsubscriber = db.collection('employees').onSnapshot(
-        (snapshot) => {
-          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Employee[];
-          console.log(`📦 Loaded ${data.length} employees from Firestore (fallback)`);
-          setEmployees(data);
-        },
-        (err) => {
-          console.error('Error fetching employees from Firestore:', err);
-        }
-      );
-      return unsubscriber;
-    };
-    
-    // Try API first (like orange-dashboard), fallback to Firestore
     loadEmployeesFromAPI();
     
     const collectionsToWatch: { [key: string]: React.Dispatch<React.SetStateAction<any>> } = {
@@ -385,37 +350,28 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
       return;
     }
 
-    const fetchMetricsFromAPI = async () => {
+    const fetchMetricsHybrid = async () => {
       try {
-        // Use /api/sales endpoint (replaces deleted /api/get-metrics)
-        // @ts-ignore
-        const API = import.meta.env.VITE_API_BASE_URL || '';
-        const apiUrl = API 
-          ? `${API}/api/sales?year=${year}&month=${month}`
-          : `/api/sales?year=${year}&month=${month}`;
+        console.log(`📊 Fetching metrics for year ${year} (${year <= 2025 ? 'legacy' : 'D365'})...`);
         
-        console.log(`🔗 Fetching metrics from API: ${apiUrl}`);
+        const result = await getSalesData({ year, month });
         
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ API error ${response.status}:`, errorText);
-          throw new Error(`API error: ${response.status} - ${errorText}`);
-        }
-        
-        const result = await response.json();
-        console.log(`✅ API response:`, { success: result.success, byStore: result.byStore?.length || 0, byEmployee: result.byEmployee?.length || 0 });
+        console.log(`✅ Hybrid response:`, { 
+          success: result.success, 
+          source: result.debug?.source || 'unknown',
+          byStore: result.byStore?.length || 0, 
+          byEmployee: result.byEmployee?.length || 0 
+        });
         
         if (result.success) {
-          // /api/sales returns byStore and byEmployee, not metrics array
-          // Convert to DailyMetric[] format for compatibility
+          // Convert normalized response to DailyMetric[] format for compatibility
           const apiMetrics: DailyMetric[] = [];
           
           // Get date from range (use "from" date for the period)
           const dateStr = result.range?.from || new Date().toISOString().split('T')[0];
           const dateObj = new Date(dateStr);
           
-          // Add employee-level metrics (byEmployee from API)
+          // Add employee-level metrics (byEmployee from API/D365, empty for legacy)
           if (Array.isArray(result.byEmployee)) {
             result.byEmployee.forEach((emp: any) => {
               const id = `${dateStr}_${emp.storeName || emp.storeId}_${emp.employeeName || emp.employeeId}`;
@@ -431,12 +387,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             });
           }
           
-          // Add store-level metrics (byStore from API) - only if no employees for that store
+          // Add store-level metrics (byStore from legacy or D365)
           if (Array.isArray(result.byStore)) {
             result.byStore.forEach((store: any) => {
-              // Only add if no employee metrics exist for this store
+              // Only add if no employee metrics exist for this store (or legacy year)
               const hasEmployees = apiMetrics.some(m => (m.store === store.storeName || m.store === store.storeId));
-              if (!hasEmployees) {
+              if (!hasEmployees || year <= 2025) {
                 const id = `${dateStr}_${store.storeName || store.storeId}`;
                 apiMetrics.push({
                   id,
@@ -450,21 +406,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             });
           }
           
-          console.log(`📊 Converted ${apiMetrics.length} metrics from API (${result.byEmployee?.length || 0} employees + ${result.byStore?.length || 0} stores)`);
-          
-          // NO Firestore - ALL data from API (orange-dashboard)
-          // Replace all metrics with API data (like orange-dashboard - local JSON)
-          console.log(`✅ Setting ${apiMetrics.length} metrics from API (orange-dashboard)`);
+          console.log(`📊 Converted ${apiMetrics.length} metrics from ${result.debug?.source || 'hybrid'}`);
+          console.log(`✅ Setting ${apiMetrics.length} metrics (${result.debug?.source || 'hybrid'})`);
           setDailyMetrics(apiMetrics);
         } else {
-          console.warn('⚠️ API returned error:', result);
+          console.warn('⚠️ Hybrid provider returned error:', result);
+          setDailyMetrics([]);
         }
       } catch (error: any) {
-        console.error('❌ Error fetching metrics from API:', error.message || error);
+        console.error('❌ Error fetching metrics from hybrid provider:', error.message || error);
+        setDailyMetrics([]);
       }
     };
 
-    fetchMetricsFromAPI();
+    fetchMetricsHybrid();
   }, [profile, dateFilter.year, dateFilter.month]);
 
   useEffect(() => {

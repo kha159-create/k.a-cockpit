@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { db } from '@/services/firebase';
-import firebase from 'firebase/app';
 import { useLocale } from '@/context/LocaleContext';
+import { getLiveSales } from '@/data/dataProvider';
+import { apiUrl } from '@/utils/apiBase';
 
 interface LiveSalesData {
   date: string; // YYYY-MM-DD (from JSON) or firebase.firestore.Timestamp (from Firestore)
