@@ -142,28 +142,7 @@ const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
     }).format(sales);
   };
 
-  if (loading && !liveData) {
-    return (
-      <div className="flex items-center justify-center h-64 bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-orange-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{copy.loading}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !liveData) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-red-200 p-6">
-        <div className="text-center text-red-600">
-          <p className="font-semibold">{copy.error}</p>
-          <p className="text-sm mt-2">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
+  // IMPORTANT: All Hooks (useMemo) must be called BEFORE any early returns
   // Get available area managers (for admin/general_manager only)
   const showAreaManagerFilter = useMemo(() => {
     return profile?.role === 'admin' || profile?.role === 'general_manager';
@@ -206,6 +185,29 @@ const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
   // Get current view data
   const currentStores = viewMode === 'today' ? filteredTodayStores : filteredYesterdayStores;
   const totalSales = currentStores.reduce((sum, item) => sum + (item.sales || 0), 0);
+
+  // Early returns AFTER all hooks (useMemo) are called
+  if (loading && !liveData) {
+    return (
+      <div className="flex items-center justify-center h-64 bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">{copy.loading}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !liveData) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-red-200 p-6">
+        <div className="text-center text-red-600">
+          <p className="font-semibold">{copy.error}</p>
+          <p className="text-sm mt-2">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
