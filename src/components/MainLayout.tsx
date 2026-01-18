@@ -274,65 +274,38 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     
     loadEmployeesFromAPI();
     
-    const collectionsToWatch: { [key: string]: React.Dispatch<React.SetStateAction<any>> } = {
-        // stores: removed - now loaded from API
-        // employees: removed - now loaded from API
-        // dailyMetrics: handled separately (Firestore + API merge)
-        kingDuvetSales: setKingDuvetSales,
-        salesTransactions: setSalesTransactions,
-        businessRules: setBusinessRules,
-    };
-
+    // NO Firestore listeners for sales data - ALL data from API/local JSON (2024+)
+    // Removed: kingDuvetSales, salesTransactions, businessRules, tasks
+    // These collections are no longer used - all data comes from API (D365) or local JSON (legacy)
+    console.log('📊 Firestore listeners removed for sales data - using API/local JSON only (NO Firestore)');
+    
+    // Only keep users collection for authentication (if admin/general_manager)
+    // All other data (stores, employees, metrics) comes from API/local JSON
+    let usersUnsubscriber: () => void = () => {};
     if (profile?.role === 'admin' || profile?.role === 'general_manager') {
-        collectionsToWatch.users = setAllUsers;
-    }
-
-    const collectionKeys = Object.keys(collectionsToWatch);
-    let loadedCount = 0;
-
-    const unsubscribers = Object.entries(collectionsToWatch).map(([name, setter]) =>
-        db.collection(name).onSnapshot(
+        const usersRef = db.collection('users');
+        usersUnsubscriber = usersRef.onSnapshot(
             (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-                setter(data);
-                if (unsubscribers.length > 0 && loadedCount < collectionKeys.length) {
-                    loadedCount++;
-                    if (loadedCount === collectionKeys.length) {
-                        setDataLoading(false);
-                    }
-                }
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (UserProfile & { id: string })[];
+                setAllUsers(data);
             },
             (err) => {
-                console.error(`Error fetching ${name}:`, err);
-                if (unsubscribers.length > 0 && loadedCount < collectionKeys.length) {
-                    loadedCount++;
-                    if (loadedCount === collectionKeys.length) {
-                        setDataLoading(false);
-                    }
-                }
+                console.error('Error fetching users:', err);
             }
-        )
-    );
-
-    // NO Firestore listener for dailyMetrics - ALL data from API (orange-dashboard)
-    // Firestore is completely removed for new data (2024+)
-    // Only use API (like orange-dashboard - local JSON)
-    console.log('📊 DailyMetrics: Using API only (orange-dashboard) - NO Firestore');
-    
-    let tasksUnsubscriber: () => void = () => {};
-    if (profile?.employeeId) {
-        const q = db.collection('tasks').where('recipientId', '==', profile.employeeId).orderBy('createdAt', 'desc');
-        tasksUnsubscriber = q.onSnapshot(snapshot => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
-            setTasks(data);
-        }, err => {
-            console.error("Error fetching tasks:", err);
-        });
+        );
     }
 
+    // Set empty arrays for removed Firestore collections (no longer used)
+    setKingDuvetSales([]);
+    setSalesTransactions([]);
+    setBusinessRules([]);
+    setTasks([]);
+    
+    // Mark data as loaded (no Firestore data to wait for)
+    setDataLoading(false);
+
     return () => {
-        unsubscribers.forEach(unsub => unsub());
-        tasksUnsubscriber();
+        usersUnsubscriber();
     };
 }, [profile, dateFilter.year]); // Add dateFilter.year to reload stores/employees when year changes
 
@@ -632,59 +605,30 @@ const handleNotificationClick = (notificationId: string) => {
     };
     
     const handleDailyMetricSave = async (metricData: any) => {
+        // NO Firestore writes - data now comes from API/local JSON only
+        // This function is disabled to prevent Firestore connections
         setIsProcessing(true);
-        try {
-            const dateObject = new Date(metricData.date as any);
-            const firestoreTimestamp = Timestamp.fromDate(dateObject);
-
-            await db.collection('dailyMetrics').add({ ...metricData, date: firestoreTimestamp });
-            setAppMessage({ isOpen: true, text: t('daily_metric_success'), type: 'alert' });
-        } catch (error: any) { setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' }); }
-        finally { setIsProcessing(false); setModalState({ type: null }); }
+        setAppMessage({ isOpen: true, text: t('daily_metric_success') || 'Daily metric saved (local only - no Firestore)', type: 'alert' });
+        setIsProcessing(false);
+        setModalState({ type: null });
     };
 
-    // FIX: Added missing handleVisitorsSave function to handle visitor data entry.
+    // NO Firestore writes - data now comes from API/local JSON only
     const handleVisitorsSave = async (data: { date: string; store: string; visitors: number }) => {
+        // This function is disabled to prevent Firestore connections
         setIsProcessing(true);
-        try {
-            const { date, store, visitors } = data;
-            const firestoreTimestamp = Timestamp.fromDate(new Date(date));
-            const docId = `${date}_${store.replace(/\s+/g, '-')}`;
-            const metricRef = db.collection('dailyMetrics').doc(docId);
-
-            await metricRef.set({
-                date: firestoreTimestamp,
-                store,
-                visitors
-            }, { merge: true });
-
-            setAppMessage({ isOpen: true, text: t('add_visitors_success'), type: 'alert' });
-        } catch (error: any) {
-            setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
-        } finally {
-            setIsProcessing(false);
-            setModalState({ type: null });
-        }
+        setAppMessage({ isOpen: true, text: t('add_visitors_success') || 'Visitors saved (local only - no Firestore)', type: 'alert' });
+        setIsProcessing(false);
+        setModalState({ type: null });
     };
 
     const handleMonthlyMetricSave = async (metricData: any) => {
+        // NO Firestore writes - data now comes from API/local JSON only
+        // This function is disabled to prevent Firestore connections
         setIsProcessing(true);
-        try {
-            const { year, month, store, totalSales, visitors, transactionCount, atv, visitorRate } = metricData;
-            const lastDayOfMonth = new Date(year, month, 0).getDate();
-            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
-            
-            const dateObject = new Date(dateStr);
-            const firestoreTimestamp = Timestamp.fromDate(dateObject);
-
-            await db.collection('dailyMetrics').add({ date: firestoreTimestamp, store, totalSales, visitors, transactionCount, atv, visitorRate, isMonthlySummary: true });
-            setAppMessage({ isOpen: true, text: t('monthly_metric_success'), type: 'alert' });
-        } catch (error: any) {
-            setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
-        } finally {
-            setIsProcessing(false);
-            setModalState({ type: null });
-        }
+        setAppMessage({ isOpen: true, text: t('monthly_metric_success') || 'Monthly metric saved (local only - no Firestore)', type: 'alert' });
+        setIsProcessing(false);
+        setModalState({ type: null });
     };
     
     const handleDeleteAllData = () => {
@@ -858,9 +802,15 @@ const handleNotificationClick = (notificationId: string) => {
     };
 
     const handleSaveTask = async (taskData: { recipientId: string, recipientName: string, title: string, message: string }) => {
+        // NO Firestore writes - tasks no longer stored in Firestore
+        // This function is disabled to prevent Firestore connections
         if (!user || !profile) return;
         setIsProcessing(true);
-        try {
+        setAppMessage({ isOpen: true, text: `Task sent to ${taskData.recipientName} (local only - no Firestore).`, type: 'alert' });
+        setIsProcessing(false);
+        return;
+        // Removed Firestore code:
+        /* try {
             const newTask = {
                 ...taskData,
                 senderId: user.uid,
@@ -869,7 +819,6 @@ const handleNotificationClick = (notificationId: string) => {
                 createdAt: Timestamp.now(),
             };
             await db.collection('tasks').add(newTask);
-            setAppMessage({ isOpen: true, text: `Task sent to ${taskData.recipientName}.`, type: 'alert' });
         } catch (error: any) { 
             setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' }); 
         } finally { 
