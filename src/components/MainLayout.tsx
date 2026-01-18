@@ -434,8 +434,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     fetchMetricsFromAPI();
   }, [profile, dateFilter.year, dateFilter.month]);
 
-
-useEffect(() => {
+  useEffect(() => {
     if (profile?.role !== 'admin' && profile?.role !== 'general_manager') {
       return;
     }
