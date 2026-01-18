@@ -366,6 +366,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
           // Convert normalized response to DailyMetric[] format for compatibility
           const apiMetrics: DailyMetric[] = [];
           
+          // Build mapping: storeId -> storeName from current stores list (for proper matching)
+          const storeNameMap = new Map<string, string>();
+          stores.forEach(s => {
+            const storeId = (s as any).store_id || s.id || s.name;
+            storeNameMap.set(storeId, s.name);
+          });
+          
           // Get date from range (use "from" date for the period)
           const dateStr = result.range?.from || new Date().toISOString().split('T')[0];
           const dateObj = new Date(dateStr);
@@ -373,11 +380,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
           // Add employee-level metrics (byEmployee from API/D365, empty for legacy)
           if (Array.isArray(result.byEmployee)) {
             result.byEmployee.forEach((emp: any) => {
-              const id = `${dateStr}_${emp.storeName || emp.storeId}_${emp.employeeName || emp.employeeId}`;
+              // Map storeId to storeName for proper matching
+              const storeId = emp.storeId || emp.storeName;
+              const storeName = storeNameMap.get(storeId) || emp.storeName || storeId;
+              const id = `${dateStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
               apiMetrics.push({
                 id,
                 date: firebase.firestore.Timestamp.fromDate(dateObj),
-                store: emp.storeName || emp.storeId,
+                store: storeName, // Use mapped name from stores list
                 employee: emp.employeeName,
                 employeeId: emp.employeeId,
                 totalSales: emp.salesAmount || 0,
@@ -389,14 +399,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
           // Add store-level metrics (byStore from legacy or D365)
           if (Array.isArray(result.byStore)) {
             result.byStore.forEach((store: any) => {
+              // Map storeId to storeName for proper matching
+              const storeId = store.storeId || store.storeName;
+              const storeName = storeNameMap.get(storeId) || store.storeName || storeId;
+              
               // Only add if no employee metrics exist for this store (or legacy year)
-              const hasEmployees = apiMetrics.some(m => (m.store === store.storeName || m.store === store.storeId));
+              const hasEmployees = apiMetrics.some(m => m.store === storeName);
               if (!hasEmployees || year <= 2025) {
-                const id = `${dateStr}_${store.storeName || store.storeId}`;
+                const id = `${dateStr}_${storeName}`;
                 apiMetrics.push({
                   id,
                   date: firebase.firestore.Timestamp.fromDate(dateObj),
-                  store: store.storeName || store.storeId,
+                  store: storeName, // Use mapped name from stores list
                   totalSales: store.salesAmount || 0,
                   transactionCount: store.invoices || 0,
                   visitors: store.visitors,
