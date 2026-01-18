@@ -260,9 +260,55 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     // Try API first (like orange-dashboard), fallback to Firestore
     loadStoresFromAPI();
     
+    // Load employees from API (like orange-dashboard) - NO Firestore needed for new data
+    const loadEmployeesFromAPI = async () => {
+      try {
+        console.log('📥 Loading employees from API (orange-dashboard)...');
+        const apiUrl = 'https://k-a-cockpit.vercel.app/api/get-employees';
+        const response = await fetch(apiUrl);
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && Array.isArray(result.employees)) {
+            console.log(`✅ Loaded ${result.employees.length} employees from API`);
+            setEmployees(result.employees as Employee[]);
+          } else {
+            console.warn('⚠️ API returned no employees, falling back to Firestore');
+            // Fallback to Firestore if API fails
+            loadEmployeesFromFirestore();
+          }
+        } else {
+          console.warn('⚠️ API failed, falling back to Firestore');
+          loadEmployeesFromFirestore();
+        }
+      } catch (error: any) {
+        console.error('❌ Error loading employees from API:', error);
+        // Fallback to Firestore if API fails
+        loadEmployeesFromFirestore();
+      }
+    };
+    
+    // Fallback: Load employees from Firestore (for old data or if API fails)
+    const loadEmployeesFromFirestore = () => {
+      const unsubscriber = db.collection('employees').onSnapshot(
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Employee[];
+          console.log(`📦 Loaded ${data.length} employees from Firestore (fallback)`);
+          setEmployees(data);
+        },
+        (err) => {
+          console.error('Error fetching employees from Firestore:', err);
+        }
+      );
+      return unsubscriber;
+    };
+    
+    // Try API first (like orange-dashboard), fallback to Firestore
+    loadEmployeesFromAPI();
+    
     const collectionsToWatch: { [key: string]: React.Dispatch<React.SetStateAction<any>> } = {
         // stores: removed - now loaded from API
-        employees: setEmployees,
+        // employees: removed - now loaded from API
         // dailyMetrics: handled separately (Firestore + API merge)
         kingDuvetSales: setKingDuvetSales,
         salesTransactions: setSalesTransactions,
