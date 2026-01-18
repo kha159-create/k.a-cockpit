@@ -68,7 +68,7 @@ async function fetchTransactionsLastTwoDays(token: string): Promise<{
   let nextLink: string | null = queryUrl;
 
   while (nextLink) {
-    const response = await fetch(nextLink, {
+    const response: Response = await fetch(nextLink, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
@@ -80,7 +80,7 @@ async function fetchTransactionsLastTwoDays(token: string): Promise<{
       throw new Error(`D365 API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
     allTransactions.push(...(data.value || []));
     nextLink = data['@odata.nextLink'] || null;
   }
@@ -136,14 +136,14 @@ async function loadStoreMapping(): Promise<Map<string, string>> {
   try {
     // Fetch mapping.xlsx from orange-dashboard GitHub repository (like dailysales)
     console.log('📥 Loading store mapping from orange-dashboard...');
-    const response = await fetch('https://raw.githubusercontent.com/ALAAWF2/dailysales/main/backend/mapping.xlsx');
+    const response: Response = await fetch('https://raw.githubusercontent.com/ALAAWF2/dailysales/main/backend/mapping.xlsx');
     
     if (!response.ok) {
       console.warn('⚠️ Could not fetch mapping from orange-dashboard, using empty mapping');
       return mapping;
     }
     
-    const arrayBuffer = await response.arrayBuffer();
+    const arrayBuffer: ArrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
     // Parse Excel using XLSX (same as dailysales)
@@ -235,13 +235,6 @@ function prepareLiveSalesJSON(
 }
 
 // NO Firestore - Pure JSON response like orange-dashboard
-      yesterday: yesterdayData,
-    }, { merge: true });
-    console.log('✅ Saved to Firestore (backup)');
-  } catch (error: any) {
-    console.warn('⚠️ Firestore backup failed:', error.message);
-  }
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS for cross-origin requests (GitHub Pages to Vercel API)
