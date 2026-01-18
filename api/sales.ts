@@ -11,6 +11,13 @@ interface D365Transaction {
   [key: string]: any;
 }
 
+interface D365AggregatedGroup {
+  OperatingUnitNumber: string;
+  TransactionDate: string;
+  TotalAmount: number; // Sum of PaymentAmount (server-side aggregated)
+  InvoiceCount: number; // Count of transactions (server-side counted)
+}
+
 async function getAccessToken(): Promise<string> {
   const clientId = process.env.D365_CLIENT_ID;
   const clientSecret = process.env.D365_CLIENT_SECRET;
@@ -102,33 +109,37 @@ async function loadStoreMapping(): Promise<Map<string, string>> {
   return mapping;
 }
 
-async function fetchD365Transactions(
+/**
+ * Fetch aggregated transactions from D365 using server-side aggregation ($apply=groupby)
+ * This dramatically reduces payload size (from 57k+ records to ~100-500 aggregated groups)
+ */
+async function fetchD365Aggregated(
   token: string,
   startDate: Date,
   endDate: Date,
   storeId?: string
-  // Note: employeeId removed - StaffId is not available in RetailTransactions entity
-): Promise<{ transactions: D365Transaction[]; pages: number }> {
+): Promise<{ groups: D365AggregatedGroup[]; pages: number }> {
   const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
   const baseUrl = `${d365Url}/data/RetailTransactions`;
 
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
-  // Build filter - matching exact format from working api/live-sales.ts
+  // Build filter - only non-zero payments in date range
   let filter = `PaymentAmount ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}`;
   if (storeId) {
     filter += ` and OperatingUnitNumber eq '${storeId}'`;
   }
-  // Note: employeeId filter removed - StaffId is not available in RetailTransactions entity
-  
-  // $select fields - EXACT match to working api/live-sales.ts (NO StaffId/StaffName)
-  const selectFields = 'OperatingUnitNumber,PaymentAmount,TransactionDate';
-  const queryUrl = `${baseUrl}?$filter=${encodeURIComponent(filter)}&$select=${selectFields}&$orderby=TransactionDate`;
-  
-  console.log(`🔍 D365 query URL: ${queryUrl.substring(0, 200)}...`);
 
-  const allTransactions: D365Transaction[] = [];
+  // OData $apply=groupby with aggregation: Group by (OperatingUnitNumber, TransactionDate)
+  // Aggregate: sum(PaymentAmount) as TotalAmount, count() as InvoiceCount
+  // This reduces 57k+ records to ~100-500 aggregated rows (one per store per day)
+  const applyClause = `groupby((OperatingUnitNumber,TransactionDate),aggregate(PaymentAmount with sum as TotalAmount,$count as InvoiceCount))`;
+  const queryUrl = `${baseUrl}?$filter=${encodeURIComponent(filter)}&$apply=${encodeURIComponent(applyClause)}&$orderby=TransactionDate,OperatingUnitNumber`;
+  
+  console.log(`🔍 D365 aggregated query URL: ${queryUrl.substring(0, 250)}...`);
+
+  const allGroups: D365AggregatedGroup[] = [];
   let nextLink: string | null = queryUrl;
   let pages = 0;
 
@@ -144,6 +155,7 @@ async function fetchD365Transactions(
 
     if (!response.ok) {
       const errorText: string = await response.text();
+      // If $apply is not supported, fall back to old method (commented for now)
       throw new Error(`D365 API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
@@ -158,11 +170,21 @@ async function fetchD365Transactions(
       throw new Error(`D365 API returned invalid response format. Expected 'value' array, got: ${JSON.stringify(Object.keys(data))}`);
     }
     
-    allTransactions.push(...(data.value || []));
+    // Map aggregated response to D365AggregatedGroup
+    const groups: D365AggregatedGroup[] = (data.value || []).map((item: any) => ({
+      OperatingUnitNumber: String(item.OperatingUnitNumber || '').trim(),
+      TransactionDate: item.TransactionDate || '',
+      TotalAmount: Number(item.TotalAmount || 0),
+      InvoiceCount: Number(item.InvoiceCount || 0),
+    }));
+    
+    allGroups.push(...groups);
     nextLink = data['@odata.nextLink'] || null;
   }
 
-  return { transactions: allTransactions, pages };
+  console.log(`✅ Fetched ${allGroups.length} aggregated groups (reduced from ~${allGroups.reduce((sum, g) => sum + g.InvoiceCount, 0)} transactions)`);
+
+  return { groups: allGroups, pages };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -576,9 +598,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       debug: {
         source: 'd365',
         pages,
-        fetched: transactions.length,
+        fetched: aggregatedGroups.length, // Number of aggregated groups (not individual transactions)
         dailyDays: byDay.length,
-        notes: [`Fetched from D365 RetailTransactions API`, `Daily breakdown: ${byDay.length} days`],
+        notes: [
+          `Fetched from D365 RetailTransactions API (server-side aggregated)`,
+          `Daily breakdown: ${byDay.length} days`,
+          `Performance: ${aggregatedGroups.length} groups vs ~${aggregatedGroups.reduce((sum, g) => sum + g.InvoiceCount, 0)} transactions (reduced by ~${Math.round(100 * (1 - aggregatedGroups.length / Math.max(1, aggregatedGroups.reduce((sum, g) => sum + g.InvoiceCount, 0))))}%)`
+        ],
       },
     });
   } catch (error: any) {
