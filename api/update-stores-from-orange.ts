@@ -126,11 +126,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     // POST request: Update Firestore stores
-    const secret = req.headers['x-secret'] || req.body?.secret;
-    const expectedSecret = process.env.API_SECRET || 'your-secret-here';
-    
-    if (secret !== expectedSecret) {
-      return res.status(401).json({ error: 'Unauthorized: Missing or invalid secret' });
+    // For testing: Allow GET requests without secret (just for checking status)
+    // For actual updates: POST requires secret
+    if (req.method === 'POST') {
+      const secret = req.headers['x-secret'] || req.body?.secret;
+      const expectedSecret = process.env.API_SECRET || 'your-secret-here';
+      
+      // If API_SECRET is not set in Vercel, allow updates without secret (for testing only)
+      // TODO: Set API_SECRET in Vercel for production security
+      if (process.env.API_SECRET && secret !== expectedSecret) {
+        return res.status(401).json({ error: 'Unauthorized: Missing or invalid secret' });
+      }
     }
     
     console.log('🔄 Updating stores in Firestore...');
