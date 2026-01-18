@@ -291,25 +291,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Step 2: Load store mapping (non-critical, can proceed if fails)
+    // Step 2: Load store mapping and employees data in parallel (optimize loading time)
+    console.log('🔄 Loading store mapping and employees data in parallel...');
+    const [storeMappingResult, employeesDataResult] = await Promise.allSettled([
+      loadStoreMapping(),
+      loadEmployeesData(),
+    ]);
+    
+    // Extract store mapping (non-critical)
     let storeMapping: Map<string, string>;
-    try {
-      console.log('🗺️ Loading store mapping...');
-      storeMapping = await loadStoreMapping();
+    if (storeMappingResult.status === 'fulfilled') {
+      storeMapping = storeMappingResult.value;
       console.log(`✅ Loaded ${storeMapping.size} store mappings`);
-    } catch (error: any) {
-      console.warn('⚠️ Failed to load store mapping, using empty mapping:', error.message);
+    } else {
+      console.warn('⚠️ Failed to load store mapping, using empty mapping:', storeMappingResult.reason?.message);
       storeMapping = new Map();
     }
-
-    // Step 2b: Load employees data from orange-dashboard (for employee names)
+    
+    // Extract employees data (non-critical)
     let employeesData: { [storeId: string]: any[][] } = {};
-    try {
-      console.log('👥 Loading employees_data.json...');
-      employeesData = await loadEmployeesData();
+    if (employeesDataResult.status === 'fulfilled') {
+      employeesData = employeesDataResult.value;
       console.log(`✅ Loaded employees data for ${Object.keys(employeesData).length} stores`);
-    } catch (error: any) {
-      console.warn('⚠️ Failed to load employees data, employee aggregation will be empty:', error.message);
+    } else {
+      console.warn('⚠️ Failed to load employees data, employee aggregation will be empty:', employeesDataResult.reason?.message);
       employeesData = {};
     }
 
