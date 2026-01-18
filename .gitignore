@@ -85,6 +85,8 @@ dist
 # Gatsby files
 .cache/
 public
+# Exception: Allow management_data.json to be committed (legacy data source)
+!public/data/management_data.json
 
 # Storybook build outputs
 .out
