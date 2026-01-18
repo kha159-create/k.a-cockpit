@@ -198,6 +198,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   const [areaStoreFilter, setAreaStoreFilter] = useState<AreaStoreFilterState>({
       areaManager: profile?.role === 'area_manager' || profile?.role === 'store_manager' ? profile.areaManager || 'All' : 'All',
       store: profile?.role === 'store_manager' || profile?.role === 'employee' ? profile.store || 'All' : 'All',
+      city: 'All', // City filter (like orange-dashboard)
   });
   const [dashboardPieFilter, setDashboardPieFilter] = useState<string | null>(null);
 

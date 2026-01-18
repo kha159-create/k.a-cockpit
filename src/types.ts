@@ -32,6 +32,7 @@ export interface BaseDocument {
 export interface Store extends BaseDocument {
   name: string;
   areaManager: string;
+  city?: string; // City/Region filter (like orange-dashboard)
   targets?: { [year: string]: { [month: string]: number } };
 }
 
@@ -83,6 +84,7 @@ export interface DateFilter {
 export interface AreaStoreFilterState {
   areaManager: string; // 'All' or manager name
   store: string;       // 'All' or store name
+  city?: string;       // 'All' or city name (like orange-dashboard)
 }
 
 export interface ModalState {

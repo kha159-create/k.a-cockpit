@@ -53,6 +53,8 @@ export const translations = {
     "all_days": "All Days",
     "all_area_managers": "All Areas",
     "all_stores": "All Stores",
+    "city": "City",
+    "all_cities": "All Cities",
     "top_stores_by_achievement": "Top Stores by Achievement",
     "top_employees_by_achievement": "Top Employees by Achievement", 
     "top_products_by_sales_value": "Top Products by Sales Value",
@@ -309,6 +311,8 @@ export const translations = {
     "passwords_do_not_match": "كلمتا المرور غير متطابقتين",
     "area_target": "هدف المنطقة",
     "stores_count": "عدد المعارض",
-    "stores_in_area": "المعارض في المنطقة"
+    "stores_in_area": "المعارض في المنطقة",
+    "city": "المدينة",
+    "all_cities": "كل المدن"
   }
 };

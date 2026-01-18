@@ -79,17 +79,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     console.log(`📊 Found ${Object.keys(storeMeta).length} stores in management_data.json`);
     
-    // Build mapping: store_id → { manager, store_name }
-    const storeMapping: { [storeId: string]: { manager: string; storeName: string } } = {};
+    // Build mapping: store_id → { manager, store_name, city }
+    const storeMapping: { [storeId: string]: { manager: string; storeName: string; city?: string } } = {};
     
     Object.entries(storeMeta).forEach(([storeId, meta]) => {
       const manager = meta.manager?.trim();
       const storeName = meta.store_name || meta.outlet || storeId;
+      const city = meta.city?.trim() || undefined;
       
       if (manager && manager.toLowerCase() !== 'unknown' && manager.toLowerCase() !== 'online') {
         storeMapping[storeId] = {
           manager,
           storeName: storeName.trim(),
+          city,
         };
       }
     });
@@ -155,6 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         batch.update(storeRef, {
           areaManager: mapping.manager,
           name: mapping.storeName, // Update name if different
+          ...(mapping.city && { city: mapping.city }), // Add city if available
         });
         batchCount++;
         updatedCount++;
@@ -169,6 +172,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           store_id: storeId,
           name: mapping.storeName,
           areaManager: mapping.manager,
+          ...(mapping.city && { city: mapping.city }), // Add city if available
           targets: {}, // Empty targets, can be set later
         });
         batchCount++;

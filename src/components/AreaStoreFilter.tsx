@@ -19,19 +19,36 @@ const AreaStoreFilter: React.FC<AreaStoreFilterProps> = ({ stores, filters, setF
     return ['All', ...Array.from(managers).sort()];
   }, [stores, showAreaManagerFilter]);
 
+  const cities = useMemo(() => {
+    if (!showAreaManagerFilter) return [];
+    const citySet = new Set(stores.map(s => s.city).filter(Boolean));
+    return ['All', ...Array.from(citySet).sort()];
+  }, [stores, showAreaManagerFilter]);
+
   const availableStores = useMemo(() => {
-    if (filters.areaManager === 'All' && showAreaManagerFilter) {
-      return stores;
-    }
-    // For non-admins/GMs, filter based on their area context from profile if available
-    const areaToFilterBy = showAreaManagerFilter ? filters.areaManager : profile?.areaManager;
-    if (!areaToFilterBy) return stores;
+    let filtered = stores;
     
-    return stores.filter(s => s.areaManager === areaToFilterBy);
-  }, [stores, filters.areaManager, showAreaManagerFilter, profile]);
+    // Filter by area manager
+    if (filters.areaManager !== 'All' && showAreaManagerFilter) {
+      filtered = filtered.filter(s => s.areaManager === filters.areaManager);
+    } else if (!showAreaManagerFilter && profile?.areaManager) {
+      filtered = filtered.filter(s => s.areaManager === profile.areaManager);
+    }
+    
+    // Filter by city
+    if (filters.city && filters.city !== 'All') {
+      filtered = filtered.filter(s => s.city === filters.city);
+    }
+    
+    return filtered;
+  }, [stores, filters.areaManager, filters.city, showAreaManagerFilter, profile]);
 
   const handleAreaManagerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters({ areaManager: e.target.value, store: 'All' });
+    setFilters({ areaManager: e.target.value, store: 'All', city: filters.city || 'All' });
+  };
+
+  const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilters({ ...filters, city: e.target.value, store: 'All' });
   };
 
   const handleStoreChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -45,6 +62,14 @@ const AreaStoreFilter: React.FC<AreaStoreFilterProps> = ({ stores, filters, setF
             <span className="font-semibold text-zinc-600">{t('area_manager')}:</span>
             <select value={filters.areaManager} onChange={handleAreaManagerChange} className="input w-full">
               {areaManagers.map(m => <option key={m} value={m}>{m === 'All' ? t('all_area_managers') : m}</option>)}
+            </select>
+          </div>
+      )}
+      {showAreaManagerFilter && cities.length > 1 && (
+          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <span className="font-semibold text-zinc-600">{t('city')}:</span>
+            <select value={filters.city || 'All'} onChange={handleCityChange} className="input w-full">
+              {cities.map(c => <option key={c} value={c}>{c === 'All' ? t('all_cities') : c}</option>)}
             </select>
           </div>
       )}
