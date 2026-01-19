@@ -123,11 +123,12 @@ async function fetchAggregatedWithFallback(
       candidates.push({ entity: entityFromEnv, amountField: 'PaymentAmount' });
     }
   } else {
+    // Default to RetailTransactions first (matches dailysales behavior)
     candidates.push(
+      { entity: 'RetailTransactions', amountField: 'PaymentAmount' },
       { entity: 'SalesTransactionBIEntity', amountField: 'NetAmount' },
       { entity: 'SalesTransactionBIEntity', amountField: 'SalesAmount' },
-      { entity: 'SalesTransactionBIEntity', amountField: 'Amount' },
-      { entity: 'RetailTransactions', amountField: 'PaymentAmount' }
+      { entity: 'SalesTransactionBIEntity', amountField: 'Amount' }
     );
   }
 
