@@ -4,10 +4,11 @@ import * as XLSX from 'xlsx';
 
 // NO Firestore - Pure D365 API like orange-dashboard
 
-interface D365Transaction {
+interface D365AggregatedGroup {
   OperatingUnitNumber: string;
   TransactionDate: string;
-  [key: string]: any;
+  TotalAmount: number; // Sum of amount field
+  InvoiceCount: number; // Count of transactions
 }
 
 // Get access token from Microsoft Dynamics 365
@@ -43,15 +44,12 @@ async function getAccessToken(): Promise<string> {
   return result.accessToken;
 }
 
-// Fetch today's and yesterday's transactions from D365 (like dailysales)
-async function fetchTransactionsLastTwoDays(
+// Fetch aggregated sales for the last two days from D365 (server-side aggregation)
+async function fetchAggregatedLastTwoDays(
   token: string,
   entity: string,
   amountField: string
-): Promise<{
-  today: D365Transaction[];
-  yesterday: D365Transaction[];
-}> {
+): Promise<D365AggregatedGroup[]> {
   const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
   const baseUrl = `${d365Url}/data/${entity}`;
 
@@ -66,9 +64,11 @@ async function fetchTransactionsLastTwoDays(
   const startStr = yesterdayStart.toISOString();
   const endStr = tomorrowStart.toISOString();
 
-  const queryUrl = `${baseUrl}?$filter=${amountField} ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}&$select=OperatingUnitNumber,${amountField},TransactionDate&$orderby=TransactionDate`;
+  const filter = `${amountField} ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}`;
+  const applyClause = `groupby((OperatingUnitNumber,TransactionDate),aggregate(${amountField} with sum as TotalAmount,$count as InvoiceCount))`;
+  const queryUrl = `${baseUrl}?$filter=${encodeURIComponent(filter)}&$apply=${encodeURIComponent(applyClause)}&$orderby=TransactionDate,OperatingUnitNumber`;
 
-  const allTransactions: D365Transaction[] = [];
+  const allGroups: D365AggregatedGroup[] = [];
   let nextLink: string | null = queryUrl;
 
   while (nextLink) {
@@ -85,52 +85,64 @@ async function fetchTransactionsLastTwoDays(
     }
 
     const data: any = await response.json();
-    allTransactions.push(...(data.value || []));
+    if (!Array.isArray(data.value)) {
+      throw new Error(`D365 API returned invalid response format. Expected 'value' array`);
+    }
+    const groups: D365AggregatedGroup[] = (data.value || []).map((item: any) => ({
+      OperatingUnitNumber: String(item.OperatingUnitNumber || '').trim(),
+      TransactionDate: item.TransactionDate || '',
+      TotalAmount: Number(item.TotalAmount || 0),
+      InvoiceCount: Number(item.InvoiceCount || 0),
+    }));
+    allGroups.push(...groups);
     nextLink = data['@odata.nextLink'] || null;
   }
 
-  // Split into today and yesterday based on Saudi Arabia time (UTC+3)
-  // After 12 AM SAST (midnight Saudi time), sales belong to "today"
-  // Before 12 AM SAST, sales belong to "yesterday"
-  
-  // Get current Saudi time (UTC+3)
-  const nowSaudi = new Date(now.getTime() + (3 * 60 * 60 * 1000)); // UTC+3
-  const saudiYear = nowSaudi.getUTCFullYear();
-  const saudiMonth = nowSaudi.getUTCMonth();
-  const saudiDate = nowSaudi.getUTCDate();
-  const saudiHour = nowSaudi.getUTCHours();
-  
-  // Today starts at 00:00 SAST (which is 21:00 UTC of previous day)
-  // Yesterday starts at 00:00 SAST of previous day (which is 21:00 UTC two days ago)
-  
-  // Calculate today's start in Saudi time (00:00 SAST = 21:00 UTC previous day)
-  const saudiTodayStart = new Date(Date.UTC(saudiYear, saudiMonth, saudiDate, 0, 0, 0));
-  const saudiTodayStartUTC = new Date(saudiTodayStart.getTime() - (3 * 60 * 60 * 1000)); // Convert SAST to UTC
-  
-  // Calculate yesterday's start in Saudi time
-  const saudiYesterdayStart = new Date(Date.UTC(saudiYear, saudiMonth, saudiDate - 1, 0, 0, 0));
-  const saudiYesterdayStartUTC = new Date(saudiYesterdayStart.getTime() - (3 * 60 * 60 * 1000)); // Convert SAST to UTC
+  console.log(`✅ Fetched ${allGroups.length} aggregated groups for last two days (${entity}/${amountField})`);
+  return allGroups;
+}
 
-  const todayTransactions: D365Transaction[] = [];
-  const yesterdayTransactions: D365Transaction[] = [];
+async function fetchAggregatedWithFallback(
+  token: string
+): Promise<{ groups: D365AggregatedGroup[]; source: { entity: string; amountField: string } }> {
+  const entityFromEnv = process.env.D365_SALES_ENTITY;
+  const amountFieldFromEnv = process.env.D365_SALES_AMOUNT_FIELD;
 
-  allTransactions.forEach((tx) => {
-    const txDate = new Date(tx.TransactionDate);
-    // Compare based on Saudi time boundaries (00:00 SAST = 21:00 UTC previous day)
-    // All transactions >= today 00:00 SAST belong to today
-    if (txDate >= saudiTodayStartUTC) {
-      todayTransactions.push(tx);
-    } 
-    // All transactions >= yesterday 00:00 SAST and < today 00:00 SAST belong to yesterday
-    else if (txDate >= saudiYesterdayStartUTC && txDate < saudiTodayStartUTC) {
-      yesterdayTransactions.push(tx);
+  const candidates: Array<{ entity: string; amountField: string }> = [];
+
+  if (entityFromEnv) {
+    if (amountFieldFromEnv) {
+      candidates.push({ entity: entityFromEnv, amountField: amountFieldFromEnv });
+    } else if (entityFromEnv.toLowerCase() === 'salestransactionbientity') {
+      candidates.push(
+        { entity: entityFromEnv, amountField: 'NetAmount' },
+        { entity: entityFromEnv, amountField: 'SalesAmount' },
+        { entity: entityFromEnv, amountField: 'Amount' }
+      );
+    } else {
+      candidates.push({ entity: entityFromEnv, amountField: 'PaymentAmount' });
     }
-  });
-  
-  console.log(`📅 Saudi time: ${nowSaudi.toISOString()} (${saudiHour}:00 SAST), Today UTC boundary: ${saudiTodayStartUTC.toISOString()}, Yesterday UTC boundary: ${saudiYesterdayStartUTC.toISOString()}`);
-  console.log(`📊 Split: ${todayTransactions.length} today (after 12 AM SAST), ${yesterdayTransactions.length} yesterday (before 12 AM SAST)`);
+  } else {
+    candidates.push(
+      { entity: 'SalesTransactionBIEntity', amountField: 'NetAmount' },
+      { entity: 'SalesTransactionBIEntity', amountField: 'SalesAmount' },
+      { entity: 'SalesTransactionBIEntity', amountField: 'Amount' },
+      { entity: 'RetailTransactions', amountField: 'PaymentAmount' }
+    );
+  }
 
-  return { today: todayTransactions, yesterday: yesterdayTransactions };
+  let lastError: Error | null = null;
+  for (const candidate of candidates) {
+    try {
+      const groups = await fetchAggregatedLastTwoDays(token, candidate.entity, candidate.amountField);
+      return { groups, source: candidate };
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(`⚠️ D365 live fetch failed for ${candidate.entity} (${candidate.amountField}): ${lastError.message}`);
+    }
+  }
+
+  throw lastError || new Error('All D365 live fetch attempts failed');
 }
 
 // Load store mapping from orange-dashboard (like dailysales) - LOCAL JSON, no Firestore needed
@@ -191,22 +203,17 @@ async function loadStoreMapping(): Promise<Map<string, string>> {
 }
 
 // Transform and aggregate transactions
-function aggregateSales(
-  transactions: D365Transaction[],
-  storeMapping: Map<string, string>,
-  amountField: string
+function aggregateGroupedSales(
+  groups: D365AggregatedGroup[],
+  storeMapping: Map<string, string>
 ): Array<{ outlet: string; sales: number }> {
   const salesMap = new Map<string, number>();
 
-  transactions.forEach((tx) => {
-    // OperatingUnitNumber from D365 is the 4-digit store ID (e.g., 1001, 1101, etc.)
-    const storeId = String(tx.OperatingUnitNumber || '').trim();
-    // Get store name from mapping, or use store ID if not found
+  groups.forEach((group) => {
+    const storeId = String(group.OperatingUnitNumber || '').trim();
     const storeName = storeMapping.get(storeId) || storeId;
-    const amount = Number((tx as any)[amountField]) || 0;
-    
-    if (amount === 0) return;
-
+    const amount = Number(group.TotalAmount) || 0;
+    if (!storeId || amount === 0) return;
     const current = salesMap.get(storeName) || 0;
     salesMap.set(storeName, current + amount);
   });
@@ -296,23 +303,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = await getAccessToken();
     console.log('✅ Got access token');
 
-    // 2. Fetch today's and yesterday's transactions (like dailysales)
-    const entityFromEnv = process.env.D365_SALES_ENTITY || 'SalesTransactionBIEntity';
-    const amountFieldFromEnv = process.env.D365_SALES_AMOUNT_FIELD || 'NetAmount';
-    const { today: todayTransactions, yesterday: yesterdayTransactions } = await fetchTransactionsLastTwoDays(
-      token,
-      entityFromEnv,
-      amountFieldFromEnv
-    );
-    console.log(`✅ Fetched ${todayTransactions.length} today + ${yesterdayTransactions.length} yesterday transactions (${entityFromEnv}/${amountFieldFromEnv})`);
+    // 2. Fetch aggregated groups for last two days (server-side aggregation)
+    const { groups, source } = await fetchAggregatedWithFallback(token);
+    console.log(`✅ Fetched ${groups.length} aggregated groups (${source.entity}/${source.amountField})`);
+
+    // Split into today and yesterday based on Saudi Arabia time (UTC+3)
+    const now = new Date();
+    const nowSaudi = new Date(now.getTime() + (3 * 60 * 60 * 1000)); // UTC+3
+    const saudiYear = nowSaudi.getUTCFullYear();
+    const saudiMonth = nowSaudi.getUTCMonth();
+    const saudiDate = nowSaudi.getUTCDate();
+    const saudiHour = nowSaudi.getUTCHours();
+
+    const saudiTodayStart = new Date(Date.UTC(saudiYear, saudiMonth, saudiDate, 0, 0, 0));
+    const saudiTodayStartUTC = new Date(saudiTodayStart.getTime() - (3 * 60 * 60 * 1000));
+    const saudiYesterdayStart = new Date(Date.UTC(saudiYear, saudiMonth, saudiDate - 1, 0, 0, 0));
+    const saudiYesterdayStartUTC = new Date(saudiYesterdayStart.getTime() - (3 * 60 * 60 * 1000));
+
+    const todayGroups: D365AggregatedGroup[] = [];
+    const yesterdayGroups: D365AggregatedGroup[] = [];
+
+    groups.forEach((group) => {
+      const txDate = new Date(group.TransactionDate);
+      if (txDate >= saudiTodayStartUTC) {
+        todayGroups.push(group);
+      } else if (txDate >= saudiYesterdayStartUTC && txDate < saudiTodayStartUTC) {
+        yesterdayGroups.push(group);
+      }
+    });
+
+    console.log(`📅 Saudi time: ${nowSaudi.toISOString()} (${saudiHour}:00 SAST), Today UTC boundary: ${saudiTodayStartUTC.toISOString()}, Yesterday UTC boundary: ${saudiYesterdayStartUTC.toISOString()}`);
+    console.log(`📊 Split: ${todayGroups.length} today (after 12 AM SAST), ${yesterdayGroups.length} yesterday (before 12 AM SAST)`);
 
     // 3. Load store mapping
     const storeMapping = await loadStoreMapping();
     console.log(`✅ Loaded ${storeMapping.size} store mappings`);
 
     // 4. Aggregate sales for both days
-    const todaySales = aggregateSales(todayTransactions, storeMapping, amountFieldFromEnv);
-    const yesterdaySales = aggregateSales(yesterdayTransactions, storeMapping, amountFieldFromEnv);
+    const todaySales = aggregateGroupedSales(todayGroups, storeMapping);
+    const yesterdaySales = aggregateGroupedSales(yesterdayGroups, storeMapping);
     console.log(`✅ Aggregated ${todaySales.length} stores today, ${yesterdaySales.length} stores yesterday`);
 
     // 5. Prepare JSON data (like dailysales) - for local storage
@@ -330,8 +359,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Metadata for debugging
       todayStoresCount: todaySales.length,
       yesterdayStoresCount: yesterdaySales.length,
-      todayTransactionsCount: todayTransactions.length,
-      yesterdayTransactionsCount: yesterdayTransactions.length,
+      todayTransactionsCount: todayGroups.reduce((sum, g) => sum + g.InvoiceCount, 0),
+      yesterdayTransactionsCount: yesterdayGroups.reduce((sum, g) => sum + g.InvoiceCount, 0),
     });
   } catch (error: any) {
     console.error('❌ Live sales sync error:', error);

@@ -19,14 +19,19 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
     // Also add any additional years found in data (for backward compatibility)
     const yearSet = new Set<number>(hardcodedYears);
     allData.forEach(d => {
-      // Handle both potential date property names, now as Timestamps
       const dateTimestamp = ('date' in d ? d.date : d['Bill Dt.']) as any;
-      if (dateTimestamp && typeof dateTimestamp.toDate === 'function') {
-        const dateObj = dateTimestamp.toDate();
-        const year = dateObj.getUTCFullYear();
-        if (!isNaN(year)) {
-          yearSet.add(year);
-        }
+      const dateObj =
+        typeof dateTimestamp === 'string'
+          ? new Date(`${dateTimestamp}T00:00:00Z`)
+          : typeof dateTimestamp?.toDate === 'function'
+            ? dateTimestamp.toDate()
+            : dateTimestamp
+              ? new Date(dateTimestamp)
+              : null;
+      if (!dateObj || Number.isNaN(dateObj.getTime())) return;
+      const year = dateObj.getUTCFullYear();
+      if (!isNaN(year)) {
+        yearSet.add(year);
       }
     });
     
@@ -53,12 +58,18 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
     let latest: Date | null = null;
     allData.forEach(item => {
       const dateTimestamp = ('date' in item ? item.date : item['Bill Dt.']) as any;
-      if (dateTimestamp && typeof dateTimestamp.toDate === 'function') {
-        const d = dateTimestamp.toDate();
-        const normalized = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-        if (!earliest || normalized < earliest) earliest = normalized;
-        if (!latest || normalized > latest) latest = normalized;
-      }
+      const dateObj =
+        typeof dateTimestamp === 'string'
+          ? new Date(`${dateTimestamp}T00:00:00Z`)
+          : typeof dateTimestamp?.toDate === 'function'
+            ? dateTimestamp.toDate()
+            : dateTimestamp
+              ? new Date(dateTimestamp)
+              : null;
+      if (!dateObj || Number.isNaN(dateObj.getTime())) return;
+      const normalized = new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate()));
+      if (!earliest || normalized < earliest) earliest = normalized;
+      if (!latest || normalized > latest) latest = normalized;
     });
     const format = (value: Date | null) => value ? value.toISOString().split('T')[0] : null;
     return {

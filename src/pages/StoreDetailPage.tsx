@@ -51,8 +51,14 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
         return allMetrics.filter(m => {
             if (m.store !== store.name) return false;
             const itemTimestamp = m.date;
-            if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
-            const itemDate = itemTimestamp.toDate();
+            if (!itemTimestamp) return false;
+            const itemDate =
+                typeof itemTimestamp === 'string'
+                    ? new Date(`${itemTimestamp}T00:00:00Z`)
+                    : typeof (itemTimestamp as any)?.toDate === 'function'
+                        ? (itemTimestamp as any).toDate()
+                        : new Date(itemTimestamp as any);
+            if (Number.isNaN(itemDate.getTime())) return false;
             const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
 
             const mode = dateFilter.mode ?? 'single';
