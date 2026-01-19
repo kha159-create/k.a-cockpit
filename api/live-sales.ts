@@ -310,30 +310,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Split into today and yesterday based on Saudi Arabia time (UTC+3)
     const now = new Date();
+    // Get current Saudi time (UTC+3)
     const nowSaudi = new Date(now.getTime() + (3 * 60 * 60 * 1000)); // UTC+3
     const saudiYear = nowSaudi.getUTCFullYear();
     const saudiMonth = nowSaudi.getUTCMonth();
     const saudiDate = nowSaudi.getUTCDate();
     const saudiHour = nowSaudi.getUTCHours();
+    const saudiMinute = nowSaudi.getUTCMinutes();
 
+    // Today starts at 00:00 SAST (which is 21:00 UTC of previous day)
     const saudiTodayStart = new Date(Date.UTC(saudiYear, saudiMonth, saudiDate, 0, 0, 0));
-    const saudiTodayStartUTC = new Date(saudiTodayStart.getTime() - (3 * 60 * 60 * 1000));
+    const saudiTodayStartUTC = new Date(saudiTodayStart.getTime() - (3 * 60 * 60 * 1000)); // Convert SAST to UTC
+    
+    // Yesterday starts at 00:00 SAST of previous day (which is 21:00 UTC two days ago)
     const saudiYesterdayStart = new Date(Date.UTC(saudiYear, saudiMonth, saudiDate - 1, 0, 0, 0));
-    const saudiYesterdayStartUTC = new Date(saudiYesterdayStart.getTime() - (3 * 60 * 60 * 1000));
+    const saudiYesterdayStartUTC = new Date(saudiYesterdayStart.getTime() - (3 * 60 * 60 * 1000)); // Convert SAST to UTC
 
     const todayTransactions: D365Transaction[] = [];
     const yesterdayTransactions: D365Transaction[] = [];
 
+    // Split transactions based on Saudi time boundaries
     transactions.forEach((tx) => {
       const txDate = new Date(tx.TransactionDate);
+      // All transactions >= today 00:00 SAST belong to today
       if (txDate >= saudiTodayStartUTC) {
         todayTransactions.push(tx);
-      } else if (txDate >= saudiYesterdayStartUTC && txDate < saudiTodayStartUTC) {
+      } 
+      // All transactions >= yesterday 00:00 SAST and < today 00:00 SAST belong to yesterday
+      else if (txDate >= saudiYesterdayStartUTC && txDate < saudiTodayStartUTC) {
         yesterdayTransactions.push(tx);
       }
     });
 
-    console.log(`📅 Saudi time: ${nowSaudi.toISOString()} (${saudiHour}:00 SAST), Today UTC boundary: ${saudiTodayStartUTC.toISOString()}, Yesterday UTC boundary: ${saudiYesterdayStartUTC.toISOString()}`);
+    console.log(`📅 Saudi time: ${saudiYear}-${String(saudiMonth + 1).padStart(2, '0')}-${String(saudiDate).padStart(2, '0')} ${String(saudiHour).padStart(2, '0')}:${String(saudiMinute).padStart(2, '0')} SAST`);
+    console.log(`📅 Today UTC boundary: ${saudiTodayStartUTC.toISOString()}`);
+    console.log(`📅 Yesterday UTC boundary: ${saudiYesterdayStartUTC.toISOString()}`);
     console.log(`📊 Split: ${todayTransactions.length} today (after 12 AM SAST), ${yesterdayTransactions.length} yesterday (before 12 AM SAST)`);
 
     // 3. Load store mapping
