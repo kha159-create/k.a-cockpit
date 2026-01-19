@@ -818,6 +818,12 @@ const handleNotificationClick = (notificationId: string) => {
   });
 
   // Stores page processedData (uses storesDateFilter and storesDailyMetrics)
+  // Use storesAreaStoreFilter (independent) for Stores page, not effectiveAreaStoreFilter
+  const storesEffectiveAreaStoreFilter = useMemo(() => {
+    // For Stores page, always use storesAreaStoreFilter (not dashboardPieFilter)
+    return storesAreaStoreFilter;
+  }, [storesAreaStoreFilter]);
+  
   const storesProcessedData = useDataProcessing({
     stores,
     employees,
@@ -825,7 +831,7 @@ const handleNotificationClick = (notificationId: string) => {
     kingDuvetSales,
     salesTransactions,
     dateFilter: storesDateFilter,
-    areaStoreFilter: effectiveAreaStoreFilter,
+    areaStoreFilter: storesEffectiveAreaStoreFilter,
     profile,
   });
 
