@@ -48,7 +48,7 @@ export interface Employee extends BaseDocument {
 }
 
 export interface DailyMetric extends BaseDocument {
-  date: Timestamp;
+  date: string; // ✅ STRING (not firebase.firestore.Timestamp) - data comes from API
   store: string;
   employee?: string;
   employeeId?: string;

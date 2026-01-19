@@ -421,7 +421,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             const hasEmployees = apiMetrics.some(m => 
               m.store === storeName && 
               m.date && 
-              m.date.toDate().toISOString().split('T')[0] === dateStr &&
+              (typeof m.date === 'string' ? m.date === dateStr : new Date(m.date).toISOString().split('T')[0] === dateStr) &&
               m.employee
             );
             
@@ -430,7 +430,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
               const id = `${dateStr}_${storeName}`;
               apiMetrics.push({
                 id,
-                date: firebase.firestore.Timestamp.fromDate(dateObj),
+                date: dateStr, // ✅ STRING (not Timestamp)
                 store: storeName,
                 totalSales: store.salesAmount || 0,
                 transactionCount: store.invoices || 0,
@@ -455,7 +455,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             const id = `${firstDayStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
             apiMetrics.push({
               id,
-              date: firebase.firestore.Timestamp.fromDate(firstDayObj),
+              date: firstDayStr, // ✅ STRING (not Timestamp)
               store: storeName,
               employee: emp.employeeName,
               employeeId: emp.employeeId,
@@ -480,7 +480,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             const id = `${dateStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
             apiMetrics.push({
               id,
-              date: firebase.firestore.Timestamp.fromDate(dateObj),
+              date: dateStr, // ✅ STRING (not Timestamp)
               store: storeName,
               employee: emp.employeeName,
               employeeId: emp.employeeId,
@@ -501,7 +501,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
               const id = `${dateStr}_${storeName}`;
               apiMetrics.push({
                 id,
-                date: firebase.firestore.Timestamp.fromDate(dateObj),
+                date: dateStr, // ✅ STRING (not Timestamp)
                 store: storeName,
                 totalSales: store.salesAmount || 0,
                 transactionCount: store.invoices || 0,
@@ -604,7 +604,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                   const hasEmployees = apiMetrics.some(m => 
                     m.store === storeName && 
                     m.date && 
-                    m.date.toDate().toISOString().split('T')[0] === dateStr &&
+                    (typeof m.date === 'string' ? m.date === dateStr : new Date(m.date).toISOString().split('T')[0] === dateStr) &&
                     m.employee
                   );
                   
@@ -613,7 +613,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                     const id = `${dateStr}_${storeName}`;
                     apiMetrics.push({
                       id,
-                      date: firebase.firestore.Timestamp.fromDate(dateObj),
+                      date: dateStr, // ✅ STRING (not Timestamp)
                       store: storeName,
                       totalSales: store.salesAmount || 0,
                       transactionCount: store.invoices || 0,
@@ -636,7 +636,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                 const id = `${firstDayStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
                 apiMetrics.push({
                   id,
-                  date: firebase.firestore.Timestamp.fromDate(firstDayObj),
+                  date: firstDayStr, // ✅ STRING (not Timestamp)
                   store: storeName,
                   employee: emp.employeeName,
                   employeeId: emp.employeeId,
@@ -658,7 +658,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                 const id = `${dateStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
                 apiMetrics.push({
                   id,
-                  date: firebase.firestore.Timestamp.fromDate(dateObj),
+                  date: dateStr, // ✅ STRING (not Timestamp)
                   store: storeName,
                   employee: emp.employeeName,
                   employeeId: emp.employeeId,
@@ -679,7 +679,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                   const id = `${dateStr}_${storeName}`;
                   apiMetrics.push({
                     id,
-                    date: firebase.firestore.Timestamp.fromDate(dateObj),
+                    date: dateStr, // ✅ STRING (not Timestamp)
                     store: storeName,
                     totalSales: store.salesAmount || 0,
                     transactionCount: store.invoices || 0,
@@ -698,7 +698,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
               store: m.store, 
               sales: m.totalSales, 
               transactions: m.transactionCount,
-              date: m.date?.toDate ? m.date.toDate().toISOString().split('T')[0] : m.date
+              date: typeof m.date === 'string' ? m.date : (m.date?.toDate ? m.date.toDate().toISOString().split('T')[0] : String(m.date))
             })));
           } else {
             console.warn(`⚠️ No metrics converted! Result structure:`, {
