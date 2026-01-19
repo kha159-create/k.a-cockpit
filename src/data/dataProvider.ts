@@ -1,10 +1,146 @@
 /**
  * Hybrid Data Provider
  * Switches between Legacy (2024/2025) and D365 (2026+) based on year
+ * Merges Targets & Visitors from orange-dashboard on the frontend (reduces API load)
  */
 
 import { getLegacyMetrics, getLegacyStores } from './legacyProvider';
 import { apiUrl } from '../utils/apiBase';
+
+// Load targets and visitors from orange-dashboard (for all years, including 2026+)
+interface OrangeDashboardManagementData {
+  targets?: {
+    [year: string]: {
+      [storeId: string]: {
+        [month: string]: number; // month: "1", "2", ... "12"
+      };
+    };
+  };
+  visitors?: Array<[string, string, number]>; // ["YYYY-MM-DD", "STORE_ID", count]
+}
+
+let cachedTargetsAndVisitors: OrangeDashboardManagementData | null = null;
+
+async function loadTargetsAndVisitors(): Promise<{ targets: OrangeDashboardManagementData['targets']; visitors: OrangeDashboardManagementData['visitors'] }> {
+  if (cachedTargetsAndVisitors) {
+    return {
+      targets: cachedTargetsAndVisitors.targets || {},
+      visitors: cachedTargetsAndVisitors.visitors || [],
+    };
+  }
+
+  try {
+    console.log('📥 Loading targets and visitors from orange-dashboard (frontend)...');
+    const response: Response = await fetch('https://raw.githubusercontent.com/ALAAWF2/orange-dashboard/main/management_data.json');
+    
+    if (!response.ok) {
+      console.warn('⚠️ Could not fetch targets/visitors from orange-dashboard');
+      return { targets: {}, visitors: [] };
+    }
+    
+    const data: OrangeDashboardManagementData = await response.json();
+    cachedTargetsAndVisitors = data;
+    console.log(`✅ Loaded targets for ${Object.keys(data.targets || {}).length} years, ${(data.visitors || []).length} visitor entries (frontend)`);
+    return {
+      targets: data.targets || {},
+      visitors: data.visitors || [],
+    };
+  } catch (error: any) {
+    console.error('❌ Error loading targets/visitors from orange-dashboard:', error.message);
+    return { targets: {}, visitors: [] };
+  }
+}
+
+/**
+ * Merge Targets & Visitors into D365 response (frontend-side, reduces API load)
+ */
+function mergeTargetsAndVisitors(
+  response: NormalizedSalesResponse,
+  targets: OrangeDashboardManagementData['targets'],
+  visitors: OrangeDashboardManagementData['visitors'],
+  year: number,
+  month?: number
+): NormalizedSalesResponse {
+  const yearKey = String(year);
+  const monthKey = month !== undefined ? String(month + 1) : 'all'; // month is 0-11, target uses 1-12
+  
+  // Build visitors maps for fast lookup
+  const monthlyVisitorsMap = new Map<string, number>(); // Key: storeId
+  const dailyVisitorsMap = new Map<string, number>(); // Key: "YYYY-MM-DD_STORE_ID"
+  
+  const startDateStr = response.range.from;
+  const endDateStr = response.range.to;
+  
+  (visitors || []).forEach((entry) => {
+    if (!Array.isArray(entry) || entry.length < 3) return;
+    const [entryDateStr, entryStoreId, count] = entry;
+    
+    // Filter by date range
+    if (entryDateStr < startDateStr || entryDateStr > endDateStr) return;
+    
+    // Monthly visitors
+    const currentMonthlyCount = monthlyVisitorsMap.get(entryStoreId) || 0;
+    monthlyVisitorsMap.set(entryStoreId, currentMonthlyCount + (Number(count) || 0));
+    
+    // Daily visitors
+    const dailyKey = `${entryDateStr}_${entryStoreId}`;
+    const currentDailyCount = dailyVisitorsMap.get(dailyKey) || 0;
+    dailyVisitorsMap.set(dailyKey, currentDailyCount + (Number(count) || 0));
+  });
+  
+  // Merge into byStore
+  const byStore = response.byStore.map(store => {
+    const targetValue = targets?.[yearKey]?.[store.storeId]?.[monthKey] || 0;
+    const monthlyVisitors = monthlyVisitorsMap.get(store.storeId) || 0;
+    const conversion = monthlyVisitors > 0 ? (store.invoices / monthlyVisitors) * 100 : 0;
+    
+    return {
+      ...store,
+      visitors: monthlyVisitors,
+      target: Number(targetValue) || 0,
+      kpis: {
+        ...store.kpis,
+        conversion: Number.isFinite(conversion) ? conversion : 0,
+      },
+    };
+  });
+  
+  // Merge into byDay
+  const byDay = response.byDay?.map(day => ({
+    ...day,
+    byStore: day.byStore.map(store => {
+      const dailyVisitors = dailyVisitorsMap.get(`${day.date}_${store.storeId}`) || 0;
+      const conversion = dailyVisitors > 0 ? (store.invoices / dailyVisitors) * 100 : 0;
+      
+      return {
+        ...store,
+        visitors: dailyVisitors,
+        kpis: {
+          ...store.kpis,
+          conversion: Number.isFinite(conversion) ? conversion : 0,
+        },
+      };
+    }),
+  }));
+  
+  // Calculate totals with visitors
+  const totalVisitors = byStore.reduce((sum, s) => sum + (s.visitors || 0), 0);
+  const totalConversion = totalVisitors > 0 ? (response.totals.invoices / totalVisitors) * 100 : 0;
+  
+  return {
+    ...response,
+    byStore,
+    byDay,
+    totals: {
+      ...response.totals,
+      visitors: totalVisitors,
+      kpis: {
+        ...response.totals.kpis,
+        conversion: Number.isFinite(totalConversion) ? totalConversion : 0,
+      },
+    },
+  };
+}
 
 interface SalesParams {
   year: number;
@@ -23,6 +159,7 @@ interface NormalizedSalesResponse {
     salesAmount: number;
     invoices: number;
     visitors?: number;
+    target?: number; // Added for Target Achievement calculation
     kpis: {
       atv: number;
       conversion?: number;
@@ -131,7 +268,12 @@ export async function getSalesData(params: SalesParams): Promise<NormalizedSales
       }
       
       const result: NormalizedSalesResponse = await response.json();
-      return result;
+      
+      // Merge Targets & Visitors from orange-dashboard (frontend-side, reduces API load)
+      const { targets, visitors } = await loadTargetsAndVisitors();
+      const mergedResult = mergeTargetsAndVisitors(result, targets, visitors, year, month);
+      
+      return mergedResult;
     } catch (error: any) {
       console.error('❌ Error fetching D365 sales:', error);
       // Return empty response on error
