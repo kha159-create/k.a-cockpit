@@ -244,6 +244,25 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   });
   const [dashboardPieFilter, setDashboardPieFilter] = useState<string | null>(null);
 
+  // Save Stores filters to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('storesDateFilter', JSON.stringify(storesDateFilter));
+      console.log('💾 Saved storesDateFilter to localStorage:', storesDateFilter);
+    } catch (e) {
+      console.warn('⚠️ Failed to save storesDateFilter to localStorage:', e);
+    }
+  }, [storesDateFilter]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('storesAreaStoreFilter', JSON.stringify(storesAreaStoreFilter));
+      console.log('💾 Saved storesAreaStoreFilter to localStorage:', storesAreaStoreFilter);
+    } catch (e) {
+      console.warn('⚠️ Failed to save storesAreaStoreFilter to localStorage:', e);
+    }
+  }, [storesAreaStoreFilter]);
+
   // UI State
   const [modalState, setModalState] = useState<ModalState>({ type: null, data: null });
   const [appMessage, setAppMessage] = useState<AppMessage>({ isOpen: false, text: '', type: 'alert' });
