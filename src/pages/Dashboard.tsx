@@ -8,6 +8,7 @@ import { KPICardSkeleton, ChartSkeleton } from '../components/SkeletonLoader';
 import MyTasks from '../components/MyTasks';
 import type { KPIData, StoreSummary, EmployeeSummary, ProductSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile, Task } from '../types';
 import { useLocale } from '../context/LocaleContext';
+import { parseDateValue } from '../utils/date';
 
 interface DashboardProps {
   kpiData: KPIData;
@@ -91,7 +92,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       const storeSet = new Set(storesInScope);
 
       // اجمع من dailyMetrics فقط داخل allDateData (وجود حقل date و totalSales)
-      const metrics = (allDateData as any[]).filter((d: any) => d && d.date && typeof d.date.toDate === 'function' && d.store && storeSet.has(d.store));
+      const metrics = (allDateData as any[]).filter((d: any) => d && d.date && d.store && storeSet.has(d.store));
 
       const Y = dateFilter.year as number;
       const M = dateFilter.month === 'all' ? 'all' : (dateFilter.month as number); // 0-index
@@ -100,7 +101,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       // شهري: مجموع من يناير إلى M واقسم على (M+1)
       const monthlyTotals = Array.from({ length: 12 }, () => 0);
       metrics.forEach((m: any) => {
-        const d = m.date.toDate();
+        const d = parseDateValue(m.date);
+        if (!d) return;
         if (d.getUTCFullYear() !== Y) return;
         monthlyTotals[d.getUTCMonth()] += Number(m.totalSales || 0);
       });
@@ -126,7 +128,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         const daysInMonth = new Date(Y, M + 1, 0).getDate();
         const dailyTotals = Array.from({ length: daysInMonth }, () => 0);
         metrics.forEach((m: any) => {
-          const d = m.date.toDate();
+          const d = parseDateValue(m.date);
+          if (!d) return;
           if (d.getUTCFullYear() !== Y || d.getUTCMonth() !== M) return;
           const idx = d.getUTCDate() - 1;
           if (idx >= 0 && idx < daysInMonth) dailyTotals[idx] += Number(m.totalSales || 0);

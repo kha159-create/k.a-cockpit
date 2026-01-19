@@ -1,8 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { auth, db } from '@/services/firebase';
-// FIX: Import firebase to use Timestamp and FieldValue for Firestore operations.
-import firebase from 'firebase/app';
+import { auth } from '@/services/firebase';
 
 import { useDataProcessing } from '@/hooks/useDataProcessing';
 import { useSmartUploader } from '@/hooks/useSmartUploader';
@@ -10,6 +8,7 @@ import { useLocale } from '@/context/LocaleContext';
 import { useData } from '@/context/DataProvider';
 import { getSalesData, getStores } from '@/data/dataProvider';
 import { apiUrl } from '@/utils/apiBase';
+import { parseDateValue } from '@/utils/date';
 
 import Dashboard from '@/pages/Dashboard';
 import StoresPage from '@/pages/StoresPage';
@@ -51,8 +50,6 @@ const LiveIcon = () => (
   </svg>
 );
 
-// FIX: Initialized Timestamp for use in Firestore operations.
-const { Timestamp } = firebase.firestore;
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -321,21 +318,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     // These collections are no longer used - all data comes from API (D365) or local JSON (legacy)
     console.log('📊 Firestore listeners removed for sales data - using API/local JSON only (NO Firestore)');
     
-    // Only keep users collection for authentication (if admin/general_manager)
-    // All other data (stores, employees, metrics) comes from API/local JSON
-    let usersUnsubscriber: () => void = () => {};
-    if (profile?.role === 'admin' || profile?.role === 'general_manager') {
-        const usersRef = db.collection('users');
-        usersUnsubscriber = usersRef.onSnapshot(
-            (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (UserProfile & { id: string })[];
-                setAllUsers(data);
-            },
-            (err) => {
-                console.error('Error fetching users:', err);
-            }
-        );
-    }
+    // Firestore features disabled: user management is not available.
+    setAllUsers([]);
 
     // Set empty arrays for removed Firestore collections (no longer used)
     setKingDuvetSales([]);
@@ -346,9 +330,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     // Mark data as loaded (no Firestore data to wait for)
                         setDataLoading(false);
 
-    return () => {
-        usersUnsubscriber();
-    };
+    return () => {};
 }, [profile, dateFilter.year]); // Add dateFilter.year to reload stores/employees when year changes
 
   // Helper function to convert allSalesData to DailyMetric[] format (reusable for all pages)
@@ -418,10 +400,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             const storeName = storeNameMap.get(storeId) || store.storeName || storeId;
             
             // Check if this store has employee metrics for this day
-            const hasEmployees = apiMetrics.some(m => 
-              m.store === storeName && 
-              m.date && 
-              m.date.toDate().toISOString().split('T')[0] === dateStr &&
+            const hasEmployees = apiMetrics.some(m =>
+              m.store === storeName &&
+              m.date === dateStr &&
               m.employee
             );
             
@@ -430,7 +411,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
               const id = `${dateStr}_${storeName}`;
               apiMetrics.push({
                 id,
-                date: firebase.firestore.Timestamp.fromDate(dateObj),
+                date: dateStr,
                 store: storeName,
                 totalSales: store.salesAmount || 0,
                 transactionCount: store.invoices || 0,
@@ -455,7 +436,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             const id = `${firstDayStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
             apiMetrics.push({
               id,
-              date: firebase.firestore.Timestamp.fromDate(firstDayObj),
+              date: firstDayStr,
               store: storeName,
               employee: emp.employeeName,
               employeeId: emp.employeeId,
@@ -480,7 +461,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             const id = `${dateStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
             apiMetrics.push({
               id,
-              date: firebase.firestore.Timestamp.fromDate(dateObj),
+              date: dateStr,
               store: storeName,
               employee: emp.employeeName,
               employeeId: emp.employeeId,
@@ -501,7 +482,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
               const id = `${dateStr}_${storeName}`;
               apiMetrics.push({
                 id,
-                date: firebase.firestore.Timestamp.fromDate(dateObj),
+                date: dateStr,
                 store: storeName,
                 totalSales: store.salesAmount || 0,
                 transactionCount: store.invoices || 0,
@@ -604,7 +585,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                   const hasEmployees = apiMetrics.some(m => 
                     m.store === storeName && 
                     m.date && 
-                    m.date.toDate().toISOString().split('T')[0] === dateStr &&
+                    m.date === dateStr &&
                     m.employee
                   );
                   
@@ -613,7 +594,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                     const id = `${dateStr}_${storeName}`;
                     apiMetrics.push({
                       id,
-                      date: firebase.firestore.Timestamp.fromDate(dateObj),
+                      date: dateStr,
                       store: storeName,
                       totalSales: store.salesAmount || 0,
                       transactionCount: store.invoices || 0,
@@ -636,7 +617,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                 const id = `${firstDayStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
                 apiMetrics.push({
                   id,
-                  date: firebase.firestore.Timestamp.fromDate(firstDayObj),
+                  date: firstDayStr,
                   store: storeName,
                   employee: emp.employeeName,
                   employeeId: emp.employeeId,
@@ -658,7 +639,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                 const id = `${dateStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
                 apiMetrics.push({
                   id,
-                  date: firebase.firestore.Timestamp.fromDate(dateObj),
+                  date: dateStr,
                   store: storeName,
                   employee: emp.employeeName,
                   employeeId: emp.employeeId,
@@ -679,7 +660,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                   const id = `${dateStr}_${storeName}`;
                   apiMetrics.push({
                     id,
-                    date: firebase.firestore.Timestamp.fromDate(dateObj),
+                    date: dateStr,
                     store: storeName,
                     totalSales: store.salesAmount || 0,
                     transactionCount: store.invoices || 0,
@@ -698,7 +679,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
               store: m.store, 
               sales: m.totalSales, 
               transactions: m.transactionCount,
-              date: m.date?.toDate ? m.date.toDate().toISOString().split('T')[0] : m.date
+              date: parseDateValue(m.date)?.toISOString().split('T')[0] ?? m.date
             })));
           } else {
             console.warn(`⚠️ No metrics converted! Result structure:`, {
@@ -725,38 +706,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   */
 
 useEffect(() => {
-    if (profile?.role !== 'admin' && profile?.role !== 'general_manager') {
-      return;
-    }
-    
-    const q = db.collection('users').where('status', '==', 'pending');
-    const unsub = q.onSnapshot(snapshot => {
-        const newNotifications: Notification[] = [];
-        const pendingUserIds = new Set<string>();
-        snapshot.forEach(doc => {
-            const user = doc.data() as UserProfile;
-            pendingUserIds.add(user.id);
-            const exists = notifications.some(n => n.id === user.id);
-            if (!exists) {
-                newNotifications.push({
-                    id: user.id,
-                    userName: user.name,
-                    message: `New user "${user.name}" is awaiting approval.`,
-                    type: 'newUser',
-                    timestamp: Timestamp.now(),
-                    read: false,
-                });
-            }
-        });
-        
-        setNotifications(prev => 
-            [...newNotifications, ...prev.filter(p => pendingUserIds.has(p.id))]
-            .sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis())
-        );
-      });
-
-    return () => unsub();
-}, [profile, notifications]); 
+    setNotifications([]);
+}, [profile]); 
 
 const handleNotificationClick = (notificationId: string) => {
     setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
@@ -845,7 +796,7 @@ const handleNotificationClick = (notificationId: string) => {
 
   const allDateData = useMemo(() => [...dailyMetrics, ...salesTransactions, ...kingDuvetSales], [dailyMetrics, salesTransactions, kingDuvetSales]);
   
-  const { handleSmartUpload, uploadResult, clearUploadResult } = useSmartUploader(db, setAppMessage, setIsProcessing, employees, stores);
+  const { handleSmartUpload, uploadResult, clearUploadResult } = useSmartUploader(setAppMessage, setIsProcessing);
 
   const runWithRecalculation = useCallback((setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
     setIsRecalculating(true);
@@ -854,68 +805,13 @@ const handleNotificationClick = (notificationId: string) => {
   }, []);
 
   // --- CRUD and Action Handlers ---
-    const handleSave = async (collectionName: 'stores' | 'employees', data: any) => {
-        const isNew = !data.id;
-        if (isNew && profile?.role !== 'admin') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to add new items.', type: 'alert' });
-            return;
-        }
-
-        if (collectionName === 'employees' && profile?.role !== 'admin' && profile?.role !== 'area_manager') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to modify employees.', type: 'alert' });
-            return;
-        }
-
-        if (collectionName === 'stores' && profile?.role !== 'admin' && profile?.role !== 'general_manager') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to modify stores.', type: 'alert' });
-            return;
-        }
-
-        setIsProcessing(true);
-        try {
-            const docId = data.id || data.name.replace(/\s+/g, '_');
-            const docRef = db.collection(collectionName).doc(docId);
-            
-            const dataToSave: Partial<Store | Employee> = { name: data.name };
-            if ('store' in data) (dataToSave as Employee).currentStore = data.store;
-            if ('areaManager' in data) (dataToSave as Store).areaManager = data.areaManager;
-
-            await docRef.set(dataToSave, { merge: true });
-
-            if (data.targetUpdate) {
-                const { year, month, salesTarget, duvetTarget } = data.targetUpdate;
-                const updatePayload: any = {};
-                if (salesTarget !== undefined) updatePayload[`targets.${year}.${month}`] = salesTarget;
-                if (duvetTarget !== undefined) updatePayload[`duvetTargets.${year}.${month}`] = duvetTarget;
-                
-                if (Object.keys(updatePayload).length > 0) {
-                    await docRef.update(updatePayload);
-                }
-            }
-            setAppMessage({ isOpen: true, text: t('save_success', { item: t(collectionName.slice(0, -1)) }), type: 'alert' });
-        } catch (error: any) { 
-            setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' }); 
-        } finally { 
-            setIsProcessing(false); 
-            setModalState({ type: null }); 
-        }
+    const handleSave = async (_collectionName: 'stores' | 'employees', _data: any) => {
+        setAppMessage({ isOpen: true, text: 'تم تعطيل عمليات الحفظ لأن النظام لا يتصل بـ Firestore.', type: 'alert' });
+        setModalState({ type: null });
     };
 
-    const handleDelete = (collectionName: 'stores' | 'employees' | 'businessRules', id: string, name: string) => {
-        if (profile?.role !== 'admin') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to delete items.', type: 'alert' });
-            return;
-        }
-        setAppMessage({
-            isOpen: true, text: t('confirm_delete', { name }), type: 'confirm', onConfirm: async () => {
-                setIsProcessing(true);
-                try {
-                    await db.collection(collectionName).doc(id).delete();
-                    setAppMessage({ isOpen: true, text: t('delete_success', { name }), type: 'alert' });
-                } catch (error: any) { setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' }); }
-                finally { setIsProcessing(false); }
-            }
-        });
+    const handleDelete = (_collectionName: 'stores' | 'employees' | 'businessRules', _id: string, name: string) => {
+        setAppMessage({ isOpen: true, text: `${t('confirm_delete', { name })} (تم تعطيل الحذف لأن النظام لا يتصل بـ Firestore).`, type: 'alert' });
     };
     
     const handleDailyMetricSave = async (metricData: any) => {
@@ -946,28 +842,7 @@ const handleNotificationClick = (notificationId: string) => {
     };
     
     const handleDeleteAllData = () => {
-        setAppMessage({
-            isOpen: true,
-            text: t('confirm_delete_all'),
-            type: 'confirm',
-            onConfirm: async () => {
-                setIsProcessing(true);
-                const collectionsToDelete = ['dailyMetrics', 'kingDuvetSales', 'salesTransactions', 'employees', 'stores', 'businessRules'];
-                try {
-                    for (const name of collectionsToDelete) {
-                        const querySnapshot = await db.collection(name).get();
-                        const batch = db.batch();
-                        querySnapshot.docs.forEach(d => batch.delete(d.ref));
-                        await batch.commit();
-                    }
-                    setAppMessage({ isOpen: true, text: t('delete_all_success'), type: 'alert' });
-                } catch (error: any) {
-                    setAppMessage({ isOpen: true, text: `${t('error_deleting_data')}: ${error.message}`, type: 'alert' });
-                } finally {
-                    setIsProcessing(false);
-                }
-            }
-        });
+        setAppMessage({ isOpen: true, text: 'تم تعطيل حذف البيانات لأن النظام لا يتصل بـ Firestore.', type: 'alert' });
     };
 
     // FIX: Added missing handleSelectiveDelete function for targeted data removal.
@@ -975,144 +850,22 @@ const handleNotificationClick = (notificationId: string) => {
         const monthName = new Date(year, month).toLocaleString(locale, { month: 'long' });
         const confirmationKey = dataType === 'visitors' ? 'confirm_delete_visitors_data' : (dataType === 'sales' ? 'confirm_delete_sales_data' : 'confirm_delete_products_data');
         const confirmationText = t(confirmationKey, { month: monthName, year: year.toString() });
-    
-        setAppMessage({
-            isOpen: true,
-            text: confirmationText,
-            type: 'confirm',
-            onConfirm: async () => {
-                setIsProcessing(true);
-                try {
-                    const startDate = Timestamp.fromDate(new Date(year, month, 1));
-                    const endDate = Timestamp.fromDate(new Date(year, month + 1, 0, 23, 59, 59));
-                    const batch = db.batch();
-    
-                    if (dataType === 'visitors') {
-                        const metricsQuery = db.collection('dailyMetrics').where('date', '>=', startDate).where('date', '<=', endDate);
-                        const metricsSnapshot = await metricsQuery.get();
-                        metricsSnapshot.forEach(doc => {
-                            batch.update(doc.ref, { visitors: firebase.firestore.FieldValue.delete() });
-                        });
-                    } else if (dataType === 'sales') {
-                        // 1. Update dailyMetrics
-                        const metricsQuery = db.collection('dailyMetrics').where('date', '>=', startDate).where('date', '<=', endDate);
-                        const metricsSnapshot = await metricsQuery.get();
-                        metricsSnapshot.forEach(doc => {
-                            batch.update(doc.ref, { 
-                                totalSales: firebase.firestore.FieldValue.delete(), 
-                                transactionCount: firebase.firestore.FieldValue.delete(),
-                                employee: firebase.firestore.FieldValue.delete(),
-                                employeeId: firebase.firestore.FieldValue.delete()
-                            });
-                        });
-    
-                        // 2. Delete salesTransactions
-                        const salesQuery = db.collection('salesTransactions').where('Bill Dt.', '>=', startDate).where('Bill Dt.', '<=', endDate);
-                        const salesSnapshot = await salesQuery.get();
-                        salesSnapshot.forEach(doc => batch.delete(doc.ref));
-    
-                        // 3. Delete kingDuvetSales
-                        const duvetQuery = db.collection('kingDuvetSales').where('Bill Dt.', '>=', startDate).where('Bill Dt.', '<=', endDate);
-                        const duvetSnapshot = await duvetQuery.get();
-                        duvetSnapshot.forEach(doc => batch.delete(doc.ref));
-                    } else if (dataType === 'products') {
-                        const startDate = Timestamp.fromDate(new Date(year, month, 1));
-                        const endDate = Timestamp.fromDate(new Date(year, month + 1, 0, 23, 59, 59));
-
-                        const deleteInChunks = async (collectionName: string) => {
-                            const snap = await db.collection(collectionName)
-                                .where('Bill Dt.', '>=', startDate)
-                                .where('Bill Dt.', '<=', endDate)
-                                .get();
-                            console.log(`[SelectiveDelete] ${collectionName} matched:`, snap.size);
-                            let count = 0;
-                            let localBatch = db.batch();
-                            for (const d of snap.docs) {
-                                localBatch.delete(d.ref);
-                                count++;
-                                if (count % 400 === 0) {
-                                    await localBatch.commit();
-                                    console.log(`[SelectiveDelete] ${collectionName} committed 400 deletes`);
-                                    localBatch = db.batch();
-                                }
-                            }
-                            await localBatch.commit();
-                            console.log(`[SelectiveDelete] ${collectionName} final commit; total deleted: ${count}`);
-                        };
-
-                        await deleteInChunks('salesTransactions');
-                        await deleteInChunks('kingDuvetSales');
-                    }
-    
-                    await batch.commit();
-                    const successText = t('delete_success_for_period', { dataType: t(dataType), month: monthName, year: year.toString() });
-                    setAppMessage({ isOpen: true, text: successText, type: 'alert' });
-                } catch (error: any) {
-                    setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
-                } finally {
-                    setIsProcessing(false);
-                }
-            }
-        });
+        setAppMessage({ isOpen: true, text: `${confirmationText} (تم تعطيل الحذف لأن النظام لا يتصل بـ Firestore).`, type: 'alert' });
     };
 
-    const handleSaveBusinessRule = async (rule: string, existingRuleId?: string) => {
-        if (!rule.trim() && !existingRuleId) return;
-        setIsProcessing(true);
-        try {
-            if (existingRuleId && !rule.trim()) {
-                await db.collection('businessRules').doc(existingRuleId).delete();
-                setAppMessage({ isOpen: true, text: 'تم حذف القاعدة بنجاح', type: 'alert' });
-            } else if (existingRuleId) {
-                await db.collection('businessRules').doc(existingRuleId).set({ rule });
-                setAppMessage({ isOpen: true, text: t('rule_saved_success'), type: 'alert' });
-            } else {
-                await db.collection('businessRules').add({ rule });
-                setAppMessage({ isOpen: true, text: t('rule_saved_success'), type: 'alert' });
-            }
-        } catch (error: any) {
-             setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
-        } finally {
-            setIsProcessing(false);
-        }
+    const handleSaveBusinessRule = async () => {
+        setAppMessage({ isOpen: true, text: 'تم تعطيل حفظ القواعد لأن النظام لا يتصل بـ Firestore.', type: 'alert' });
+        setIsProcessing(false);
     };
 
-    const handleUpdateUser = async (userId: string, data: Partial<UserProfile>) => {
-        setIsProcessing(true);
-        try {
-            await db.collection('users').doc(userId).update(data);
-            setAppMessage({ isOpen: true, text: t('user_updated_success'), type: 'alert' });
-        } catch (error: any) {
-            setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
-        } finally {
-            setIsProcessing(false);
-            setModalState({ type: null });
-        }
+    const handleUpdateUser = async () => {
+        setAppMessage({ isOpen: true, text: 'تم تعطيل تعديل المستخدمين لأن النظام لا يتصل بـ Firestore.', type: 'alert' });
+        setIsProcessing(false);
+        setModalState({ type: null });
     };
 
-    const handleDeleteUser = (userId: string, userName: string) => {
-        if (profile?.role !== 'admin') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to delete users.', type: 'alert' });
-            return;
-        }
-        
-        setAppMessage({
-            isOpen: true,
-            text: `Are you sure you want to delete user "${userName}"? This action cannot be undone.`,
-            type: 'confirm',
-            onConfirm: async () => {
-                setIsProcessing(true);
-                try {
-                    await db.collection('users').doc(userId).delete();
-                    setAppMessage({ isOpen: true, text: t('user_deleted_success'), type: 'alert' });
-                } catch (error: any) {
-                    console.error('Error deleting user:', error);
-                    setAppMessage({ isOpen: true, text: t('error_deleting_user'), type: 'alert' });
-                } finally {
-                    setIsProcessing(false);
-                }
-            }
-        });
+    const handleDeleteUser = (_userId: string, userName: string) => {
+        setAppMessage({ isOpen: true, text: `تم تعطيل حذف المستخدمين (${userName}) لأن النظام لا يتصل بـ Firestore.`, type: 'alert' });
     };
 
     const handleSaveTask = async (taskData: { recipientId: string, recipientName: string, title: string, message: string }) => {
@@ -1125,17 +878,8 @@ const handleNotificationClick = (notificationId: string) => {
             setModalState({ type: null }); 
     };
 
-    const handleUpdateTaskStatus = async (taskId: string, status: 'completed') => {
-        try {
-            const taskRef = db.collection('tasks').doc(taskId);
-            const updateData: any = { status };
-            if (status === 'completed') {
-                updateData.completedAt = Timestamp.now();
-            }
-            await taskRef.update(updateData);
-        } catch (error: any) {
-            setAppMessage({ isOpen: true, text: `Error updating task: ${error.message}`, type: 'alert' });
-        }
+    const handleUpdateTaskStatus = async () => {
+        setAppMessage({ isOpen: true, text: 'تم تعطيل تحديث المهام لأن النظام لا يتصل بـ Firestore.', type: 'alert' });
     };
 
   const handleLogout = async () => {
@@ -1154,8 +898,6 @@ const handleNotificationClick = (notificationId: string) => {
           { icon: <CubeIcon />, label: t('products'), name: "products", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
           { icon: <UploadIcon />, label: t('smart_upload'), name: "uploads", roles: ['admin', 'general_manager', 'area_manager'] as UserRole[] },
           { icon: <CogIcon />, label: t('settings'), name: "settings", roles: ['admin', 'general_manager'] as UserRole[] },
-          { icon: <span>⏳</span>, label: t('pending_approvals'), name: "pendingApprovals", roles: ['admin'] as UserRole[] },
-          { icon: <span>👥</span>, label: t('roles_management'), name: "rolesManagement", roles: ['admin'] as UserRole[] },
       ];
       return allItems.filter(item => item.roles.includes(role));
   }, [profile, t]);

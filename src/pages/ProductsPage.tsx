@@ -9,6 +9,7 @@ import { getCategory, getSmartDuvetCategories, getSmartDuvetCategory, getSmartDu
 import type { ProductSummary, Store, DateFilter, AreaStoreFilterState, FilterableData, ModalState, UserProfile } from '../types';
 import { ChartCard, BarChart, LineChart, PieChart } from '../components/DashboardComponents';
 import { generateText } from '../services/geminiService';
+import { parseDateValue } from '../utils/date';
 
 interface ProductsPageProps {
   productSummary: ProductSummary[];
@@ -90,7 +91,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     const uptoDay = D === 'all' ? daysInMonth : Math.min(D, daysInMonth);
 
     const currentMonth = sales.filter(s => {
-      const d = s['Bill Dt.'].toDate();
+      const d = parseDateValue(s['Bill Dt.']);
+      if (!d) return false;
       return d.getUTCFullYear() === Y && d.getUTCMonth() === M && d.getUTCDate() <= uptoDay;
     });
 
@@ -98,7 +100,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     const PY = prevMonthDate.getUTCFullYear();
     const PM = prevMonthDate.getUTCMonth();
     const prevMonth = sales.filter(s => {
-      const d = s['Bill Dt.'].toDate();
+      const d = parseDateValue(s['Bill Dt.']);
+      if (!d) return false;
       return d.getUTCFullYear() === PY && d.getUTCMonth() === PM;
     });
 
@@ -149,7 +152,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
 
     const monthlyTrend = Array.from({ length: 12 }, (_, i) => ({ name: new Date(0, i).toLocaleString('en-US', { month: 'short' }), value: 0 }));
     sales.forEach(s => {
-      const d = s['Bill Dt.'].toDate();
+      const d = parseDateValue(s['Bill Dt.']);
+      if (!d) return false;
       if (d.getUTCFullYear() !== Y) return;
       const m = d.getUTCMonth();
       monthlyTrend[m].value += Number(s['Sold Qty'] || 0) * Number(s['Item Rate'] || 0);
@@ -364,7 +368,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     // Group items by bill_no if available; fallback to synthetic key
     const byTxn = new Map<string, { name: string }[]>();
     for (const s of sales) {
-      const d = s['Bill Dt.'].toDate();
+      const d = parseDateValue(s['Bill Dt.']);
+      if (!d) return false;
       if (d.getUTCFullYear() !== Y || (dateFilter.month !== 'all' && d.getUTCMonth() !== M)) continue;
       const billNo = (s.bill_no || s['Bill_No'] || s['Invoice'] || s['Transaction_ID'] || s['Bill Number'] || s['Invoice No'] || '').toString();
       const key = billNo

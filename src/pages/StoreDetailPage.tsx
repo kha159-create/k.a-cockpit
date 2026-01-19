@@ -7,6 +7,7 @@ import type { StoreSummary, DailyMetric, ModalState, DateFilter, FilterableData,
 import { calculateEffectiveTarget } from '../utils/calculator';
 import { generateText } from '../services/geminiService';
 import { useLocale } from '../context/LocaleContext';
+import { parseDateValue } from '../utils/date';
 
 interface StoreDetailPageProps {
     store: StoreSummary;
@@ -50,9 +51,8 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
     const filteredMetrics = useMemo(() => {
         return allMetrics.filter(m => {
             if (m.store !== store.name) return false;
-            const itemTimestamp = m.date;
-            if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
-            const itemDate = itemTimestamp.toDate();
+            const itemDate = parseDateValue(m.date);
+            if (!itemDate) return false;
             const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
 
             const mode = dateFilter.mode ?? 'single';
@@ -119,7 +119,8 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
         
         const salesThisMonth = allMetrics.filter(m => {
             if (m.store !== store.name || !m.date || typeof m.date.toDate !== 'function') return false;
-            const metricDate = m.date.toDate();
+            const metricDate = parseDateValue(m.date);
+            if (!metricDate) return;
             return metricDate.getFullYear() === year && metricDate.getMonth() === month;
         }).reduce((sum, m) => sum + (m.totalSales || 0), 0);
             

@@ -4,6 +4,7 @@ import MonthYearFilter from '../components/MonthYearFilter';
 import { useLocale } from '../context/LocaleContext';
 import type { DateFilter, DuvetSummary, Employee, EmployeeSummary, StoreSummary, FilterableData, SalesTransaction, Store } from '../types';
 import { getCategory, getSmartPillowCategories, getSmartPillowCategory } from '../utils/calculator';
+import { parseDateValue } from '../utils/date';
 import * as XLSX from 'xlsx';
 
 interface SmartUploaderPageProps {
@@ -188,8 +189,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
     // Filter sales transactions by date
     const filterByDate = (item: FilterableData) => {
       const itemTimestamp = 'date' in item ? item.date : item['Bill Dt.'];
-      if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
-      const itemDate = itemTimestamp.toDate();
+      const itemDate = parseDateValue(itemTimestamp);
+      if (!itemDate) return false;
       const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
 
       const mode = dateFilter.mode ?? 'single';
@@ -282,8 +283,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
   const pillowSummary = useMemo(() => {
     const filterByDate = (item: FilterableData) => {
       const itemTimestamp = 'date' in item ? item.date : item['Bill Dt.'];
-      if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
-      const itemDate = itemTimestamp.toDate();
+      const itemDate = parseDateValue(itemTimestamp);
+      if (!itemDate) return false;
       const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
 
       const mode = dateFilter.mode ?? 'single';
@@ -918,7 +919,8 @@ const SmartUploaderPage: React.FC<SmartUploaderPageProps> = ({
       
       const filtered = allMetrics.filter(m => {
         if (m.store !== storeName || !m.date || typeof m.date.toDate !== 'function') return false;
-        const d = m.date.toDate();
+        const d = parseDateValue(m.date);
+        if (!d) return false;
         const itemDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
         return itemDate >= startDate && itemDate <= endDate;
       });

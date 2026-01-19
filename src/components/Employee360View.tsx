@@ -5,6 +5,7 @@ import { SparklesIcon } from './Icons';
 import { calculateEffectiveTarget, getCategory, getSmartDuvetCategories, getSmartDuvetCategory } from '../utils/calculator';
 import type { EmployeeSummary, DailyMetric, SalesTransaction, StoreSummary, DateFilter, ModalState } from '../types';
 import { useLocale } from '../context/LocaleContext';
+import { parseDateValue } from '../utils/date';
 
 interface Employee360ViewProps {
     employee: EmployeeSummary;
@@ -26,8 +27,8 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
         // --- Date Filtering Logic ---
         const filterByDate = (item: DailyMetric | SalesTransaction) => {
             const itemTimestamp = 'date' in item ? item.date : item['Bill Dt.'];
-            if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
-            const itemDate = itemTimestamp.toDate();
+            const itemDate = parseDateValue(itemTimestamp);
+            if (!itemDate) return false;
             const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
 
             const mode = dateFilter.mode ?? 'single';

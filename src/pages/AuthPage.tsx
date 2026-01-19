@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-// FIX: Use namespaced compat API by importing auth and db services.
-import { auth, db } from '../services/firebase';
+import { auth } from '../services/firebase';
 import { useLocale } from '../context/LocaleContext';
 import '../styles/AuthPage.css';
 import { UserIcon, EmailIcon, PasswordIcon } from '../components/Icons';
@@ -15,7 +14,6 @@ const AuthPage: React.FC = () => {
     const [loginPassword, setLoginPassword] = useState('');
 
     const [signUpName, setSignUpName] = useState('');
-    const [signUpEmployeeId, setSignUpEmployeeId] = useState('');
     const [signUpEmail, setSignUpEmail] = useState('');
     const [signUpPassword, setSignUpPassword] = useState('');
     const [signUpPasswordConfirm, setSignUpPasswordConfirm] = useState('');
@@ -30,21 +28,10 @@ const AuthPage: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            let userEmail = loginIdentifier;
             if (!loginIdentifier.includes('@')) {
-                // FIX: Use namespaced compat API for Firestore queries.
-                const usersRef = db.collection('users');
-                const q = usersRef.where('employeeId', '==', loginIdentifier).limit(1);
-                const snapshot = await q.get();
-                if (snapshot.empty) throw new Error(t('error_no_user_id'));
-                
-                const userData = snapshot.docs[0].data();
-                if (!userData?.email) throw new Error(t('error_no_user_email'));
-                
-                userEmail = userData.email;
+                throw new Error(t('error_invalid_email'));
             }
-            // FIX: Use namespaced compat API for authentication.
-            await auth.signInWithEmailAndPassword(userEmail, loginPassword);
+            await auth.signInWithEmailAndPassword(loginIdentifier, loginPassword);
         } catch (err: any) {
           setError(err.message || t('error_login_failed'));
         } finally {
@@ -65,17 +52,7 @@ const AuthPage: React.FC = () => {
             const userCredential = await auth.createUserWithEmailAndPassword(signUpEmail, signUpPassword);
             const user = userCredential.user;
             if (user) {
-                // FIX: Use namespaced compat API for user profile updates.
                 await user.updateProfile({ displayName: signUpName });
-                // FIX: Use namespaced compat API for Firestore operations.
-                await db.collection('users').doc(user.uid).set({
-                  id: user.uid,
-                  name: signUpName,
-                  employeeId: signUpEmployeeId,
-                  email: signUpEmail,
-                  role: 'employee',
-                  status: 'pending',
-                });
                 setSuccess(t('sign_up_success'));
                 setTimeout(() => {
                     setMode('login');
@@ -99,7 +76,7 @@ const AuthPage: React.FC = () => {
                 <form className="space-y-4" onSubmit={handleLogin}>
                     <div className="auth-input-container">
                         <span className="auth-input-icon"><EmailIcon/></span>
-                        <input className="auth-input" type="text" placeholder={t('email_or_id')} value={loginIdentifier} onChange={e => setLoginIdentifier(e.target.value)} required />
+                        <input className="auth-input" type="text" placeholder={t('email')} value={loginIdentifier} onChange={e => setLoginIdentifier(e.target.value)} required />
                     </div>
                     <div className="auth-input-container">
                         <span className="auth-input-icon"><PasswordIcon/></span>
@@ -123,10 +100,6 @@ const AuthPage: React.FC = () => {
                     <div className="auth-input-container">
                         <span className="auth-input-icon"><UserIcon/></span>
                         <input className="auth-input" type="text" placeholder={t('name')} value={signUpName} onChange={e => setSignUpName(e.target.value)} required />
-                    </div>
-                    <div className="auth-input-container">
-                        <span className="auth-input-icon"><UserIcon/></span>
-                        <input className="auth-input" type="text" placeholder={t('employee_id')} value={signUpEmployeeId} onChange={e => setSignUpEmployeeId(e.target.value)} required />
                     </div>
                     <div className="auth-input-container">
                         <span className="auth-input-icon"><EmailIcon/></span>

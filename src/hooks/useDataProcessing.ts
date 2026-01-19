@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import type { Store, Employee, DailyMetric, SalesTransaction, DateFilter, AreaStoreFilterState, KPIData, StoreSummary, EmployeeSummary, ProductSummary, DuvetSummary, CommissionStoreData, UserProfile } from '../types.js';
 import { calculateEffectiveTarget } from '../utils/calculator.js';
+import { parseDateValue } from '../utils/date';
 
 interface UseDataProcessingProps {
   stores: Store[];
@@ -64,8 +65,8 @@ const aggregateRangeForStores = (
         return result;
     }
     metrics.forEach(metric => {
-        if (!metric.date || typeof metric.date.toDate !== 'function') return;
-        const dateObj = metric.date.toDate();
+        const dateObj = parseDateValue(metric.date);
+        if (!dateObj) return;
         if (dateObj.getUTCFullYear() !== year || dateObj.getUTCMonth() !== month) return;
         const day = dateObj.getUTCDate();
         if (day < bounds.from || day > bounds.to) return;
@@ -150,8 +151,8 @@ export const useDataProcessing = ({
   const dateFilteredData = useMemo(() => {
     const filterByDate = (item: DailyMetric | SalesTransaction) => {
         const itemTimestamp = 'date' in item ? item.date : item['Bill Dt.'];
-        if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false; // Check if it's a valid Timestamp
-        const itemDate = itemTimestamp.toDate();
+        const itemDate = parseDateValue(itemTimestamp);
+        if (!itemDate) return false;
         const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
 
         const mode = dateFilter.mode ?? 'single';
@@ -524,7 +525,8 @@ export const useDataProcessing = ({
 
         areaFilteredData.metrics.forEach(metric => {
             if (!metric.date || typeof metric.date.toDate !== 'function') return;
-            const date = metric.date.toDate();
+            const date = parseDateValue(metric.date);
+            if (!date) return;
             if (date.getUTCFullYear() === year && date.getUTCMonth() === month) {
                 const dayOfMonth = date.getUTCDate() - 1;
                 if (dayOfMonth >= 0 && dayOfMonth < daysInMonth) {
@@ -544,7 +546,8 @@ export const useDataProcessing = ({
 
     areaFilteredData.metrics.forEach(metric => {
         if (!metric.date || typeof metric.date.toDate !== 'function') return;
-        const date = metric.date.toDate();
+        const date = parseDateValue(metric.date);
+        if (!date) return;
         if (date.getUTCFullYear() === year) {
             const monthIndex = date.getUTCMonth();
             performanceByMonth[monthIndex].sales += metric.totalSales || 0;

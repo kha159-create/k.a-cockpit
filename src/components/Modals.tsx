@@ -6,6 +6,7 @@ import { generateText, generatePrediction } from '../services/geminiService';
 import type { Store, Employee, ProductSummary, AppMessage, StoreSummary, EmployeeSummary, KPIData, UserProfile, UserRole, DailyMetric, PredictionResult } from '../types';
 import { useLocale } from '../context/LocaleContext';
 import { ChartCard, BarChart } from './DashboardComponents';
+import { parseDateValue } from '../utils/date';
 
 // --- Reusable Modal Components ---
 interface ModalProps {
@@ -738,7 +739,8 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ data, 
     const arr = Array.from({ length: 12 }, (_, i) => ({ name: new Date(0, i).toLocaleString('en-US', { month: 'short' }), Sales: 0, Target: 0 }));
     const activeYear = filteredSales[0]?.['Bill Dt.']?.toDate?.()?.getUTCFullYear?.() ?? new Date().getUTCFullYear();
     filteredSales.forEach(s => {
-      const d = s['Bill Dt.'].toDate();
+      const d = parseDateValue(s['Bill Dt.']);
+      if (!d) return false;
       if (d.getUTCFullYear() !== activeYear) return;
       const val = Number(s['Sold Qty'] || 0) * Number(s['Item Rate'] || 0);
       arr[d.getUTCMonth()].Sales += val;

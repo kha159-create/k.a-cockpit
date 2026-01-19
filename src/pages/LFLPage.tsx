@@ -3,6 +3,7 @@ import type { Store, DailyMetric, UserProfile } from '../types';
 import { DetailedComparisonCard, ChartCard, BarChart, LineChart, PieChart } from '../components/DashboardComponents';
 import { Table, Column } from '../components/Table';
 import * as XLSX from 'xlsx';
+import { parseDateValue } from '../utils/date';
 
 interface LFLPageProps {
     allStores: Store[];
@@ -95,7 +96,8 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
         const yearSet = new Set<number>();
         allMetrics.forEach(m => {
             if (m.date && typeof m.date.toDate === 'function') {
-                const d = m.date.toDate();
+                const d = parseDateValue(m.date);
+                if (!d) return;
                 yearSet.add(d.getUTCFullYear());
             }
         });
@@ -108,7 +110,8 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
         const processPeriod = (data: DailyMetric[], startDate: Date, endDate: Date): LFLData => {
             const filtered = data.filter(s => {
                 if (!s.date || typeof s.date.toDate !== 'function') return false;
-                const d = s.date.toDate();
+                const d = parseDateValue(s.date);
+                if (!d) return;
                 // Ensure we compare dates only, ignoring time part by using UTC
                 const itemDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
                 return itemDate >= startDate && itemDate <= endDate;
@@ -223,7 +226,8 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             const endDate = new Date(Date.UTC(year, month + 1, 0));
             const filtered = dataForFilter.filter(s => {
                 if (!s.date || typeof s.date.toDate !== 'function') return false;
-                const d = s.date.toDate();
+                const d = parseDateValue(s.date);
+                if (!d) return;
                 const itemDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
                 return itemDate >= startDate && itemDate <= endDate;
             });
@@ -347,7 +351,8 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                     const processStorePeriod = (storeMetrics: DailyMetric[], startDate: Date, endDate: Date): LFLData => {
                         const filtered = storeMetrics.filter(s => {
                             if (!s.date || typeof s.date.toDate !== 'function') return false;
-                            const d = s.date.toDate();
+                            const d = parseDateValue(s.date);
+                            if (!d) return;
                             const itemDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
                             return itemDate >= startDate && itemDate <= endDate;
                         });

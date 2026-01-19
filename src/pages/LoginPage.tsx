@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-// FIX: Use namespaced compat API by importing auth and db services.
-import { auth, db } from '../services/firebase';
+import { auth } from '../services/firebase';
 import { useLocale } from '../context/LocaleContext';
 
 interface LoginPageProps {
@@ -10,7 +9,7 @@ interface LoginPageProps {
 
 const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
   const { t } = useLocale();
-  const [identifier, setIdentifier] = useState('kha.als@outlook.com'); // Can be email or ID
+  const [identifier, setIdentifier] = useState('kha.als@outlook.com');
   const [password, setPassword] = useState(''); // Empty password for security
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,23 +19,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
     setLoading(true);
     setError(null);
     try {
-        let userEmail = identifier;
         if (!identifier.includes('@')) {
-            // FIX: Use namespaced compat API for Firestore queries.
-            const usersRef = db.collection('users');
-            const q = usersRef.where('employeeId', '==', identifier).limit(1);
-            const snapshot = await q.get();
-            if (snapshot.empty) {
-                throw new Error(t('error_no_user_id'));
-            }
-            const userData = snapshot.docs[0].data();
-            if (!userData || !userData.email) {
-                throw new Error(t('error_no_user_email'));
-            }
-            userEmail = userData.email;
+            throw new Error(t('error_invalid_email'));
         }
-        // FIX: Use namespaced compat API for authentication.
-        await auth.signInWithEmailAndPassword(userEmail, password);
+        await auth.signInWithEmailAndPassword(identifier, password);
     } catch (err: any) {
       let errorMessage = err.message || t('error_login_failed');
       
@@ -74,14 +60,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignUp }) => {
         
         <form className="space-y-6" onSubmit={handleLogin}>
           <div>
-            <label className="label">{t('email_or_id')}</label>
+            <label className="label">{t('email')}</label>
             <input
               type="text"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required
               className="input"
-              placeholder={t('email_or_id_placeholder')}
+              placeholder={t('email')}
             />
           </div>
           

@@ -1,6 +1,7 @@
 // FIX: Updated to use the correct @google/generative-ai package
 import { GoogleGenerativeAI, GenerationConfig } from "@google/generative-ai";
 import type { StoreSummary, DailyMetric, PredictionResult, EmployeeSummary } from '../types.js';
+import { parseDateValue } from '../utils/date';
 
 
 // Read Gemini API key strictly from env (GitHub Secrets at build time)
@@ -198,10 +199,12 @@ export const generatePrediction = async (store: StoreSummary, historicalMetrics:
             if (!m.date || typeof m.date.toDate !== 'function') {
                 return false;
             }
-            const metricDate = m.date.toDate();
+            const metricDate = parseDateValue(m.date);
+            if (!metricDate) return false;
             return metricDate.getMonth() === currentMonth && metricDate.getFullYear() === currentYear;
         })
-        .map(m => ({ date: m.date.toDate().toISOString().split('T')[0], sales: m.totalSales || 0 }));
+        .map(m => ({ date: parseDateValue(m.date)?.toISOString().split('T')[0], sales: m.totalSales || 0 }))
+        .filter(item => !!item.date);
     
     const languageInstruction = locale === 'ar' ? 'IMPORTANT: The justification must be in Arabic.' : '';
 

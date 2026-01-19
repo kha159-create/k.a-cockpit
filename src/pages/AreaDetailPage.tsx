@@ -7,6 +7,7 @@ import { calculateEffectiveTarget } from '../utils/calculator';
 import { generateText } from '../services/geminiService';
 import { useLocale } from '../context/LocaleContext';
 import { StoreName } from '@/components/Names';
+import { parseDateValue } from '../utils/date';
 
 interface AreaDetailPageProps {
     areaManager: string;
@@ -40,9 +41,8 @@ const AreaDetailPage: React.FC<AreaDetailPageProps> = ({
         const storeNames = new Set(stores.map(s => s.name));
         return allMetrics.filter(m => {
             if (!storeNames.has(m.store)) return false;
-            const itemTimestamp = m.date;
-            if (!itemTimestamp || typeof itemTimestamp.toDate !== 'function') return false;
-            const itemDate = itemTimestamp.toDate();
+            const itemDate = parseDateValue(m.date);
+            if (!itemDate) return false;
             const normalizedDate = new Date(Date.UTC(itemDate.getUTCFullYear(), itemDate.getUTCMonth(), itemDate.getUTCDate()));
 
             const mode = dateFilter.mode ?? 'single';
@@ -117,7 +117,8 @@ const AreaDetailPage: React.FC<AreaDetailPageProps> = ({
         const salesThisMonth = allMetrics.filter(m => {
             const storeNames = new Set(stores.map(s => s.name));
             if (!storeNames.has(m.store) || !m.date || typeof m.date.toDate !== 'function') return false;
-            const metricDate = m.date.toDate();
+            const metricDate = parseDateValue(m.date);
+            if (!metricDate) return;
             return metricDate.getFullYear() === year && metricDate.getMonth() === month;
         }).reduce((sum, m) => sum + (m.totalSales || 0), 0);
             
@@ -241,4 +242,3 @@ const AreaDetailPage: React.FC<AreaDetailPageProps> = ({
 };
 
 export default AreaDetailPage;
-

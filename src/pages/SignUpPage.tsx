@@ -1,9 +1,7 @@
 
 import React, { useState } from 'react';
-// FIX: Use namespaced compat API by importing auth and db services.
-import { auth, db } from '../services/firebase';
+import { auth } from '../services/firebase';
 import { useLocale } from '../context/LocaleContext';
-import firebase from 'firebase/app';
 
 interface SignUpPageProps {
   onSwitchToLogin: () => void;
@@ -12,7 +10,6 @@ interface SignUpPageProps {
 const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
   const { t } = useLocale();
   const [name, setName] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,35 +24,11 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
       return;
     }
     
-    // التحقق من Employee ID
-    if (!employeeId || employeeId.length !== 4) {
-      setError('رقم الموظف يجب أن يكون 4 خانات');
-      return;
-    }
-    
     setLoading(true);
     setError(null);
     setSuccess(null);
     
     try {
-      // التحقق من وجود Employee ID في مجموعة employees
-      const employeeDoc = await db.collection('employees').doc(employeeId).get();
-      
-      if (!employeeDoc.exists) {
-        setError('رقم الموظف غير مسجل، تواصل مع الإدارة');
-        setLoading(false);
-        return;
-      }
-      
-      const employeeData = employeeDoc.data();
-      
-      // التحقق من أن الموظف غير مربوط بحساب آخر
-      if (employeeData?.linkedAccount) {
-        setError('رقم الموظف مربوط بحساب آخر بالفعل');
-        setLoading(false);
-        return;
-      }
-      
       // إنشاء حساب المستخدم
       const userCredential = await auth.createUserWithEmailAndPassword(email, password);
       const user = userCredential.user;
@@ -63,22 +36,7 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
       if (user) {
         // تحديث معلومات المستخدم
         await user.updateProfile({ displayName: name });
-        
-        // إنشاء سجل في pendingEmployees
-        await db.collection('pendingEmployees').doc(user.uid).set({
-          employeeId: employeeId,
-          email: email,
-          name: name,
-          role: 'employee',
-          status: 'pending',
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          userId: user.uid
-        });
-        
-        // تسجيل الخروج فوراً (المستخدم لا يستطيع تسجيل الدخول حتى موافقة الإدارة)
-        await auth.signOut();
-        
-        setSuccess('تم إرسال طلب التسجيل بنجاح، يرجى انتظار موافقة الإدارة');
+        setSuccess('تم إنشاء الحساب بنجاح، يمكنك تسجيل الدخول الآن');
       }
     } catch (err: any) {
       let errorMessage = err.message;
@@ -115,18 +73,6 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
         ) : (
           <form className="space-y-4" onSubmit={handleSignUp}>
             <div><label className="label">{t('name')}</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="input" /></div>
-            <div>
-              <label className="label">رقم الموظف (4 خانات)</label>
-              <input 
-                type="text" 
-                value={employeeId} 
-                onChange={(e) => setEmployeeId(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-                required 
-                className="input" 
-                placeholder="مثال: 2156"
-                maxLength={4}
-              />
-            </div>
             <div><label className="label">{t('email')}</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="input" /></div>
             <div><label className="label">{t('password')}</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="input" /></div>
             <div><label className="label">{t('confirm_password')}</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className="input" /></div>

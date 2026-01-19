@@ -1,6 +1,5 @@
 import firebase from 'firebase/app'
 import 'firebase/auth'
-import 'firebase/firestore'
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -14,52 +13,24 @@ export const firebaseConfig = {
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig)
 
 export const auth = firebase.auth();
-export const db = firebase.firestore();
 
 // إدارة الصلاحيات والأدوار
 export const getUserRole = async (userId: string): Promise<string | null> => {
-  try {
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      return userData?.role || null;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting user role:', error);
-    return null;
-  }
+  console.warn('Firestore disabled: getUserRole fallback used for', userId);
+  return null;
 };
 
 export const getUserStatus = async (userId: string): Promise<string | null> => {
-  try {
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      return userData?.status || null;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting user status:', error);
-    return null;
-  }
+  console.warn('Firestore disabled: getUserStatus fallback used for', userId);
+  return null;
 };
 
 export const isUserApproved = async (userId: string): Promise<boolean> => {
-  const status = await getUserStatus(userId);
-  // Allow both 'approved' and 'active' statuses for login
-  return status === 'approved' || status === 'active';
+  console.warn('Firestore disabled: auto-approving user', userId);
+  return true;
 };
 
 export const getUserProfile = async (userId: string) => {
-  try {
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (userDoc.exists) {
-      return userDoc.data();
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting user profile:', error);
-    return null;
-  }
+  console.warn('Firestore disabled: getUserProfile fallback used for', userId);
+  return null;
 };

@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { StoreSummary, UserProfile } from '../types.js';
 import { useLocale } from '../context/LocaleContext.js';
-import { updateAllEmployeesWithLinkedAccount } from '../utils/updateEmployees.js';
-import { fixUnknownEmployeesAndMetrics } from '../utils/fixUnknownEmployees.js';
 
 interface SelectiveDataDeletionProps {
     onSelectiveDelete: (dataType: 'visitors' | 'sales', year: number, month: number) => void;
@@ -55,83 +53,6 @@ const SelectiveDataDeletion: React.FC<SelectiveDataDeletionProps> = ({ onSelecti
     );
 };
 
-const EmployeeUpdateSection: React.FC = () => {
-    const { t } = useLocale();
-    const [isUpdating, setIsUpdating] = useState(false);
-    const [updateResult, setUpdateResult] = useState<{success: boolean, message: string, updatedCount?: number} | null>(null);
-
-    const handleUpdateEmployees = async () => {
-        if (!confirm(t('confirm_update_employees'))) {
-            return;
-        }
-
-        setIsUpdating(true);
-        setUpdateResult(null);
-
-        try {
-            const result = await updateAllEmployeesWithLinkedAccount();
-            setUpdateResult(result);
-        } catch (error) {
-            setUpdateResult({
-                success: false,
-                message: `${t('error_updating_employees')}: ${error}`
-            });
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-
-    return (
-        <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="text-xl font-semibold text-zinc-700 mb-2">{t('update_employees')}</h3>
-            <p className="text-sm text-zinc-500 mb-4">{t('update_employees_desc')}</p>
-            
-            <div className="p-4 border border-orange-200 bg-orange-50 rounded-lg">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                        <span className="text-orange-600 text-lg">👥</span>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-orange-800">{t('update_employees')}</h4>
-                        <p className="text-orange-700 text-sm">{t('update_employees_desc')}</p>
-                    </div>
-                </div>
-                
-                <button 
-                    onClick={handleUpdateEmployees} 
-                    disabled={isUpdating}
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                    {isUpdating ? (
-                        <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            {t('updating')}
-                        </>
-                    ) : (
-                        <>
-                            <span>🔄</span>
-                            {t('update_all_employees')}
-                        </>
-                    )}
-                </button>
-                
-                {updateResult && (
-                    <div className={`mt-4 p-3 rounded-lg ${updateResult.success ? 'bg-green-100 border border-green-200' : 'bg-red-100 border border-red-200'}`}>
-                        <p className={`font-medium ${updateResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                            {updateResult.message}
-                        </p>
-                        {updateResult.updatedCount !== undefined && updateResult.updatedCount > 0 && (
-                            <p className="text-green-700 text-sm mt-1">
-                                {t('employees_updated_successfully')}: {updateResult.updatedCount}
-                            </p>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
 interface SettingsPageProps {
     storeSummary: StoreSummary[];
     onAddMonthlyData: () => void;
@@ -159,14 +80,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             )}
             
             {isAdmin && (
-                <EmployeeUpdateSection />
-            )}
-
-            {isAdmin && (
                 <div className="bg-white p-6 rounded-xl shadow-sm border">
-                    <h3 className="text-xl font-semibold text-zinc-700 mb-2">Fix Unknown Employees</h3>
-                    <p className="text-sm text-zinc-500 mb-4">Extract numeric IDs from names like "Unknown 2792" and backfill missing employeeId in employees and dailyMetrics.</p>
-                    <FixUnknownEmployeesButton />
+                    <h3 className="text-xl font-semibold text-zinc-700 mb-2">Firestore Tools Disabled</h3>
+                    <p className="text-sm text-zinc-500 mb-4">User/employee management tools are disabled because Firestore connections are turned off.</p>
                 </div>
             )}
 
@@ -192,31 +108,3 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
 };
 
 export default SettingsPage;
-
-const FixUnknownEmployeesButton: React.FC = () => {
-    const { t } = useLocale();
-    const [running, setRunning] = React.useState(false);
-    const [result, setResult] = React.useState<{ employeesUpdated: number; metricsUpdated: number } | null>(null);
-
-    const handleRun = async () => {
-        setRunning(true);
-        setResult(null);
-        try {
-            const res = await fixUnknownEmployeesAndMetrics();
-            setResult(res);
-        } finally {
-            setRunning(false);
-        }
-    };
-
-    return (
-        <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
-            <button onClick={handleRun} disabled={running} className="btn-primary">
-                {running ? 'Processing...' : 'Fix Unknown Employees & Metrics'}
-            </button>
-            {result && (
-                <p className="text-sm text-blue-800 mt-2">Employees updated: {result.employeesUpdated} — Metrics updated: {result.metricsUpdated}</p>
-            )}
-        </div>
-    );
-};

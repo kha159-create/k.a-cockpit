@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseDateValue } from '../utils/date';
 import type { Task } from '../types.js';
 import { useLocale } from '../context/LocaleContext.js';
 
@@ -10,7 +11,7 @@ interface MyTasksProps {
 
 const TaskItem: React.FC<{ task: Task; onUpdateStatus: (taskId: string, status: 'completed') => void; isProcessing: boolean; }> = ({ task, onUpdateStatus, isProcessing }) => {
     const { t, locale } = useLocale();
-    const createdAt = task.createdAt?.toDate();
+    const createdAt = parseDateValue(task.createdAt);
     const dateOptions: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
 
     return (

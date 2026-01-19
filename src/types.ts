@@ -1,11 +1,7 @@
 
-// FIX: Use firebase compat types to resolve module export errors.
-import firebase from 'firebase/app';
-import 'firebase/auth';
-import 'firebase/firestore';
+import type firebase from 'firebase/app';
 
 export type User = firebase.User;
-export type Timestamp = firebase.firestore.Timestamp;
 
 
 export type UserRole = 'admin' | 'general_manager' | 'area_manager' | 'store_manager' | 'employee';
@@ -20,7 +16,7 @@ export interface UserProfile {
     areaManager?: string; // For area_manager role
     store?: string; // For store_manager and employee roles
     status?: 'pending' | 'approved' | 'active';
-    approvedAt?: Timestamp;
+    approvedAt?: string;
     approvedBy?: string;
 }
 
@@ -48,7 +44,7 @@ export interface Employee extends BaseDocument {
 }
 
 export interface DailyMetric extends BaseDocument {
-  date: Timestamp;
+  date: string;
   store: string;
   employee?: string;
   employeeId?: string;
@@ -59,7 +55,7 @@ export interface DailyMetric extends BaseDocument {
 }
 
 export interface SalesTransaction extends BaseDocument {
-  'Bill Dt.': Timestamp;
+  'Bill Dt.': string;
   'Outlet Name': string;
   'SalesMan Name': string;
   employeeId?: string;
@@ -108,7 +104,7 @@ export interface Notification {
   userName: string;
   message: string;
   type: 'newUser';
-  timestamp: Timestamp;
+  timestamp: string;
   read: boolean;
 }
 
@@ -126,8 +122,8 @@ export interface Task extends BaseDocument {
   title: string;
   message: string;
   status: 'pending' | 'completed';
-  createdAt: Timestamp;
-  completedAt?: Timestamp;
+  createdAt: string;
+  completedAt?: string;
 }
 
 

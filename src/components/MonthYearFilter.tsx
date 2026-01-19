@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import type { DateFilter, FilterableData } from '../types';
 import { useLocale } from '../context/LocaleContext';
+import { parseDateValue } from '../utils/date';
 
 interface MonthYearFilterProps {
   dateFilter: DateFilter;
@@ -19,10 +20,9 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
     // Also add any additional years found in data (for backward compatibility)
     const yearSet = new Set<number>(hardcodedYears);
     allData.forEach(d => {
-      // Handle both potential date property names, now as Timestamps
-      const dateTimestamp = ('date' in d ? d.date : d['Bill Dt.']) as any;
-      if (dateTimestamp && typeof dateTimestamp.toDate === 'function') {
-        const dateObj = dateTimestamp.toDate();
+      const dateValue = ('date' in d ? d.date : d['Bill Dt.']) as string | undefined;
+      const dateObj = parseDateValue(dateValue);
+      if (dateObj) {
         const year = dateObj.getUTCFullYear();
         if (!isNaN(year)) {
           yearSet.add(year);
@@ -52,9 +52,9 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
     let earliest: Date | null = null;
     let latest: Date | null = null;
     allData.forEach(item => {
-      const dateTimestamp = ('date' in item ? item.date : item['Bill Dt.']) as any;
-      if (dateTimestamp && typeof dateTimestamp.toDate === 'function') {
-        const d = dateTimestamp.toDate();
+      const dateValue = ('date' in item ? item.date : item['Bill Dt.']) as string | undefined;
+      const d = parseDateValue(dateValue);
+      if (d) {
         const normalized = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
         if (!earliest || normalized < earliest) earliest = normalized;
         if (!latest || normalized > latest) latest = normalized;
