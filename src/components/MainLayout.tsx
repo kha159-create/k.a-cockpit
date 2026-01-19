@@ -316,9 +316,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     };
 }, [profile, dateFilter.year]); // Add dateFilter.year to reload stores/employees when year changes
 
-  // Convert preloaded NormalizedSalesResponse to DailyMetric[] format (like orange-dashboard)
-  // This reads from allSalesData (preloaded at startup) and filters by month locally
-  const dailyMetricsFromPreloaded = useMemo(() => {
+  // Helper function to convert allSalesData to DailyMetric[] format (reusable for all pages)
+  const convertAllSalesDataToDailyMetrics = useCallback((yearFilter: number | 'all', monthFilter: number | 'all') => {
     if (!profile || dataPreloading) {
       return [];
     }
@@ -329,8 +328,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
       return [];
     }
     
-    const year = typeof dateFilter.year === 'number' ? dateFilter.year : new Date().getFullYear();
-    const month = typeof dateFilter.month === 'number' ? dateFilter.month : (dateFilter.month === 'all' ? undefined : new Date().getMonth());
+    const year = typeof yearFilter === 'number' ? yearFilter : new Date().getFullYear();
+    const month = typeof monthFilter === 'number' ? monthFilter : (monthFilter === 'all' ? undefined : new Date().getMonth());
     
     if (typeof year !== 'number' || year < 2024 || year > 2026) {
       return [];
@@ -481,9 +480,34 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     
     console.log(`📊 Converted ${apiMetrics.length} metrics from preloaded data for year ${year} (${month !== undefined ? `month ${month + 1}` : 'all months'})`);
     return apiMetrics;
-  }, [profile, allSalesData, dataPreloading, dateFilter.year, dateFilter.month, stores]);
+  }, [profile, allSalesData, dataPreloading, stores]);
 
-  // Use preloaded data instead of fetching (like orange-dashboard)
+  // Convert preloaded NormalizedSalesResponse to DailyMetric[] format for Dashboard (uses dateFilter)
+  const dailyMetricsFromPreloaded = useMemo(() => {
+    return convertAllSalesDataToDailyMetrics(dateFilter.year, dateFilter.month);
+  }, [convertAllSalesDataToDailyMetrics, dateFilter.year, dateFilter.month]);
+
+  // Convert for Stores page (uses storesDateFilter)
+  const storesDailyMetrics = useMemo(() => {
+    return convertAllSalesDataToDailyMetrics(storesDateFilter.year, storesDateFilter.month);
+  }, [convertAllSalesDataToDailyMetrics, storesDateFilter.year, storesDateFilter.month]);
+
+  // Convert for Products page (uses productsDateFilter)
+  const productsDailyMetrics = useMemo(() => {
+    return convertAllSalesDataToDailyMetrics(productsDateFilter.year, productsDateFilter.month);
+  }, [convertAllSalesDataToDailyMetrics, productsDateFilter.year, productsDateFilter.month]);
+
+  // Convert for Employees page (uses employeesDateFilter)
+  const employeesDailyMetrics = useMemo(() => {
+    return convertAllSalesDataToDailyMetrics(employeesDateFilter.year, employeesDateFilter.month);
+  }, [convertAllSalesDataToDailyMetrics, employeesDateFilter.year, employeesDateFilter.month]);
+
+  // Convert for Commissions page (uses commissionsDateFilter)
+  const commissionsDailyMetrics = useMemo(() => {
+    return convertAllSalesDataToDailyMetrics(commissionsDateFilter.year, commissionsDateFilter.month);
+  }, [convertAllSalesDataToDailyMetrics, commissionsDateFilter.year, commissionsDateFilter.month]);
+
+  // Use preloaded data instead of fetching (like orange-dashboard) - Dashboard uses dateFilter
   useEffect(() => {
     if (!profile || dataPreloading) {
       return;
@@ -729,7 +753,8 @@ const handleNotificationClick = (notificationId: string) => {
     return areaStoreFilter;
   }, [dashboardPieFilter, areaStoreFilter, stores]);
 
-  const processedData = useDataProcessing({
+  // Dashboard processedData (uses dateFilter and dailyMetrics)
+  const dashboardProcessedData = useDataProcessing({
     stores,
     employees,
     dailyMetrics,
@@ -739,6 +764,57 @@ const handleNotificationClick = (notificationId: string) => {
     areaStoreFilter: effectiveAreaStoreFilter,
     profile,
   });
+
+  // Stores page processedData (uses storesDateFilter and storesDailyMetrics)
+  const storesProcessedData = useDataProcessing({
+    stores,
+    employees,
+    dailyMetrics: storesDailyMetrics,
+    kingDuvetSales,
+    salesTransactions,
+    dateFilter: storesDateFilter,
+    areaStoreFilter: effectiveAreaStoreFilter,
+    profile,
+  });
+
+  // Products page processedData (uses productsDateFilter and productsDailyMetrics)
+  const productsProcessedData = useDataProcessing({
+    stores,
+    employees,
+    dailyMetrics: productsDailyMetrics,
+    kingDuvetSales,
+    salesTransactions,
+    dateFilter: productsDateFilter,
+    areaStoreFilter: effectiveAreaStoreFilter,
+    profile,
+  });
+
+  // Employees page processedData (uses employeesDateFilter and employeesDailyMetrics)
+  const employeesProcessedData = useDataProcessing({
+    stores,
+    employees,
+    dailyMetrics: employeesDailyMetrics,
+    kingDuvetSales,
+    salesTransactions,
+    dateFilter: employeesDateFilter,
+    areaStoreFilter: effectiveAreaStoreFilter,
+    profile,
+  });
+
+  // Commissions page processedData (uses commissionsDateFilter and commissionsDailyMetrics)
+  const commissionsProcessedData = useDataProcessing({
+    stores,
+    employees,
+    dailyMetrics: commissionsDailyMetrics,
+    kingDuvetSales,
+    salesTransactions,
+    dateFilter: commissionsDateFilter,
+    areaStoreFilter: effectiveAreaStoreFilter,
+    profile,
+  });
+
+  // Default processedData (for backward compatibility, uses dashboard data)
+  const processedData = dashboardProcessedData;
 
   const allDateData = useMemo(() => [...dailyMetrics, ...salesTransactions, ...kingDuvetSales], [dailyMetrics, salesTransactions, kingDuvetSales]);
   
@@ -1123,14 +1199,14 @@ const handleNotificationClick = (notificationId: string) => {
 
   switch (activeTab) {
     case 'dashboard':
-      return <Dashboard {...processedData} {...pageProps} dashboardPieFilter={dashboardPieFilter} setDashboardPieFilter={setDashboardPieFilter} tasks={tasks} onUpdateTaskStatus={handleUpdateTaskStatus} isProcessing={isProcessing} />;
+      return <Dashboard {...dashboardProcessedData} {...pageProps} dashboardPieFilter={dashboardPieFilter} setDashboardPieFilter={setDashboardPieFilter} tasks={tasks} onUpdateTaskStatus={handleUpdateTaskStatus} isProcessing={isProcessing} />;
     case 'stores':
-      // Use independent dateFilter for Stores page
-      return <StoresPage {...processedData} dateFilter={storesDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setStoresDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} onEdit={d => setModalState({type: 'store', data: d})} onDelete={(id, name) => handleDelete('stores', id, name)} onSelectStore={setSelectedStore} onSelectArea={(managerName, stores) => setSelectedArea({ managerName, stores })} allMetrics={dailyMetrics} />;
+      // Use independent dateFilter and processedData for Stores page
+      return <StoresPage {...storesProcessedData} dateFilter={storesDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setStoresDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} onEdit={d => setModalState({type: 'store', data: d})} onDelete={(id, name) => handleDelete('stores', id, name)} onSelectStore={setSelectedStore} onSelectArea={(managerName, stores) => setSelectedArea({ managerName, stores })} allMetrics={storesDailyMetrics} />;
      case 'employees':
-      // Use independent dateFilter for Employees page
+      // Use independent dateFilter and processedData for Employees page
       return <EmployeesPage 
-          {...processedData} 
+          {...employeesProcessedData} 
           dateFilter={employeesDateFilter} 
           setDateFilter={(value: DateFilter) => runWithRecalculation(setEmployeesDateFilter, value)} 
           areaStoreFilter={areaStoreFilter} 
@@ -1142,18 +1218,18 @@ const handleNotificationClick = (notificationId: string) => {
           profile={profile}
           onEdit={d => setModalState({type: 'employee', data: d})} 
           onDelete={(id, name) => handleDelete('employees', id, name)} 
-          dailyMetrics={dailyMetrics} 
+          dailyMetrics={employeesDailyMetrics} 
           salesTransactions={salesTransactions}
           kingDuvetSales={kingDuvetSales}
           allEmployees={employees}
-          storeSummary={processedData.storeSummary}
+          storeSummary={employeesProcessedData.storeSummary}
           />;
      case 'products':
-       // Use independent dateFilter for Products page
-       return <ProductsPage {...processedData} dateFilter={productsDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setProductsDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} />;
+       // Use independent dateFilter and processedData for Products page
+       return <ProductsPage {...productsProcessedData} dateFilter={productsDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setProductsDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} />;
      case 'commissions':
-        // Use independent dateFilter for Commissions page
-        return <CommissionsPage {...processedData} dateFilter={commissionsDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setCommissionsDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} />;
+        // Use independent dateFilter and processedData for Commissions page
+        return <CommissionsPage {...commissionsProcessedData} dateFilter={commissionsDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setCommissionsDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} />;
     case 'uploads':
        return (
          <SmartUploaderPage
