@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { auth } from '@/services/firebase';
-import { getSalesData } from '@/data/dataProvider';
+import { getSalesData, loadTargetsAndVisitors, mergeTargetsAndVisitors } from '@/data/dataProvider';
 import type { NormalizedSalesResponse } from '@/data/dataProvider';
 
 type AllSalesDataByYear = {
@@ -43,11 +43,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setError(undefined);
         console.log('🚀 DataProvider: Starting parallel load of all years (2024, 2025, 2026)...');
 
-        // Load all years in parallel using Promise.all
-        const [year2024, year2025, year2026] = await Promise.allSettled([
+        // Load all years + targets/visitors in parallel (like orange-dashboard init)
+        const [year2024, year2025, year2026, targetsVisitors] = await Promise.allSettled([
           getSalesData({ year: 2024 }), // Legacy data
           getSalesData({ year: 2025 }), // Legacy data
-          getSalesData({ year: 2026 }), // D365 data
+          getSalesData({ year: 2026 }), // D365 data (raw, without targets/visitors)
+          loadTargetsAndVisitors(), // Load targets/visitors once (for merging)
         ]);
 
         if (cancelled) return;
@@ -75,11 +76,46 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           newData[2025] = null;
         }
 
-        // Process 2026
+        // Extract targets/visitors (once, for merging with all years)
+        let targets: any = {};
+        let visitors: any[] = [];
+        if (targetsVisitors.status === 'fulfilled') {
+          targets = targetsVisitors.value.targets || {};
+          visitors = targetsVisitors.value.visitors || [];
+          console.log(`✅ DataProvider: Loaded targets/visitors - ${Object.keys(targets).length} years, ${visitors.length} visitor entries`);
+        } else {
+          console.warn('⚠️ DataProvider: Failed to load targets/visitors (will merge empty data):', targetsVisitors.status === 'rejected' ? targetsVisitors.reason : 'unknown error');
+        }
+        
+        // Process 2024 - Merge targets/visitors (like orange-dashboard)
+        if (year2024.status === 'fulfilled' && year2024.value.success) {
+          // Legacy data already has targets/visitors from legacyProvider, but ensure consistency
+          newData[2024] = year2024.value;
+          newLoadedYears.add(2024);
+          console.log(`✅ DataProvider: Loaded 2024 (legacy) - ${year2024.value.byStore.length} stores, ${year2024.value.byDay?.length || 0} days`);
+        } else {
+          console.warn('⚠️ DataProvider: Failed to load 2024:', year2024.status === 'rejected' ? year2024.reason : 'unknown error');
+          newData[2024] = null;
+        }
+        
+        // Process 2025 - Merge targets/visitors (like orange-dashboard)
+        if (year2025.status === 'fulfilled' && year2025.value.success) {
+          // Legacy data already has targets/visitors from legacyProvider, but ensure consistency
+          newData[2025] = year2025.value;
+          newLoadedYears.add(2025);
+          console.log(`✅ DataProvider: Loaded 2025 (legacy) - ${year2025.value.byStore.length} stores, ${year2025.value.byDay?.length || 0} days`);
+        } else {
+          console.warn('⚠️ DataProvider: Failed to load 2025:', year2025.status === 'rejected' ? year2025.reason : 'unknown error');
+          newData[2025] = null;
+        }
+        
+        // Process 2026 - Merge targets/visitors ONCE during initialization (NOT in render loop)
         if (year2026.status === 'fulfilled' && year2026.value.success) {
-          newData[2026] = year2026.value;
+          // Merge targets/visitors with D365 data ONCE here (like orange-dashboard init)
+          const merged2026 = mergeTargetsAndVisitors(year2026.value, targets, visitors, 2026);
+          newData[2026] = merged2026;
           newLoadedYears.add(2026);
-          console.log(`✅ DataProvider: Loaded 2026 (D365) - ${year2026.value.byStore.length} stores, ${year2026.value.byDay?.length || 0} days, ${year2026.value.byEmployee.length} employees`);
+          console.log(`✅ DataProvider: Loaded 2026 (D365) - ${merged2026.byStore.length} stores, ${merged2026.byDay?.length || 0} days, ${merged2026.byEmployee.length} employees (merged with targets/visitors)`);
         } else {
           console.warn('⚠️ DataProvider: Failed to load 2026:', year2026.status === 'rejected' ? year2026.reason : 'unknown error');
           newData[2026] = null;

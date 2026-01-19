@@ -21,7 +21,7 @@ interface OrangeDashboardManagementData {
 
 let cachedTargetsAndVisitors: OrangeDashboardManagementData | null = null;
 
-async function loadTargetsAndVisitors(): Promise<{ targets: OrangeDashboardManagementData['targets']; visitors: OrangeDashboardManagementData['visitors'] }> {
+export async function loadTargetsAndVisitors(): Promise<{ targets: OrangeDashboardManagementData['targets']; visitors: OrangeDashboardManagementData['visitors'] }> {
   if (cachedTargetsAndVisitors) {
     return {
       targets: cachedTargetsAndVisitors.targets || {},
@@ -53,8 +53,9 @@ async function loadTargetsAndVisitors(): Promise<{ targets: OrangeDashboardManag
 
 /**
  * Merge Targets & Visitors into D365 response (frontend-side, reduces API load)
+ * IMPORTANT: This function should be called ONCE during initialization, NOT in render loop
  */
-function mergeTargetsAndVisitors(
+export function mergeTargetsAndVisitors(
   response: NormalizedSalesResponse,
   targets: OrangeDashboardManagementData['targets'],
   visitors: OrangeDashboardManagementData['visitors'],
@@ -269,11 +270,10 @@ export async function getSalesData(params: SalesParams): Promise<NormalizedSales
       
       const result: NormalizedSalesResponse = await response.json();
       
-      // Merge Targets & Visitors from orange-dashboard (frontend-side, reduces API load)
-      const { targets, visitors } = await loadTargetsAndVisitors();
-      const mergedResult = mergeTargetsAndVisitors(result, targets, visitors, year, month);
-      
-      return mergedResult;
+      // IMPORTANT: DO NOT merge Targets & Visitors here (causes 20s freeze in render loop)
+      // Merging will be done ONCE in DataProvider during initialization (like orange-dashboard)
+      // Return raw D365 data without targets/visitors to avoid performance issues
+      return result;
     } catch (error: any) {
       console.error('❌ Error fetching D365 sales:', error);
       // Return empty response on error
