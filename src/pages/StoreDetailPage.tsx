@@ -20,6 +20,8 @@ interface StoreDetailPageProps {
     onSaveRule: (rule: string, existingId?: string) => void;
     onDeleteRule: (id: string) => void;
     isProcessing: boolean;
+    storesDateFilter: DateFilter; // Receive storesDateFilter to maintain filter state
+    setStoresDateFilter: React.Dispatch<React.SetStateAction<DateFilter>>; // To update storesDateFilter
 }
 
 const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
@@ -34,11 +36,16 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
     onSaveRule,
     onDeleteRule,
     isProcessing,
+    storesDateFilter,
+    setStoresDateFilter,
 }) => {
     const { t, locale } = useLocale();
     const [aiAnalysis, setAiAnalysis] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [dateFilter, setDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' });
+    // Use storesDateFilter directly (unified dateFilter) - no local state needed
+    // Changes to dateFilter in StoreDetailPage will update the unified dateFilter automatically
+    const dateFilter = storesDateFilter;
+    const setDateFilter = setStoresDateFilter;
 
     const filteredMetrics = useMemo(() => {
         return allMetrics.filter(m => {
