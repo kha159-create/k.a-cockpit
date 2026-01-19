@@ -199,15 +199,48 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
 
   // Filter States: default to current year and current month
   // Each page has its own independent dateFilter (like orange-dashboard)
+  
+  // Load saved filters from localStorage for Stores page
+  const loadStoresFilters = (): { dateFilter: DateFilter; areaStoreFilter: AreaStoreFilterState } => {
+    try {
+      const savedDateFilter = localStorage.getItem('storesDateFilter');
+      const savedAreaStoreFilter = localStorage.getItem('storesAreaStoreFilter');
+      
+      const defaultDateFilter: DateFilter = { year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' };
+      const defaultAreaStoreFilter: AreaStoreFilterState = {
+        areaManager: profile?.role === 'area_manager' || profile?.role === 'store_manager' ? profile.areaManager || 'All' : 'All',
+        store: profile?.role === 'store_manager' || profile?.role === 'employee' ? profile.store || 'All' : 'All',
+        city: 'All',
+      };
+      
+      return {
+        dateFilter: savedDateFilter ? JSON.parse(savedDateFilter) : defaultDateFilter,
+        areaStoreFilter: savedAreaStoreFilter ? JSON.parse(savedAreaStoreFilter) : defaultAreaStoreFilter,
+      };
+    } catch {
+      return {
+        dateFilter: { year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' },
+        areaStoreFilter: {
+          areaManager: profile?.role === 'area_manager' || profile?.role === 'store_manager' ? profile.areaManager || 'All' : 'All',
+          store: profile?.role === 'store_manager' || profile?.role === 'employee' ? profile.store || 'All' : 'All',
+          city: 'All',
+        },
+      };
+    }
+  };
+  
+  const savedStoresFilters = loadStoresFilters();
+  
   const [dateFilter, setDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Dashboard default
-  const [storesDateFilter, setStoresDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Stores page
+  const [storesDateFilter, setStoresDateFilter] = useState<DateFilter>(savedStoresFilters.dateFilter); // Stores page - with saved filter
+  const [storesAreaStoreFilter, setStoresAreaStoreFilter] = useState<AreaStoreFilterState>(savedStoresFilters.areaStoreFilter); // Stores page - independent area/store filter
   const [productsDateFilter, setProductsDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Products page
   const [employeesDateFilter, setEmployeesDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Employees page
   const [commissionsDateFilter, setCommissionsDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Commissions page
   const [areaStoreFilter, setAreaStoreFilter] = useState<AreaStoreFilterState>({
       areaManager: profile?.role === 'area_manager' || profile?.role === 'store_manager' ? profile.areaManager || 'All' : 'All',
       store: profile?.role === 'store_manager' || profile?.role === 'employee' ? profile.store || 'All' : 'All',
-      city: 'All', // City filter (like orange-dashboard)
+      city: 'All', // City filter (like orange-dashboard) - for other pages
   });
   const [dashboardPieFilter, setDashboardPieFilter] = useState<string | null>(null);
 
@@ -1202,7 +1235,8 @@ const handleNotificationClick = (notificationId: string) => {
       return <Dashboard {...dashboardProcessedData} {...pageProps} dashboardPieFilter={dashboardPieFilter} setDashboardPieFilter={setDashboardPieFilter} tasks={tasks} onUpdateTaskStatus={handleUpdateTaskStatus} isProcessing={isProcessing} />;
     case 'stores':
       // Use independent dateFilter and processedData for Stores page
-      return <StoresPage {...storesProcessedData} dateFilter={storesDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setStoresDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} onEdit={d => setModalState({type: 'store', data: d})} onDelete={(id, name) => handleDelete('stores', id, name)} onSelectStore={setSelectedStore} onSelectArea={(managerName, stores) => setSelectedArea({ managerName, stores })} allMetrics={storesDailyMetrics} />;
+      // Use storesAreaStoreFilter (independent) for Stores page
+      return <StoresPage {...storesProcessedData} dateFilter={storesDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setStoresDateFilter, value)} areaStoreFilter={storesAreaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setStoresAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} onEdit={d => setModalState({type: 'store', data: d})} onDelete={(id, name) => handleDelete('stores', id, name)} onSelectStore={setSelectedStore} onSelectArea={(managerName, stores) => setSelectedArea({ managerName, stores })} allMetrics={storesDailyMetrics} />;
      case 'employees':
       // Use independent dateFilter and processedData for Employees page
       return <EmployeesPage 
