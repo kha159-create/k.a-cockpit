@@ -4,13 +4,6 @@ import * as XLSX from 'xlsx';
 
 // NO Firestore - Pure D365 API like orange-dashboard
 
-interface D365AggregatedGroup {
-  OperatingUnitNumber: string;
-  TransactionDate: string;
-  TotalAmount: number; // Sum of amount field
-  InvoiceCount: number; // Count of transactions
-}
-
 // Get access token from Microsoft Dynamics 365
 async function getAccessToken(): Promise<string> {
   const clientId = process.env.D365_CLIENT_ID;
@@ -44,12 +37,18 @@ async function getAccessToken(): Promise<string> {
   return result.accessToken;
 }
 
-// Fetch aggregated sales for the last two days from D365 (server-side aggregation)
-async function fetchAggregatedLastTwoDays(
+// Fetch raw transactions for the last two days from D365 (like dailysales - client-side aggregation)
+interface D365Transaction {
+  OperatingUnitNumber: string;
+  TransactionDate: string;
+  [amountField: string]: any; // Dynamic amount field
+}
+
+async function fetchTransactionsLastTwoDays(
   token: string,
   entity: string,
   amountField: string
-): Promise<D365AggregatedGroup[]> {
+): Promise<D365Transaction[]> {
   const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
   const baseUrl = `${d365Url}/data/${entity}`;
 
@@ -64,11 +63,12 @@ async function fetchAggregatedLastTwoDays(
   const startStr = yesterdayStart.toISOString();
   const endStr = tomorrowStart.toISOString();
 
+  // Fetch raw transactions (like dailysales) - no server-side aggregation
   const filter = `${amountField} ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}`;
-  const applyClause = `groupby((OperatingUnitNumber,TransactionDate),aggregate(${amountField} with sum as TotalAmount,$count as InvoiceCount))`;
-  const queryUrl = `${baseUrl}?$filter=${encodeURIComponent(filter)}&$apply=${encodeURIComponent(applyClause)}&$orderby=TransactionDate,OperatingUnitNumber`;
+  const selectFields = `OperatingUnitNumber,${amountField},TransactionDate`;
+  const queryUrl = `${baseUrl}?$filter=${encodeURIComponent(filter)}&$select=${encodeURIComponent(selectFields)}&$orderby=TransactionDate`;
 
-  const allGroups: D365AggregatedGroup[] = [];
+  const allTransactions: D365Transaction[] = [];
   let nextLink: string | null = queryUrl;
 
   while (nextLink) {
@@ -88,23 +88,22 @@ async function fetchAggregatedLastTwoDays(
     if (!Array.isArray(data.value)) {
       throw new Error(`D365 API returned invalid response format. Expected 'value' array`);
     }
-    const groups: D365AggregatedGroup[] = (data.value || []).map((item: any) => ({
+    const transactions: D365Transaction[] = (data.value || []).map((item: any) => ({
       OperatingUnitNumber: String(item.OperatingUnitNumber || '').trim(),
       TransactionDate: item.TransactionDate || '',
-      TotalAmount: Number(item.TotalAmount || 0),
-      InvoiceCount: Number(item.InvoiceCount || 0),
+      [amountField]: Number(item[amountField] || 0),
     }));
-    allGroups.push(...groups);
+    allTransactions.push(...transactions);
     nextLink = data['@odata.nextLink'] || null;
   }
 
-  console.log(`✅ Fetched ${allGroups.length} aggregated groups for last two days (${entity}/${amountField})`);
-  return allGroups;
+  console.log(`✅ Fetched ${allTransactions.length} transactions for last two days (${entity}/${amountField})`);
+  return allTransactions;
 }
 
-async function fetchAggregatedWithFallback(
+async function fetchTransactionsWithFallback(
   token: string
-): Promise<{ groups: D365AggregatedGroup[]; source: { entity: string; amountField: string } }> {
+): Promise<{ transactions: D365Transaction[]; source: { entity: string; amountField: string } }> {
   const entityFromEnv = process.env.D365_SALES_ENTITY;
   const amountFieldFromEnv = process.env.D365_SALES_AMOUNT_FIELD;
 
@@ -135,8 +134,8 @@ async function fetchAggregatedWithFallback(
   let lastError: Error | null = null;
   for (const candidate of candidates) {
     try {
-      const groups = await fetchAggregatedLastTwoDays(token, candidate.entity, candidate.amountField);
-      return { groups, source: candidate };
+      const transactions = await fetchTransactionsLastTwoDays(token, candidate.entity, candidate.amountField);
+      return { transactions, source: candidate };
     } catch (error: any) {
       lastError = error instanceof Error ? error : new Error(String(error));
       console.warn(`⚠️ D365 live fetch failed for ${candidate.entity} (${candidate.amountField}): ${lastError.message}`);
@@ -203,17 +202,18 @@ async function loadStoreMapping(): Promise<Map<string, string>> {
   return mapping;
 }
 
-// Transform and aggregate transactions
-function aggregateGroupedSales(
-  groups: D365AggregatedGroup[],
-  storeMapping: Map<string, string>
+// Transform and aggregate transactions (client-side aggregation like dailysales)
+function aggregateTransactions(
+  transactions: D365Transaction[],
+  storeMapping: Map<string, string>,
+  amountField: string
 ): Array<{ outlet: string; sales: number }> {
   const salesMap = new Map<string, number>();
 
-  groups.forEach((group) => {
-    const storeId = String(group.OperatingUnitNumber || '').trim();
+  transactions.forEach((tx) => {
+    const storeId = String(tx.OperatingUnitNumber || '').trim();
     const storeName = storeMapping.get(storeId) || storeId;
-    const amount = Number(group.TotalAmount) || 0;
+    const amount = Number(tx[amountField] || 0);
     if (!storeId || amount === 0) return;
     const current = salesMap.get(storeName) || 0;
     salesMap.set(storeName, current + amount);
@@ -304,9 +304,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = await getAccessToken();
     console.log('✅ Got access token');
 
-    // 2. Fetch aggregated groups for last two days (server-side aggregation)
-    const { groups, source } = await fetchAggregatedWithFallback(token);
-    console.log(`✅ Fetched ${groups.length} aggregated groups (${source.entity}/${source.amountField})`);
+    // 2. Fetch raw transactions for last two days (like dailysales - client-side aggregation)
+    const { transactions, source } = await fetchTransactionsWithFallback(token);
+    console.log(`✅ Fetched ${transactions.length} transactions (${source.entity}/${source.amountField})`);
 
     // Split into today and yesterday based on Saudi Arabia time (UTC+3)
     const now = new Date();
@@ -321,28 +321,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const saudiYesterdayStart = new Date(Date.UTC(saudiYear, saudiMonth, saudiDate - 1, 0, 0, 0));
     const saudiYesterdayStartUTC = new Date(saudiYesterdayStart.getTime() - (3 * 60 * 60 * 1000));
 
-    const todayGroups: D365AggregatedGroup[] = [];
-    const yesterdayGroups: D365AggregatedGroup[] = [];
+    const todayTransactions: D365Transaction[] = [];
+    const yesterdayTransactions: D365Transaction[] = [];
 
-    groups.forEach((group) => {
-      const txDate = new Date(group.TransactionDate);
+    transactions.forEach((tx) => {
+      const txDate = new Date(tx.TransactionDate);
       if (txDate >= saudiTodayStartUTC) {
-        todayGroups.push(group);
+        todayTransactions.push(tx);
       } else if (txDate >= saudiYesterdayStartUTC && txDate < saudiTodayStartUTC) {
-        yesterdayGroups.push(group);
+        yesterdayTransactions.push(tx);
       }
     });
 
     console.log(`📅 Saudi time: ${nowSaudi.toISOString()} (${saudiHour}:00 SAST), Today UTC boundary: ${saudiTodayStartUTC.toISOString()}, Yesterday UTC boundary: ${saudiYesterdayStartUTC.toISOString()}`);
-    console.log(`📊 Split: ${todayGroups.length} today (after 12 AM SAST), ${yesterdayGroups.length} yesterday (before 12 AM SAST)`);
+    console.log(`📊 Split: ${todayTransactions.length} today (after 12 AM SAST), ${yesterdayTransactions.length} yesterday (before 12 AM SAST)`);
 
     // 3. Load store mapping
     const storeMapping = await loadStoreMapping();
     console.log(`✅ Loaded ${storeMapping.size} store mappings`);
 
-    // 4. Aggregate sales for both days
-    const todaySales = aggregateGroupedSales(todayGroups, storeMapping);
-    const yesterdaySales = aggregateGroupedSales(yesterdayGroups, storeMapping);
+    // 4. Aggregate sales for both days (client-side aggregation like dailysales)
+    const todaySales = aggregateTransactions(todayTransactions, storeMapping, source.amountField);
+    const yesterdaySales = aggregateTransactions(yesterdayTransactions, storeMapping, source.amountField);
     console.log(`✅ Aggregated ${todaySales.length} stores today, ${yesterdaySales.length} stores yesterday`);
 
     // 5. Prepare JSON data (like dailysales) - for local storage
@@ -360,8 +360,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Metadata for debugging
       todayStoresCount: todaySales.length,
       yesterdayStoresCount: yesterdaySales.length,
-      todayTransactionsCount: todayGroups.reduce((sum, g) => sum + g.InvoiceCount, 0),
-      yesterdayTransactionsCount: yesterdayGroups.reduce((sum, g) => sum + g.InvoiceCount, 0),
+      todayTransactionsCount: todayTransactions.length,
+      yesterdayTransactionsCount: yesterdayTransactions.length,
     });
   } catch (error: any) {
     console.error('❌ Live sales sync error:', error);
