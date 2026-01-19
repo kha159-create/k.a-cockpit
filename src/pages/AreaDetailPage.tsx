@@ -116,8 +116,8 @@ const AreaDetailPage: React.FC<AreaDetailPageProps> = ({
         
         const salesThisMonth = allMetrics.filter(m => {
             const storeNames = new Set(stores.map(s => s.name));
-            if (!storeNames.has(m.store) || !m.date || typeof m.date.toDate !== 'function') return false;
-            const metricDate = m.date.toDate();
+            if (!storeNames.has(m.store) || !m.date) return false;
+            const metricDate = typeof m.date === 'string' ? new Date(m.date) : (m.date?.toDate ? m.date.toDate() : new Date(m.date));
             return metricDate.getFullYear() === year && metricDate.getMonth() === month;
         }).reduce((sum, m) => sum + (m.totalSales || 0), 0);
             

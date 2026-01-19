@@ -195,13 +195,16 @@ export const generatePrediction = async (store: StoreSummary, historicalMetrics:
     const salesThisMonth = historicalMetrics
         .filter(m => {
             // FIX: Add a guard to ensure metric has a valid date before processing.
-            if (!m.date || typeof m.date.toDate !== 'function') {
+            if (!m.date) {
                 return false;
             }
-            const metricDate = m.date.toDate();
+            const metricDate = typeof m.date === 'string' ? new Date(m.date) : (m.date?.toDate ? m.date.toDate() : new Date(m.date));
             return metricDate.getMonth() === currentMonth && metricDate.getFullYear() === currentYear;
         })
-        .map(m => ({ date: m.date.toDate().toISOString().split('T')[0], sales: m.totalSales || 0 }));
+        .map(m => ({ 
+            date: typeof m.date === 'string' ? m.date : (m.date?.toDate ? m.date.toDate().toISOString().split('T')[0] : new Date(m.date).toISOString().split('T')[0]), 
+            sales: m.totalSales || 0 
+        }));
     
     const languageInstruction = locale === 'ar' ? 'IMPORTANT: The justification must be in Arabic.' : '';
 

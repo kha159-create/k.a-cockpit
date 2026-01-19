@@ -94,8 +94,8 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     const availableYears = useMemo(() => {
         const yearSet = new Set<number>();
         allMetrics.forEach(m => {
-            if (m.date && typeof m.date.toDate === 'function') {
-                const d = m.date.toDate();
+            if (m.date) {
+                const d = typeof m.date === 'string' ? new Date(m.date) : (m.date?.toDate ? m.date.toDate() : new Date(m.date));
                 yearSet.add(d.getUTCFullYear());
             }
         });
@@ -107,8 +107,8 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
     const lflData = useMemo(() => {
         const processPeriod = (data: DailyMetric[], startDate: Date, endDate: Date): LFLData => {
             const filtered = data.filter(s => {
-                if (!s.date || typeof s.date.toDate !== 'function') return false;
-                const d = s.date.toDate();
+                if (!s.date) return false;
+                const d = typeof s.date === 'string' ? new Date(s.date) : (s.date?.toDate ? s.date.toDate() : new Date(s.date));
                 // Ensure we compare dates only, ignoring time part by using UTC
                 const itemDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
                 return itemDate >= startDate && itemDate <= endDate;

@@ -118,8 +118,8 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
         const remainingDays = Math.max(0, totalDaysInMonth - todayDate + 1);
         
         const salesThisMonth = allMetrics.filter(m => {
-            if (m.store !== store.name || !m.date || typeof m.date.toDate !== 'function') return false;
-            const metricDate = m.date.toDate();
+            if (m.store !== store.name || !m.date) return false;
+            const metricDate = typeof m.date === 'string' ? new Date(m.date) : (m.date?.toDate ? m.date.toDate() : new Date(m.date));
             return metricDate.getFullYear() === year && metricDate.getMonth() === month;
         }).reduce((sum, m) => sum + (m.totalSales || 0), 0);
             
