@@ -6,8 +6,8 @@ import * as XLSX from 'xlsx';
 
 interface D365Transaction {
   OperatingUnitNumber: string;
-  PaymentAmount: number;
   TransactionDate: string;
+  [key: string]: any;
 }
 
 // Get access token from Microsoft Dynamics 365
@@ -44,12 +44,16 @@ async function getAccessToken(): Promise<string> {
 }
 
 // Fetch today's and yesterday's transactions from D365 (like dailysales)
-async function fetchTransactionsLastTwoDays(token: string): Promise<{
+async function fetchTransactionsLastTwoDays(
+  token: string,
+  entity: string,
+  amountField: string
+): Promise<{
   today: D365Transaction[];
   yesterday: D365Transaction[];
 }> {
   const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
-  const baseUrl = `${d365Url}/data/RetailTransactions`;
+  const baseUrl = `${d365Url}/data/${entity}`;
 
   const now = new Date();
   const todayStart = new Date(now);
@@ -62,7 +66,7 @@ async function fetchTransactionsLastTwoDays(token: string): Promise<{
   const startStr = yesterdayStart.toISOString();
   const endStr = tomorrowStart.toISOString();
 
-  const queryUrl = `${baseUrl}?$filter=PaymentAmount ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}&$select=OperatingUnitNumber,PaymentAmount,TransactionDate&$orderby=TransactionDate`;
+  const queryUrl = `${baseUrl}?$filter=${amountField} ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}&$select=OperatingUnitNumber,${amountField},TransactionDate&$orderby=TransactionDate`;
 
   const allTransactions: D365Transaction[] = [];
   let nextLink: string | null = queryUrl;
@@ -187,7 +191,11 @@ async function loadStoreMapping(): Promise<Map<string, string>> {
 }
 
 // Transform and aggregate transactions
-function aggregateSales(transactions: D365Transaction[], storeMapping: Map<string, string>): Array<{ outlet: string; sales: number }> {
+function aggregateSales(
+  transactions: D365Transaction[],
+  storeMapping: Map<string, string>,
+  amountField: string
+): Array<{ outlet: string; sales: number }> {
   const salesMap = new Map<string, number>();
 
   transactions.forEach((tx) => {
@@ -195,7 +203,7 @@ function aggregateSales(transactions: D365Transaction[], storeMapping: Map<strin
     const storeId = String(tx.OperatingUnitNumber || '').trim();
     // Get store name from mapping, or use store ID if not found
     const storeName = storeMapping.get(storeId) || storeId;
-    const amount = Number(tx.PaymentAmount) || 0;
+    const amount = Number((tx as any)[amountField]) || 0;
     
     if (amount === 0) return;
 
@@ -289,16 +297,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('✅ Got access token');
 
     // 2. Fetch today's and yesterday's transactions (like dailysales)
-    const { today: todayTransactions, yesterday: yesterdayTransactions } = await fetchTransactionsLastTwoDays(token);
-    console.log(`✅ Fetched ${todayTransactions.length} today + ${yesterdayTransactions.length} yesterday transactions`);
+    const entityFromEnv = process.env.D365_SALES_ENTITY || 'SalesTransactionBIEntity';
+    const amountFieldFromEnv = process.env.D365_SALES_AMOUNT_FIELD || 'NetAmount';
+    const { today: todayTransactions, yesterday: yesterdayTransactions } = await fetchTransactionsLastTwoDays(
+      token,
+      entityFromEnv,
+      amountFieldFromEnv
+    );
+    console.log(`✅ Fetched ${todayTransactions.length} today + ${yesterdayTransactions.length} yesterday transactions (${entityFromEnv}/${amountFieldFromEnv})`);
 
     // 3. Load store mapping
     const storeMapping = await loadStoreMapping();
     console.log(`✅ Loaded ${storeMapping.size} store mappings`);
 
     // 4. Aggregate sales for both days
-    const todaySales = aggregateSales(todayTransactions, storeMapping);
-    const yesterdaySales = aggregateSales(yesterdayTransactions, storeMapping);
+    const todaySales = aggregateSales(todayTransactions, storeMapping, amountFieldFromEnv);
+    const yesterdaySales = aggregateSales(yesterdayTransactions, storeMapping, amountFieldFromEnv);
     console.log(`✅ Aggregated ${todaySales.length} stores today, ${yesterdaySales.length} stores yesterday`);
 
     // 5. Prepare JSON data (like dailysales) - for local storage

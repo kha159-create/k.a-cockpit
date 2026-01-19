@@ -35,9 +35,13 @@ async function getAccessToken(): Promise<string> {
 }
 
 // Test D365 query with small sample (last 1 day)
-async function testD365Query(token: string): Promise<{ count: number; duration: number }> {
+async function testD365Query(
+  token: string,
+  entity: string,
+  amountField: string
+): Promise<{ count: number; duration: number }> {
   const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
-  const baseUrl = `${d365Url}/data/RetailTransactions`;
+  const baseUrl = `${d365Url}/data/${entity}`;
 
   const endDate = new Date();
   const startDate = new Date(endDate);
@@ -46,7 +50,7 @@ async function testD365Query(token: string): Promise<{ count: number; duration: 
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
-  const queryUrl = `${baseUrl}?$filter=PaymentAmount ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}&$select=OperatingUnitNumber,PaymentAmount,TransactionDate&$top=10`;
+  const queryUrl = `${baseUrl}?$filter=${amountField} ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}&$select=OperatingUnitNumber,${amountField},TransactionDate&$top=10`;
 
   const startTime = Date.now();
   
@@ -114,10 +118,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const queryStartTime = Date.now();
     try {
       const token = await getAccessToken();
-      const { count, duration } = await testD365Query(token);
+      const entityFromEnv = process.env.D365_SALES_ENTITY || 'SalesTransactionBIEntity';
+      const amountFieldFromEnv = process.env.D365_SALES_AMOUNT_FIELD || 'NetAmount';
+      const { count, duration } = await testD365Query(token, entityFromEnv, amountFieldFromEnv);
       checks.d365Query = {
         status: 'ok',
-        message: `D365 query successful - fetched ${count} sample transactions`,
+        message: `D365 query successful - fetched ${count} sample transactions (${entityFromEnv}/${amountFieldFromEnv})`,
         duration,
       };
     } catch (error: any) {

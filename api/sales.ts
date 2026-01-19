@@ -162,27 +162,29 @@ async function fetchD365Aggregated(
   token: string,
   startDate: Date,
   endDate: Date,
-  storeId?: string
+  storeId: string | undefined,
+  entity: string,
+  amountField: string
 ): Promise<{ groups: D365AggregatedGroup[]; pages: number }> {
   const d365Url = process.env.D365_URL || 'https://orangepax.operations.eu.dynamics.com';
-  const baseUrl = `${d365Url}/data/RetailTransactions`;
+  const baseUrl = `${d365Url}/data/${entity}`;
 
   const startStr = startDate.toISOString();
   const endStr = endDate.toISOString();
 
   // Build filter - only non-zero payments in date range
-  let filter = `PaymentAmount ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}`;
+  let filter = `${amountField} ne 0 and TransactionDate ge ${startStr} and TransactionDate lt ${endStr}`;
   if (storeId) {
     filter += ` and OperatingUnitNumber eq '${storeId}'`;
   }
 
   // OData $apply=groupby with aggregation: Group by (OperatingUnitNumber, TransactionDate)
-  // Aggregate: sum(PaymentAmount) as TotalAmount, count() as InvoiceCount
+  // Aggregate: sum(amountField) as TotalAmount, count() as InvoiceCount
   // This reduces 57k+ records to ~100-500 aggregated rows (one per store per day)
-  const applyClause = `groupby((OperatingUnitNumber,TransactionDate),aggregate(PaymentAmount with sum as TotalAmount,$count as InvoiceCount))`;
+  const applyClause = `groupby((OperatingUnitNumber,TransactionDate),aggregate(${amountField} with sum as TotalAmount,$count as InvoiceCount))`;
   const queryUrl = `${baseUrl}?$filter=${encodeURIComponent(filter)}&$apply=${encodeURIComponent(applyClause)}&$orderby=TransactionDate,OperatingUnitNumber`;
   
-  console.log(`🔍 D365 aggregated query URL: ${queryUrl.substring(0, 250)}...`);
+  console.log(`🔍 D365 aggregated query URL (${entity}, ${amountField}): ${queryUrl.substring(0, 250)}...`);
 
   const allGroups: D365AggregatedGroup[] = [];
   let nextLink: string | null = queryUrl;
@@ -227,9 +229,79 @@ async function fetchD365Aggregated(
     nextLink = data['@odata.nextLink'] || null;
   }
 
-  console.log(`✅ Fetched ${allGroups.length} aggregated groups (reduced from ~${allGroups.reduce((sum, g) => sum + g.InvoiceCount, 0)} transactions)`);
+  console.log(`✅ Fetched ${allGroups.length} aggregated groups (${entity}, ${amountField}) (reduced from ~${allGroups.reduce((sum, g) => sum + g.InvoiceCount, 0)} transactions)`);
 
   return { groups: allGroups, pages };
+}
+
+function getQueryParam(req: VercelRequest, key: string): string | undefined {
+  // Prefer WHATWG URL API to avoid url.parse deprecation warnings
+  try {
+    const url = new URL(req.url || '', 'http://localhost');
+    const value = url.searchParams.get(key);
+    if (value !== null) return value;
+  } catch {
+    // Ignore URL parse errors and fall back to req.query
+  }
+  const raw = req.query?.[key];
+  if (Array.isArray(raw)) return raw[0];
+  return typeof raw === 'string' ? raw : undefined;
+}
+
+async function fetchD365AggregatedWithFallback(
+  token: string,
+  startDate: Date,
+  endDate: Date,
+  storeId: string | undefined
+): Promise<{ groups: D365AggregatedGroup[]; pages: number; source: { entity: string; amountField: string } }> {
+  const entityFromEnv = process.env.D365_SALES_ENTITY;
+  const amountFieldFromEnv = process.env.D365_SALES_AMOUNT_FIELD;
+
+  const candidates: Array<{ entity: string; amountField: string }> = [];
+
+  if (entityFromEnv) {
+    if (amountFieldFromEnv) {
+      candidates.push({ entity: entityFromEnv, amountField: amountFieldFromEnv });
+    } else if (entityFromEnv.toLowerCase() === 'salestransactionbientity') {
+      candidates.push(
+        { entity: entityFromEnv, amountField: 'NetAmount' },
+        { entity: entityFromEnv, amountField: 'SalesAmount' },
+        { entity: entityFromEnv, amountField: 'Amount' }
+      );
+    } else {
+      candidates.push({ entity: entityFromEnv, amountField: 'PaymentAmount' });
+    }
+  } else {
+    // Default strategy: use SalesTransactionBIEntity first (orange-dashboard), then fall back to RetailTransactions
+    candidates.push(
+      { entity: 'SalesTransactionBIEntity', amountField: 'NetAmount' },
+      { entity: 'SalesTransactionBIEntity', amountField: 'SalesAmount' },
+      { entity: 'SalesTransactionBIEntity', amountField: 'Amount' },
+      { entity: 'RetailTransactions', amountField: 'PaymentAmount' }
+    );
+  }
+
+  let lastError: Error | null = null;
+  for (const candidate of candidates) {
+    try {
+      const result = await fetchD365Aggregated(
+        token,
+        startDate,
+        endDate,
+        storeId,
+        candidate.entity,
+        candidate.amountField
+      );
+      return { ...result, source: candidate };
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(
+        `⚠️ D365 fetch failed for ${candidate.entity} (${candidate.amountField}): ${lastError.message}`
+      );
+    }
+  }
+
+  throw lastError || new Error('All D365 fetch attempts failed');
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -249,8 +321,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Parse and validate input parameters
-    const year = parseInt(req.query.year as string) || new Date().getFullYear();
-    const monthParam = req.query.month as string | undefined;
+    const year = parseInt(getQueryParam(req, 'year') || '') || new Date().getFullYear();
+    const monthParam = getQueryParam(req, 'month');
     let month: number | undefined;
     if (monthParam !== undefined) {
       month = parseInt(monthParam);
@@ -268,7 +340,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
     
-    const dayParam = req.query.day as string | undefined;
+    const dayParam = getQueryParam(req, 'day');
     let day: number | undefined;
     if (dayParam !== undefined) {
       day = parseInt(dayParam);
@@ -286,7 +358,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
     
-    const storeId = req.query.storeId as string | undefined;
+    const storeId = getQueryParam(req, 'storeId');
     // Note: employeeId parameter removed - employee filtering not supported (StaffId not in RetailTransactions entity)
     
     console.log(`📊 /api/sales request: year=${year}, month=${month !== undefined ? month + 1 : 'all'}, day=${day}, storeId=${storeId}`);
@@ -391,10 +463,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let pages: number;
     try {
       console.log('📦 Fetching D365 aggregated data (server-side groupby)...');
-      const result = await fetchD365Aggregated(token, startDate, endDate, storeId);
+      const result = await fetchD365AggregatedWithFallback(token, startDate, endDate, storeId);
       aggregatedGroups = result.groups;
       pages = result.pages;
-      console.log(`✅ Fetched ${aggregatedGroups.length} aggregated groups in ${pages} pages (already summed on server)`);
+      console.log(
+        `✅ Fetched ${aggregatedGroups.length} aggregated groups in ${pages} pages (source: ${result.source.entity}/${result.source.amountField})`
+      );
     } catch (error: any) {
       console.error('❌ Failed to fetch D365 aggregated data:', error.message);
       // Return 200 with empty data instead of 500 - no data is not an error
