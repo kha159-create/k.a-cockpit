@@ -165,7 +165,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <KPICard title={t('avg_transaction_value')} value={displayKpiData.averageTransactionValue} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<ScaleIcon/>} iconBgColor="bg-indigo-100 text-indigo-600" />
                 {!isEmployee && (
                     <>
-                        <KPICard title={t('conversion_rate')} value={displayKpiData.conversionRate} format={v => `${v.toFixed(1)}%`} icon={<ChartPieIcon/>} iconBgColor="bg-amber-100 text-amber-600" />
+                        <KPICard title={t('conversion_rate')} value={displayKpiData.conversionRate} format={v => `${Math.round(v)}%`} icon={<ChartPieIcon/>} iconBgColor="bg-amber-100 text-amber-600" />
                         <KPICard title={t('sales_per_visitor')} value={displayKpiData.salesPerVisitor} format={val => val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 })} icon={<UsersIcon/>} iconBgColor="bg-pink-100 text-pink-600" />
                     </>
                 )}
@@ -201,12 +201,12 @@ const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           {isRecalculating ? <ChartSkeleton/> : (
             <ChartCard title={t('top_stores_by_achievement')}>
-                <BarChart data={[...storeSummary].sort((a, b) => b.targetAchievement - a.targetAchievement).slice(0, 10)} dataKey="targetAchievement" nameKey="name" format={val => `${val.toFixed(1)}%`} />
+                <BarChart data={[...storeSummary].sort((a, b) => b.targetAchievement - a.targetAchievement).slice(0, 10)} dataKey="targetAchievement" nameKey="name" format={val => `${Math.round(val)}%`} />
             </ChartCard>
           )}
           {isRecalculating ? <ChartSkeleton/> : (
             <ChartCard title={t('top_employees_by_achievement')}>
-                <BarChart data={topEmployeesByAchievement} dataKey="achievement" nameKey="name" format={val => `${val.toFixed(1)}%`} />
+                <BarChart data={topEmployeesByAchievement} dataKey="achievement" nameKey="name" format={val => `${Math.round(val)}%`} />
             </ChartCard>
           )}
       </div>

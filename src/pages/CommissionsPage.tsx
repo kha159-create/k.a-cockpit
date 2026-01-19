@@ -33,8 +33,8 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
             <EmployeeName id={(record as any).employeeId ?? (record as any).id ?? record.name} fallback={record.name} />
         ) },
         { key: 'totalSales', label: 'Total Sales', sortable: true, render: (value) => (value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) },
-        { key: 'achievement', label: 'Employee Achievement', sortable: true, render: (value) => `${(value as number).toFixed(1)}%` },
-        { key: 'finalCommissionRate', label: 'Final Commission Rate', sortable: true, render: (value) => <span className="font-semibold text-blue-600">{`${(value as number).toFixed(2)}%`}</span> },
+        { key: 'achievement', label: 'Employee Achievement', sortable: true, render: (value) => `${Math.round(value as number)}%` },
+        { key: 'finalCommissionRate', label: 'Final Commission Rate', sortable: true, render: (value) => <span className="font-semibold text-blue-600">{`${Math.round(value as number)}%`}</span> },
         { key: 'commissionAmount', label: 'Commission Amount', sortable: true, render: (value) => <span className="font-semibold text-green-600">{(value as number).toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span> },
     ];
 
@@ -60,7 +60,7 @@ const CommissionsPage: React.FC<CommissionsPageProps> = ({
                                 <span className="text-xl">{openStore === store.name ? '−' : '+'}</span>
                             </div>
                             <p className="text-sm text-zinc-500 mt-1">
-                                Store Achievement: {store.achievement.toFixed(1)}% | Applicable Commission Rate: <strong>{store.commissionRate.toFixed(1)}%</strong>
+                                Store Achievement: {Math.round(store.achievement)}% | Applicable Commission Rate: <strong>{Math.round(store.commissionRate)}%</strong>
                             </p>
                         </div>
                             {openStore === store.name && (

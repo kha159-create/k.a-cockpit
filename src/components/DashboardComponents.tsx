@@ -300,7 +300,7 @@ export const PieChart: React.FC<{ data: { name: string, value: number, count?: n
                                         const containerRect = containerRef.current.getBoundingClientRect();
                                         const x = e.clientX - containerRect.left;
                                         const y = e.clientY - containerRect.top;
-                                        setTooltip({ content: `${item.name}: ${((item.value/total)*100).toFixed(1)}%`, x, y });
+                                        setTooltip({ content: `${item.name}: ${Math.round((item.value/total)*100)}%`, x, y });
                                     }}
                                    />
                         })}
@@ -370,7 +370,7 @@ export const PieChart: React.FC<{ data: { name: string, value: number, count?: n
                                     const containerRect = containerRef.current.getBoundingClientRect();
                                     const x = e.clientX - containerRect.left;
                                     const y = e.clientY - containerRect.top;
-                                    setTooltip({ content: `${item.name}: ${((item.value/total)*100).toFixed(1)}%`, x, y });
+                                    setTooltip({ content: `${item.name}: ${Math.round((item.value/total)*100)}%`, x, y });
                                 }}
                                />
                     })}
