@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useLocale } from '@/context/LocaleContext';
-import { getLiveSales } from '@/data/dataProvider';
+import { getLiveSales, getStores } from '@/data/dataProvider';
 import { useData } from '@/context/DataProvider';
 import { apiUrl } from '@/utils/apiBase';
 import type { Store, UserProfile } from '@/types';
@@ -15,11 +15,11 @@ interface LiveSalesData {
 }
 
 interface LivePageProps {
-  stores: Store[];
+  stores: Store[]; // Legacy prop (may be filtered by dateFilter) - we'll ignore it and load our own
   profile: UserProfile | null;
 }
 
-const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
+const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) => {
   const { locale, t } = useLocale();
   const { allSalesData } = useData(); // Get preloaded data (independent of dateFilter)
   const [liveData, setLiveData] = useState<LiveSalesData | null>(null);
@@ -27,6 +27,10 @@ const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'today' | 'yesterday'>('today');
   const [areaManagerFilter, setAreaManagerFilter] = useState<string>('All'); // Local state (independent of global filters)
+  
+  // Load stores independently from API (2026 only) - NOT affected by dateFilter
+  const [allStores, setAllStores] = useState<Store[]>([]);
+  const [storesLoading, setStoresLoading] = useState(true);
 
   const copy = useMemo(() => {
     if (locale === 'ar') {
@@ -56,6 +60,35 @@ const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
         allAreaManagers: 'All Area Managers',
       };
   }, [locale]);
+
+  // Load stores independently (2026 only) - NOT affected by dateFilter
+  useEffect(() => {
+    const loadStoresForLive = async () => {
+      try {
+        setStoresLoading(true);
+        console.log('🔗 Loading stores for Live page (2026 only, independent of dateFilter)...');
+        
+        // Always load stores for 2026 (current year) regardless of dateFilter
+        const currentYear = 2026; // Live page always uses 2026 data
+        const storesList = await getStores(currentYear);
+        
+        if (storesList.length > 0) {
+          console.log(`✅ Loaded ${storesList.length} stores for Live page (2026)`);
+          setAllStores(storesList as Store[]);
+        } else {
+          console.warn('⚠️ No stores loaded for Live page');
+          setAllStores([]);
+        }
+        setStoresLoading(false);
+      } catch (error: any) {
+        console.error('❌ Error loading stores for Live page:', error);
+        setAllStores([]);
+        setStoresLoading(false);
+      }
+    };
+    
+    loadStoresForLive();
+  }, []); // Load once on mount, never re-run
 
   useEffect(() => {
     // Load live sales from D365 API (NO Firestore)
@@ -138,37 +171,40 @@ const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
   
   const availableAreaManagers = useMemo(() => {
     if (!showAreaManagerFilter) return [];
-    const managers = new Set(stores.map(s => s.areaManager).filter(Boolean));
+    // Use allStores (loaded independently for 2026) instead of stores prop
+    const managers = new Set(allStores.map(s => s.areaManager).filter(Boolean));
     return ['All', ...Array.from(managers).sort()];
-  }, [stores, showAreaManagerFilter]);
+  }, [allStores, showAreaManagerFilter]);
 
   // Support both new format (today/yesterday) and legacy format (stores)
   const todayStores = liveData?.today || liveData?.stores || [];
   const yesterdayStores = liveData?.yesterday || [];
   
-  // Filter stores by area manager
+  // Filter stores by area manager (using allStores loaded independently for 2026)
   const filteredTodayStores = useMemo(() => {
     if (areaManagerFilter === 'All' || !showAreaManagerFilter) {
       return todayStores;
     }
     // Match outlet names with store names to get areaManager
-    const storeMap = new Map(stores.map(s => [s.name, s]));
+    // Use allStores (loaded independently for 2026) instead of stores prop
+    const storeMap = new Map(allStores.map(s => [s.name, s]));
     return todayStores.filter(item => {
       const store = storeMap.get(item.outlet);
       return store?.areaManager === areaManagerFilter;
     });
-  }, [todayStores, areaManagerFilter, stores, showAreaManagerFilter]);
+  }, [todayStores, areaManagerFilter, allStores, showAreaManagerFilter]);
 
   const filteredYesterdayStores = useMemo(() => {
     if (areaManagerFilter === 'All' || !showAreaManagerFilter) {
       return yesterdayStores;
     }
-    const storeMap = new Map(stores.map(s => [s.name, s]));
+    // Use allStores (loaded independently for 2026) instead of stores prop
+    const storeMap = new Map(allStores.map(s => [s.name, s]));
     return yesterdayStores.filter(item => {
       const store = storeMap.get(item.outlet);
       return store?.areaManager === areaManagerFilter;
     });
-  }, [yesterdayStores, areaManagerFilter, stores, showAreaManagerFilter]);
+  }, [yesterdayStores, areaManagerFilter, allStores, showAreaManagerFilter]);
   
   // Get current view data
   const currentStores = viewMode === 'today' ? filteredTodayStores : filteredYesterdayStores;
