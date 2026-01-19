@@ -314,7 +314,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   // Convert preloaded NormalizedSalesResponse to DailyMetric[] format (like orange-dashboard)
   // This reads from allSalesData (preloaded at startup) and filters by month locally
   const dailyMetricsFromPreloaded = useMemo(() => {
-    if (!profile || dataPreloading || !allSalesData) {
+    if (!profile || dataPreloading) {
+      return [];
+    }
+    
+    // Check if allSalesData is available (it's an object, not null)
+    if (!allSalesData || typeof allSalesData !== 'object') {
+      console.warn('⚠️ allSalesData is not available yet');
       return [];
     }
     
@@ -328,9 +334,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     // Get preloaded data for this year (already loaded at startup)
     const result = allSalesData[year];
     if (!result || !result.success) {
-      console.warn(`⚠️ No preloaded data for year ${year}`);
+      console.warn(`⚠️ No preloaded data for year ${year}`, { 
+        availableYears: Object.keys(allSalesData), 
+        yearData: result 
+      });
       return [];
     }
+    
+    // Debug: Log data structure
+    console.log(`📊 Processing data for year ${year}:`, {
+      hasByDay: !!result.byDay,
+      byDayLength: result.byDay?.length || 0,
+      hasByStore: !!result.byStore,
+      byStoreLength: result.byStore?.length || 0,
+      hasByEmployee: !!result.byEmployee,
+      byEmployeeLength: result.byEmployee?.length || 0,
+      storesCount: stores.length,
+    });
     
     // Build mapping: storeId -> storeName from current stores list (for proper matching)
     const storeNameMap = new Map<string, string>();
