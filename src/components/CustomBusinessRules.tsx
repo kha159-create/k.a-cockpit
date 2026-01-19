@@ -53,8 +53,8 @@ const buildStoreRuleString = (storeName: string, values: StoreRuleValues, locale
     const spv = Number(values.salesPerVisitor) || 0;
     const friendlyText =
         locale === 'ar'
-            ? `متجر ${storeName}: متوسط الفاتورة المستهدف ${atv.toFixed(2)} ريال، معدل التحويل المطلوب ${conversion.toFixed(2)}٪، والمبيعات لكل زائر ${spv.toFixed(2)} ريال. التزم بهذه الحدود عند تقديم التوصيات.`
-            : `Store ${storeName}: target ATV ${atv.toFixed(2)} SAR, required conversion ${conversion.toFixed(2)}%, and sales per visitor ${spv.toFixed(2)} SAR. Follow these limits in all insights.`;
+            ? `متجر ${storeName}: متوسط الفاتورة المستهدف ${Math.round(atv)} ريال، معدل التحويل المطلوب ${Math.round(conversion)}٪، والمبيعات لكل زائر ${Math.round(spv)} ريال. التزم بهذه الحدود عند تقديم التوصيات.`
+            : `Store ${storeName}: target ATV ${Math.round(atv)} SAR, required conversion ${Math.round(conversion)}%, and sales per visitor ${Math.round(spv)} SAR. Follow these limits in all insights.`;
     const metadata = JSON.stringify({
         store: storeName,
         atvTarget: atv,

@@ -187,7 +187,7 @@ const AreaDetailPage: React.FC<AreaDetailPageProps> = ({
                 <KPICard title={t('visitors')} value={areaData.totalVisitors} />
                 <KPICard title={t('total_transactions')} value={areaData.totalTransactions} />
                 <KPICard title={t('avg_transaction_value')} value={areaData.atv} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}/>
-                <KPICard title={t('conversion_rate')} value={areaData.visitorRate} format={v => `${v.toFixed(1)}%`} />
+                <KPICard title={t('conversion_rate')} value={areaData.visitorRate} format={v => `${Math.round(v)}%`} />
                 <KPICard title={t('sales_per_visitor')} value={areaData.salesPerVisitor} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })} />
             </div>
 
@@ -228,7 +228,7 @@ const AreaDetailPage: React.FC<AreaDetailPageProps> = ({
                                     <p className="text-sm text-zinc-500">{t('sales')}: {store.totalSales.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="font-semibold text-zinc-700">{store.targetAchievement.toFixed(1)}%</p>
+                                    <p className="font-semibold text-zinc-700">{Math.round(store.targetAchievement)}%</p>
                                     <p className="text-sm text-zinc-500">{t('achievement')}</p>
                                 </div>
                             </div>

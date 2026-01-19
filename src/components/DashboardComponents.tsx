@@ -321,7 +321,7 @@ export const PieChart: React.FC<{ data: { name: string, value: number, count?: n
                                 </div>
                                 <div className="flex items-center justify-between gap-2 mt-1">
                                     <span className="text-xs text-neutral-600">Share:</span>
-                                    <span className="text-sm font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">{((item.value/total) * 100).toFixed(1)}%</span>
+                                    <span className="text-sm font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">{Math.round((item.value/total) * 100)}%</span>
                                 </div>
                                 {item.count !== undefined && (
                                     <div className="flex items-center justify-between gap-2 mt-1">
@@ -384,7 +384,7 @@ export const PieChart: React.FC<{ data: { name: string, value: number, count?: n
                             <span className="text-neutral-700 flex-grow font-medium whitespace-nowrap" title={item.name}>{item.name}</span>
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-neutral-500">{item.value.toLocaleString()}</span>
-                                <span className="font-bold text-neutral-900 bg-neutral-100 px-2 py-1 rounded-md text-xs">{((item.value/total) * 100).toFixed(1)}%</span>
+                                <span className="font-bold text-neutral-900 bg-neutral-100 px-2 py-1 rounded-md text-xs">{Math.round((item.value/total) * 100)}%</span>
                             </div>
                         </li>
                     ))}
@@ -497,7 +497,7 @@ export const LineChart: React.FC<{ data: { name: string; [key: string]: any }[] 
                         return (
                             <g key={i} className="text-gray-400">
                                 <text x={padding.left - 8} y={y + 4} textAnchor="end" fontSize="10" fill="currentColor">
-                                    {val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val.toFixed(0)}
+                                    {val >= 1000 ? `${Math.round(val / 1000)}k` : Math.round(val)}
                                 </text>
                                 <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="currentColor" strokeOpacity="0.2" strokeDasharray="2 2" />
                             </g>
@@ -550,7 +550,7 @@ export const DetailedComparisonCard: React.FC<{
     watermarkOpacity?: number;
 }> = ({ title, current, previous, isPercentage, watermark, watermarkOpacity = 0.1 }) => {
     const format = (val: number) => {
-        if (isPercentage) return `${val.toFixed(1)}%`;
+        if (isPercentage) return `${Math.round(val)}%`;
         if (val >= 1000) {
            return val.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 });
         }
@@ -574,7 +574,7 @@ export const DetailedComparisonCard: React.FC<{
             <div className={`mt-2 flex items-center text-sm font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
                 {isPositive ? '▲' : '▼'}
                 <span className="ml-1">{format(Math.abs(difference))}</span>
-                <span className="ml-2">({Math.abs(percentageChange).toFixed(1)}%)</span>
+                <span className="ml-2">({Math.round(Math.abs(percentageChange))}%)</span>
             </div>
         </div>
     );
@@ -621,7 +621,7 @@ export const AchievementBar: React.FC<{ percentage: number }> = ({ percentage })
       
       {/* النسبة المئوية */}
       <div className={`text-sm font-bold ${getTextColor()} min-w-[2.5rem] text-right`}>
-        {percentage.toFixed(1)}%
+        {Math.round(percentage)}%
       </div>
     </div>
   );

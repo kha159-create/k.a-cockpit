@@ -198,7 +198,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   const [dataLoading, setDataLoading] = useState(true);
 
   // Filter States: default to current year and current month
-  const [dateFilter, setDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' });
+  // Each page has its own independent dateFilter (like orange-dashboard)
+  const [dateFilter, setDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Dashboard default
+  const [storesDateFilter, setStoresDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Stores page
+  const [productsDateFilter, setProductsDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Products page
+  const [employeesDateFilter, setEmployeesDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Employees page
+  const [commissionsDateFilter, setCommissionsDateFilter] = useState<DateFilter>({ year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }); // Commissions page
   const [areaStoreFilter, setAreaStoreFilter] = useState<AreaStoreFilterState>({
       areaManager: profile?.role === 'area_manager' || profile?.role === 'store_manager' ? profile.areaManager || 'All' : 'All',
       store: profile?.role === 'store_manager' || profile?.role === 'employee' ? profile.store || 'All' : 'All',
@@ -304,7 +309,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     setTasks([]);
     
     // Mark data as loaded (no Firestore data to wait for)
-    setDataLoading(false);
+                        setDataLoading(false);
 
     return () => {
         usersUnsubscriber();
@@ -673,7 +678,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   }, [profile, dateFilter.year, dateFilter.month, stores]); // Add stores dependency for proper store name mapping
   */
 
-  useEffect(() => {
+useEffect(() => {
     if (profile?.role !== 'admin' && profile?.role !== 'general_manager') {
       return;
     }
@@ -824,8 +829,8 @@ const handleNotificationClick = (notificationId: string) => {
         // This function is disabled to prevent Firestore connections
         setIsProcessing(true);
         setAppMessage({ isOpen: true, text: t('add_visitors_success') || 'Visitors saved (local only - no Firestore)', type: 'alert' });
-        setIsProcessing(false);
-        setModalState({ type: null });
+            setIsProcessing(false);
+            setModalState({ type: null });
     };
 
     const handleMonthlyMetricSave = async (metricData: any) => {
@@ -833,8 +838,8 @@ const handleNotificationClick = (notificationId: string) => {
         // This function is disabled to prevent Firestore connections
         setIsProcessing(true);
         setAppMessage({ isOpen: true, text: t('monthly_metric_success') || 'Monthly metric saved (local only - no Firestore)', type: 'alert' });
-        setIsProcessing(false);
-        setModalState({ type: null });
+            setIsProcessing(false);
+            setModalState({ type: null });
     };
     
     const handleDeleteAllData = () => {
@@ -1013,8 +1018,8 @@ const handleNotificationClick = (notificationId: string) => {
         if (!user || !profile) return;
         setIsProcessing(true);
         setAppMessage({ isOpen: true, text: `Task sent to ${taskData.recipientName} (local only - no Firestore).`, type: 'alert' });
-        setIsProcessing(false);
-        setModalState({ type: null });
+            setIsProcessing(false); 
+            setModalState({ type: null }); 
     };
 
     const handleUpdateTaskStatus = async (taskId: string, status: 'completed') => {
@@ -1120,11 +1125,21 @@ const handleNotificationClick = (notificationId: string) => {
     case 'dashboard':
       return <Dashboard {...processedData} {...pageProps} dashboardPieFilter={dashboardPieFilter} setDashboardPieFilter={setDashboardPieFilter} tasks={tasks} onUpdateTaskStatus={handleUpdateTaskStatus} isProcessing={isProcessing} />;
     case 'stores':
-      return <StoresPage {...processedData} {...pageProps} onEdit={d => setModalState({type: 'store', data: d})} onDelete={(id, name) => handleDelete('stores', id, name)} onSelectStore={setSelectedStore} onSelectArea={(managerName, stores) => setSelectedArea({ managerName, stores })} allMetrics={dailyMetrics} />;
+      // Use independent dateFilter for Stores page
+      return <StoresPage {...processedData} dateFilter={storesDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setStoresDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} onEdit={d => setModalState({type: 'store', data: d})} onDelete={(id, name) => handleDelete('stores', id, name)} onSelectStore={setSelectedStore} onSelectArea={(managerName, stores) => setSelectedArea({ managerName, stores })} allMetrics={dailyMetrics} />;
      case 'employees':
+      // Use independent dateFilter for Employees page
       return <EmployeesPage 
           {...processedData} 
-          {...pageProps} 
+          dateFilter={employeesDateFilter} 
+          setDateFilter={(value: DateFilter) => runWithRecalculation(setEmployeesDateFilter, value)} 
+          areaStoreFilter={areaStoreFilter} 
+          setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} 
+          allStores={stores} 
+          allDateData={allDateData} 
+          setModalState={setModalState} 
+          isRecalculating={isRecalculating} 
+          profile={profile}
           onEdit={d => setModalState({type: 'employee', data: d})} 
           onDelete={(id, name) => handleDelete('employees', id, name)} 
           dailyMetrics={dailyMetrics} 
@@ -1134,9 +1149,11 @@ const handleNotificationClick = (notificationId: string) => {
           storeSummary={processedData.storeSummary}
           />;
      case 'products':
-       return <ProductsPage {...processedData} {...pageProps} />;
+       // Use independent dateFilter for Products page
+       return <ProductsPage {...processedData} dateFilter={productsDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setProductsDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} />;
      case 'commissions':
-        return <CommissionsPage {...processedData} {...pageProps} />;
+        // Use independent dateFilter for Commissions page
+        return <CommissionsPage {...processedData} dateFilter={commissionsDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setCommissionsDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} />;
     case 'uploads':
        return (
          <SmartUploaderPage

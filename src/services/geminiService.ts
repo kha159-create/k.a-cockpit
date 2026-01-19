@@ -208,7 +208,7 @@ export const generatePrediction = async (store: StoreSummary, historicalMetrics:
     const prompt = `You are a predictive retail analyst. Your task is to forecast month-end sales for a store and assess its risk of missing its target.
 
 Store Name: ${store.name}
-Monthly Sales Target: ${store.effectiveTarget.toFixed(2)} SAR
+Monthly Sales Target: ${Math.round(store.effectiveTarget)} SAR
 Current Sales Data (This Month So Far): ${reduceDataSize(salesThisMonth, 2000)}
 
 Based ONLY on this data, provide a JSON object with your analysis.

@@ -16,7 +16,7 @@ export const fmtCurrency = (
   new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(safeNumber(v));
 
 

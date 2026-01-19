@@ -181,7 +181,7 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
                 <KPICard title={t('visitors')} value={storeData.totalVisitors} />
                 <KPICard title={t('total_transactions')} value={storeData.totalTransactions} />
                 <KPICard title={t('avg_transaction_value')} value={storeData.atv} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}/>
-                <KPICard title={t('conversion_rate')} value={storeData.visitorRate} format={v => `${v.toFixed(1)}%`} />
+                <KPICard title={t('conversion_rate')} value={storeData.visitorRate} format={v => `${Math.round(v)}%`} />
                 <KPICard title={t('sales_per_visitor')} value={storeData.salesPerVisitor} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })} />
             </div>
 

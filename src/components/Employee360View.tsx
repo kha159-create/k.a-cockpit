@@ -233,9 +233,9 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 my-4">
                     <KPICard title={t('total_sales')} value={employeeData.totalSales} format={v => v.toLocaleString('en-US', {style: 'currency', currency: 'SAR'})} />
                     <KPICard title={t('avg_transaction_value')} value={employeeData.atv} format={v => v.toLocaleString('en-US', {style: 'currency', currency: 'SAR'})} comparisonValue={employeeData.storeAvgAtv} comparisonLabel={t('store_avg')}/>
-                    <KPICard title={t('items_per_bill')} value={employeeData.avgItemsPerBill} format={v => v.toFixed(2)} comparisonValue={employeeData.storeAvgUpt} comparisonLabel={t('store_avg')}/>
-                    <KPICard title={t('achievement')} value={employeeData.achievement} format={v => `${v.toFixed(1)}%`} />
-                    <KPICard title={t('contribution_to_store_sales')} value={employeeData.contributionPercentage} format={v => `${v.toFixed(1)}%`} />
+                    <KPICard title={t('items_per_bill')} value={employeeData.avgItemsPerBill} format={v => Math.round(v)} comparisonValue={employeeData.storeAvgUpt} comparisonLabel={t('store_avg')}/>
+                    <KPICard title={t('achievement')} value={employeeData.achievement} format={v => `${Math.round(v)}%`} />
+                    <KPICard title={t('contribution_to_store_sales')} value={employeeData.contributionPercentage} format={v => `${Math.round(v)}%`} />
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -258,7 +258,7 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
                                     <div key={cat.name}>
                                         <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
                                             <span>{cat.name}</span>
-                                            <span>{cat.count} units ({percentage.toFixed(1)}%)</span>
+                                            <span>{cat.count} units ({Math.round(percentage)}%)</span>
                                         </div>
                                         <div className="w-full bg-gray-200 rounded-full h-3"><div className="bg-sky-500 h-3 rounded-full" style={{ width: `${percentage}%` }}></div></div>
                                     </div>
@@ -267,7 +267,7 @@ const Employee360View: React.FC<Employee360ViewProps> = ({ employee, allMetrics,
                             <div className="mt-auto pt-2 border-t border-gray-200">
                                 <div className="flex justify-between items-center text-xs"><span className="font-semibold text-zinc-700">Monthly Duvet Target:</span><span className="font-bold">{employeeData.duvetTargetData.target}</span></div>
                                 <div className="flex justify-between items-center text-xs mt-1"><span className="font-semibold text-zinc-700">Sold (MTD):</span><span className="font-bold">{employeeData.duvetTargetData.sold}</span></div>
-                                <div className="flex justify-between items-center text-sm mt-1"><span className="font-bold text-green-700">Achievement (MTD):</span><span className="font-extrabold text-green-600">{employeeData.duvetTargetData.achievement.toFixed(1)}%</span></div>
+                                <div className="flex justify-between items-center text-sm mt-1"><span className="font-bold text-green-700">Achievement (MTD):</span><span className="font-extrabold text-green-600">{Math.round(employeeData.duvetTargetData.achievement)}%</span></div>
                             </div>
                         </div>
                     </ChartCard>

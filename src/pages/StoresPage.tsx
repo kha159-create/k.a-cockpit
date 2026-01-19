@@ -147,7 +147,7 @@ const StoresPage: React.FC<StoresPageProps> = ({
                                             <p className="text-sm text-orange-700">{t('stores_count')}: {storesCount}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-2xl font-bold text-orange-900">{targetAchievement.toFixed(1)}%</p>
+                                            <p className="text-2xl font-bold text-orange-900">{Math.round(targetAchievement)}%</p>
                                             <p className="text-sm text-orange-700">{t('achievement')}</p>
                                         </div>
                                     </div>

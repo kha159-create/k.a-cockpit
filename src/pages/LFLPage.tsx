@@ -264,7 +264,7 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
             { key: 'visitors', title: 'Visitors', current: data.current.totalVisitors, previous: data.previous.totalVisitors, format: (v: number) => v.toLocaleString('en-US') },
             { key: 'atv', title: 'ATV', current: data.current.atv, previous: data.previous.atv, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
             { key: 'transactions', title: 'Transactions', current: data.current.totalTransactions, previous: data.previous.totalTransactions, format: (v: number) => v.toLocaleString('en-US') },
-            { key: 'visitorRate', title: 'Visitor Conversion Rate', current: data.current.visitorRate, previous: data.previous.visitorRate, format: (v: number) => `${v.toFixed(2)}%`, isPercentage: true },
+            { key: 'visitorRate', title: 'Visitor Conversion Rate', current: data.current.visitorRate, previous: data.previous.visitorRate, format: (v: number) => `${Math.round(v)}%`, isPercentage: true },
             { key: 'salesPerVisitor', title: 'Sales per Visitor', current: data.current.totalVisitors > 0 ? data.current.totalSales / data.current.totalVisitors : 0, previous: data.previous.totalVisitors > 0 ? data.previous.totalSales / data.previous.totalVisitors : 0, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
         ];
 
@@ -423,7 +423,7 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                         { key: 'visitors', title: 'Visitors', current: storeCurrent.totalVisitors, previous: storePrevious.totalVisitors, format: (v: number) => v.toLocaleString('en-US') },
                         { key: 'atv', title: 'ATV', current: storeCurrent.atv, previous: storePrevious.atv, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
                         { key: 'transactions', title: 'Transactions', current: storeCurrent.totalTransactions, previous: storePrevious.totalTransactions, format: (v: number) => v.toLocaleString('en-US') },
-                        { key: 'visitorRate', title: 'Visitor Conversion Rate', current: storeCurrent.visitorRate, previous: storePrevious.visitorRate, format: (v: number) => `${v.toFixed(2)}%`, isPercentage: true },
+                        { key: 'visitorRate', title: 'Visitor Conversion Rate', current: storeCurrent.visitorRate, previous: storePrevious.visitorRate, format: (v: number) => `${Math.round(v)}%`, isPercentage: true },
                         { key: 'salesPerVisitor', title: 'Sales per Visitor', current: storeCurrent.totalVisitors > 0 ? storeCurrent.totalSales / storeCurrent.totalVisitors : 0, previous: storePrevious.totalVisitors > 0 ? storePrevious.totalSales / storePrevious.totalVisitors : 0, format: (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }) },
                     ];
 
@@ -787,7 +787,7 @@ const LFLPage: React.FC<LFLPageProps> = ({ allStores, allMetrics, profile }) => 
                     const isPositive = change >= 0;
                     return (
                         <span className={isPositive ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                            {isPositive ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
+                            {isPositive ? '▲' : '▼'} {Math.round(Math.abs(change))}%
                         </span>
                     );
                 }

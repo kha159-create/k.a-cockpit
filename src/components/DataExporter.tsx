@@ -22,7 +22,7 @@ const DataExporter: React.FC<DataExporterProps> = ({ employeeSummary, storeSumma
             'Store': emp.store,
             'Total Sales': emp.totalSales,
             'Target': emp.effectiveTarget,
-            'Achievement %': emp.achievement.toFixed(2),
+            'Achievement %': Math.round(emp.achievement),
         }));
         exportData(data, "Employees_Report");
     };
@@ -33,7 +33,7 @@ const DataExporter: React.FC<DataExporterProps> = ({ employeeSummary, storeSumma
             'Area Manager': store.areaManager,
             'Total Sales': store.totalSales,
             'Target': store.effectiveTarget,
-            'Achievement %': store.targetAchievement.toFixed(2),
+            'Achievement %': Math.round(store.targetAchievement),
             'Visitors': store.visitors,
             'Transactions': store.transactionCount,
         }));

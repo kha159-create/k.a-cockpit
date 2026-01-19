@@ -528,12 +528,12 @@ Use short sentences. Output in Arabic.` }]}
           <div className="bg-white p-4 rounded-xl shadow-sm border">
             <div className="text-xs text-zinc-500 mb-1">Best Performing Product</div>
             <div className="text-sm font-semibold truncate" title={summary.best?.name || ''}>{summary.best?.name || '-'}</div>
-            <div className="text-green-600 text-xs">{summary.best ? `${summary.best.growth.toFixed(1)}%` : '-'}</div>
+            <div className="text-green-600 text-xs">{summary.best ? `${Math.round(summary.best.growth)}%` : '-'}</div>
           </div>
           <div className="bg-white p-4 rounded-xl shadow-sm border">
             <div className="text-xs text-zinc-500 mb-1">Weakest Performing Product</div>
             <div className="text-sm font-semibold truncate" title={summary.weak?.name || ''}>{summary.weak?.name || '-'}</div>
-            <div className="text-red-600 text-xs">{summary.weak ? `${summary.weak.growth.toFixed(1)}%` : '-'}</div>
+            <div className="text-red-600 text-xs">{summary.weak ? `${Math.round(summary.weak.growth)}%` : '-'}</div>
           </div>
           <div className="bg-white p-4 rounded-xl shadow-sm border">
             <div className="text-xs text-zinc-500 mb-1">Average Daily Sales</div>
@@ -541,7 +541,7 @@ Use short sentences. Output in Arabic.` }]}
           </div>
         <div className={`bg-white p-4 rounded-xl shadow-sm border`}>
             <div className="text-xs text-zinc-500 mb-1">Monthly Growth Rate</div>
-            <div className={`text-2xl font-bold ${summary.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{`${summary.monthlyGrowth.toFixed(1)}%`}</div>
+            <div className={`text-2xl font-bold ${summary.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>{`${Math.round(summary.monthlyGrowth)}%`}</div>
           </div>
         </div>
 
@@ -562,7 +562,7 @@ Use short sentences. Output in Arabic.` }]}
                       <div key={item.name}>
                         <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
                           <span>{item.name}</span>
-                          <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
+                          <span>{item.units} units ({Math.round(item.percentage)}%)</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-3">
                           <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
@@ -588,7 +588,7 @@ Use short sentences. Output in Arabic.` }]}
                       <div key={item.name}>
                         <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
                           <span>{item.name}</span>
-                          <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
+                          <span>{item.units} units ({Math.round(item.percentage)}%)</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-3">
                           <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
@@ -614,7 +614,7 @@ Use short sentences. Output in Arabic.` }]}
                       <div key={item.name}>
                         <div className="flex justify-between text-xs font-medium text-zinc-600 mb-1">
                           <span>{item.name}</span>
-                          <span>{item.units} units ({item.percentage.toFixed(1)}%)</span>
+                          <span>{item.units} units ({Math.round(item.percentage)}%)</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-3">
                           <div className="bg-sky-500 h-3 rounded-full" style={{ width: `${item.percentage}%` }}></div>
