@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useLocale } from '@/context/LocaleContext';
 import { getLiveSales } from '@/data/dataProvider';
+import { useData } from '@/context/DataProvider';
 import { apiUrl } from '@/utils/apiBase';
 import type { Store, UserProfile } from '@/types';
 
 interface LiveSalesData {
-  date: string; // YYYY-MM-DD (from JSON) or firebase.firestore.Timestamp (from Firestore)
-  lastUpdate: string; // HH:MM format (from JSON) or firebase.firestore.Timestamp (from Firestore)
+  date: string; // YYYY-MM-DD (from API JSON)
+  lastUpdate: string; // HH:MM format (from API JSON)
   today: Array<{ outlet: string; sales: number }>;
   yesterday: Array<{ outlet: string; sales: number }>;
   // Legacy support - fallback to old format
@@ -20,11 +21,12 @@ interface LivePageProps {
 
 const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
   const { locale, t } = useLocale();
+  const { allSalesData } = useData(); // Get preloaded data (independent of dateFilter)
   const [liveData, setLiveData] = useState<LiveSalesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'today' | 'yesterday'>('today');
-  const [areaManagerFilter, setAreaManagerFilter] = useState<string>('All');
+  const [areaManagerFilter, setAreaManagerFilter] = useState<string>('All'); // Local state (independent of global filters)
 
   const copy = useMemo(() => {
     if (locale === 'ar') {
@@ -106,14 +108,9 @@ const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
     };
   }, [copy]);
 
-  const formatDate = (dateStr: string | firebase.firestore.Timestamp | undefined) => {
+  const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return '-';
-    let date: Date;
-    if (typeof dateStr === 'string') {
-      date = new Date(dateStr);
-    } else {
-      date = dateStr.toDate();
-    }
+    const date = new Date(dateStr);
     return date.toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US', {
       year: 'numeric',
       month: 'long',
@@ -121,19 +118,10 @@ const LivePage: React.FC<LivePageProps> = ({ stores, profile }) => {
     });
   };
 
-  const formatTime = (timeStr: string | firebase.firestore.Timestamp | undefined) => {
+  const formatTime = (timeStr: string | undefined) => {
     if (!timeStr) return '-';
-    // If it's already a string (HH:MM format), return it
-    if (typeof timeStr === 'string') {
-      return timeStr;
-    }
-    // If it's a Firestore Timestamp, format it
-    const date = timeStr.toDate();
-    return date.toLocaleTimeString(locale === 'ar' ? 'ar-SA' : 'en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
+    // timeStr is already a string (HH:MM format) from API
+    return timeStr;
   };
 
   const formatSales = (sales: number) => {
