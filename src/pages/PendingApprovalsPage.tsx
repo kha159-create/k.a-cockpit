@@ -61,35 +61,52 @@ const PendingApprovalsPage: React.FC = () => {
     const unsub2 = db
       .collection('users')
       .where('status', '==', 'pending')
-      .onSnapshot((snapshot) => {
-        const list = snapshot.docs.map((doc) => {
-          const d = doc.data() as any;
-          return {
-            id: doc.id,
-            employeeId: d.employeeId ?? '',
-            email: d.email ?? '',
-            name: d.name ?? '',
-            role: d.role ?? 'employee',
-            status: d.status ?? 'pending',
-            createdAt: d.createdAt || d.approvedAt || new Date(),
-            userId: doc.id,
-            source: 'users' as const,
-            ...d,
-          } as PendingEmployee;
-        });
+      .onSnapshot(
+        (snapshot) => {
+          try {
+            const list = snapshot.docs.map((doc) => {
+              const d = doc.data() as any;
+              return {
+                id: doc.id,
+                employeeId: d.employeeId ?? '',
+                email: d.email ?? '',
+                name: d.name ?? '',
+                role: d.role ?? 'employee',
+                status: d.status ?? 'pending',
+                createdAt: d.createdAt || d.approvedAt || new Date(),
+                userId: doc.id,
+                source: 'users' as const,
+                ...d,
+              } as PendingEmployee;
+            });
 
-        setPendingEmployees((prev) => {
-          const others = prev.filter((p) => p.source === 'pendingEmployees');
-          const combined = [...others, ...list];
-          combined.sort((a, b) => {
-            const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-            const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-            return bTime.getTime() - aTime.getTime();
-          });
-          return combined;
-        });
-        setLoading(false);
-      });
+            setPendingEmployees((prev) => {
+              const others = prev.filter((p) => p.source === 'pendingEmployees');
+              const combined = [...others, ...list];
+              combined.sort((a, b) => {
+                const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+                const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+                return bTime.getTime() - aTime.getTime();
+              });
+              return combined;
+            });
+            setLoading(false);
+          } catch (err: any) {
+            console.debug('Error processing users snapshot:', err?.message);
+            setLoading(false);
+          }
+        },
+        (err: any) => {
+          // Silently ignore network errors (QUIC, DNS, etc.)
+          const errorMessage = err?.message || String(err);
+          if (errorMessage.includes('QUIC') || errorMessage.includes('DNS') || errorMessage.includes('NETWORK')) {
+            console.debug('Firestore network error (ignored):', errorMessage);
+          } else {
+            console.warn('Firestore users error:', errorMessage);
+          }
+          setLoading(false);
+        }
+      );
 
     return () => {
       unsub1();

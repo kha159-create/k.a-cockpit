@@ -384,11 +384,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         const usersRef = db.collection('users');
         usersUnsubscriber = usersRef.onSnapshot(
             (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (UserProfile & { id: string })[];
-                setAllUsers(data);
+                try {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (UserProfile & { id: string })[];
+                    setAllUsers(data);
+                } catch (err: any) {
+                    // Silently ignore errors (network issues)
+                    console.debug('Error processing users snapshot:', err?.message);
+                }
             },
-            (err) => {
-                console.error('Error fetching users:', err);
+            (err: any) => {
+                // Silently ignore network errors (QUIC, DNS, etc.)
+                // These are common and don't affect functionality
+                const errorMessage = err?.message || String(err);
+                if (errorMessage.includes('QUIC') || errorMessage.includes('DNS') || errorMessage.includes('NETWORK')) {
+                    console.debug('Firestore network error (ignored):', errorMessage);
+                } else {
+                    console.warn('Firestore users error:', errorMessage);
+                }
             }
         );
     }
