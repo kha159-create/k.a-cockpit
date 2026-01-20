@@ -93,42 +93,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`📅 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
-    // Build SQL query for gofrugal_sales
-    let salesQuery = `
-      SELECT 
-        outlet_name,
-        bill_no,
-        bill_date,
-        net_amount,
-        transaction_type,
-        salesman
-      FROM gofrugal_sales
-      WHERE bill_date >= $1 AND bill_date <= $2
-    `;
-    const queryParams: any[] = [startDate, endDate];
-    let paramIndex = 3;
-
-    if (storeId) {
-      // If storeId is provided, it might be dynamic_number (Store Number) or outlet_name
-      // Try to match both
-      const storeMappingCheck = await pool.query(`
-        SELECT outlet_name FROM gofrugal_outlets_mapping 
-        WHERE dynamic_number = $1 OR outlet_name = $1
-        LIMIT 1
-      `, [storeId]);
-      
-      if (storeMappingCheck.rows.length > 0) {
-        // Found by dynamic_number or outlet_name, use outlet_name for query
-        salesQuery += ` AND outlet_name = $${paramIndex}`;
-        queryParams.push(storeMappingCheck.rows[0].outlet_name);
-      } else {
-        // Direct match on outlet_name
-        salesQuery += ` AND outlet_name = $${paramIndex}`;
-        queryParams.push(storeId);
-      }
-      paramIndex++;
-    }
-
     // Load store mapping FIRST (needed for storeId filtering)
     const storeMappingResult = await pool.query(`
       SELECT outlet_name, dynamic_number, area_manager, city
@@ -171,21 +135,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Handle storeId filter - convert dynamic_number to outlet_name if needed
     if (storeId) {
-      const storeMappingCheck = await pool.query(`
-        SELECT outlet_name FROM gofrugal_outlets_mapping 
-        WHERE dynamic_number = $1 OR outlet_name = $1
-        LIMIT 1
-      `, [storeId]);
-      
-      if (storeMappingCheck.rows.length > 0) {
-        // Found by dynamic_number or outlet_name, use outlet_name for query
-        salesQuery += ` AND outlet_name = $${paramIndex}`;
-        queryParams.push(storeMappingCheck.rows[0].outlet_name);
-      } else {
-        // Direct match on outlet_name
-        salesQuery += ` AND outlet_name = $${paramIndex}`;
-        queryParams.push(storeId);
+      // Find outlet_name by dynamic_number or direct match
+      let targetOutletName = storeId;
+      for (const [outletName, dynamicNum] of outletNameToStoreId.entries()) {
+        if (dynamicNum === storeId || outletName === storeId) {
+          targetOutletName = outletName;
+          break;
+        }
       }
+      
+      salesQuery += ` AND outlet_name = $${paramIndex}`;
+      queryParams.push(targetOutletName);
       paramIndex++;
     }
 
