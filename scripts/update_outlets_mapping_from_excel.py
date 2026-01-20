@@ -78,7 +78,7 @@ def load_mapping_from_excel():
         return {}
 
 
-def update_outlets_mapping():
+def update_outlets_mapping(file_path=None):
     """Update gofrugal_outlets_mapping with correct dynamic_number from mapping.xlsx"""
     conn = None
     try:
@@ -87,8 +87,8 @@ def update_outlets_mapping():
         
         print("[START] Updating outlets mapping with dynamic_number from mapping.xlsx...")
         
-        # Load mapping from Excel
-        excel_mapping = load_mapping_from_excel()
+        # Load mapping from Excel (local file or GitHub)
+        excel_mapping = load_mapping_from_excel(file_path)
         
         if not excel_mapping:
             print("[ERROR] No mappings loaded from Excel, aborting")
@@ -160,4 +160,9 @@ def update_outlets_mapping():
 
 
 if __name__ == "__main__":
-    update_outlets_mapping()
+    import sys
+    # Allow passing file path as argument
+    file_path = sys.argv[1] if len(sys.argv) > 1 else None
+    if file_path:
+        print(f"[INFO] Using local file: {file_path}")
+    update_outlets_mapping(file_path)

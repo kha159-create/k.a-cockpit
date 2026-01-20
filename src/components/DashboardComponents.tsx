@@ -454,29 +454,35 @@ export const LineChart: React.FC<{ data: { name: string; [key: string]: any }[] 
         // Use requestAnimationFrame to avoid forced reflow (performance optimization)
         requestAnimationFrame(() => {
             if (!containerRef.current) return;
-            const svg = e.currentTarget;
-            const point = new DOMPoint(e.clientX, e.clientY);
-            const screenCTM = svg.getScreenCTM();
-            if (!screenCTM) return; // SVG not in DOM or not visible
-            const transformedPoint = point.matrixTransform(screenCTM.inverse());
-            
-            const index = Math.min(data.length - 1, Math.max(0, Math.round(((transformedPoint.x - padding.left) / (width - padding.left - padding.right)) * (data.length - 1))));
-
-            if (index >= 0 && index < data.length) {
-                const item = data[index];
-                const tooltipContent = `<div class="font-bold mb-1">${item.name}</div>${keys.filter(k => visibleKeys.has(k)).map(key => `
-                    <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center">
-                           <span class="w-2 h-2 rounded-full mr-1.5" style="background-color: ${colors[key]}"></span>
-                           <span>${key}:</span>
-                        </div>
-                        <span class="font-semibold">${(item[key] as number).toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
-                    </div>
-                `).join('')}`;
+            try {
+                const svg = e.currentTarget;
+                if (!svg || !svg.ownerSVGElement) return; // SVG not in DOM
+                const point = new DOMPoint(e.clientX, e.clientY);
+                const screenCTM = svg.getScreenCTM();
+                if (!screenCTM) return; // SVG not in DOM or not visible
+                const transformedPoint = point.matrixTransform(screenCTM.inverse());
                 
-                // Cache getBoundingClientRect() to avoid multiple calls (prevents forced reflow)
-                const containerRect = containerRef.current.getBoundingClientRect();
-                setTooltip({ content: tooltipContent, x: e.clientX - containerRect.left, y: e.clientY - containerRect.top });
+                const index = Math.min(data.length - 1, Math.max(0, Math.round(((transformedPoint.x - padding.left) / (width - padding.left - padding.right)) * (data.length - 1))));
+
+                if (index >= 0 && index < data.length) {
+                    const item = data[index];
+                    const tooltipContent = `<div class="font-bold mb-1">${item.name}</div>${keys.filter(k => visibleKeys.has(k)).map(key => `
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center">
+                               <span class="w-2 h-2 rounded-full mr-1.5" style="background-color: ${colors[key]}"></span>
+                               <span>${key}:</span>
+                            </div>
+                            <span class="font-semibold">${(item[key] as number).toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                        </div>
+                    `).join('')}`;
+                    
+                    // Cache getBoundingClientRect() to avoid multiple calls (prevents forced reflow)
+                    const containerRect = containerRef.current.getBoundingClientRect();
+                    setTooltip({ content: tooltipContent, x: e.clientX - containerRect.left, y: e.clientY - containerRect.top });
+                }
+            } catch (error) {
+                // Silently ignore errors (SVG may not be ready)
+                console.debug('LineChart mouse move error:', error);
             }
         });
     };
