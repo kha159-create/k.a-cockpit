@@ -6,9 +6,15 @@ This matches the Store Number (OperatingUnitNumber) used in the system
 import sys
 import io
 import psycopg2
-import requests
 import pandas as pd
 from io import BytesIO
+
+# Optional import for GitHub fetching
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
@@ -21,20 +27,27 @@ DB_CONFIG = {
 }
 
 
-def load_mapping_from_excel():
-    """Load store mapping from mapping.xlsx (from dailysales repository)"""
+def load_mapping_from_excel(file_path=None):
+    """Load store mapping from mapping.xlsx (local file or from GitHub)"""
     try:
-        print("[INFO] Fetching mapping.xlsx from GitHub...")
-        url = "https://raw.githubusercontent.com/ALAAWF2/dailysales/main/backend/mapping.xlsx"
-        response = requests.get(url)
-        
-        if not response.ok:
-            print(f"[ERROR] Failed to fetch mapping.xlsx: {response.status_code}")
-            return {}
-        
-        # Read Excel file
-        excel_data = BytesIO(response.content)
-        df = pd.read_excel(excel_data, engine='openpyxl')
+        if file_path:
+            print(f"[INFO] Loading mapping.xlsx from local file: {file_path}")
+            df = pd.read_excel(file_path, engine='openpyxl')
+        else:
+            if not HAS_REQUESTS:
+                print("[ERROR] requests module not installed. Please provide local file path or install: pip install requests")
+                return {}
+            print("[INFO] Fetching mapping.xlsx from GitHub...")
+            url = "https://raw.githubusercontent.com/ALAAWF2/dailysales/main/backend/mapping.xlsx"
+            response = requests.get(url)
+            
+            if not response.ok:
+                print(f"[ERROR] Failed to fetch mapping.xlsx: {response.status_code}")
+                return {}
+            
+            # Read Excel file
+            excel_data = BytesIO(response.content)
+            df = pd.read_excel(excel_data, engine='openpyxl')
         
         # Find columns (flexible matching)
         columns = df.columns.tolist()
