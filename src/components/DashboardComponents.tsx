@@ -456,7 +456,9 @@ export const LineChart: React.FC<{ data: { name: string; [key: string]: any }[] 
             if (!containerRef.current) return;
             const svg = e.currentTarget;
             const point = new DOMPoint(e.clientX, e.clientY);
-            const transformedPoint = point.matrixTransform((svg.getScreenCTM() as DOMMatrix).inverse());
+            const screenCTM = svg.getScreenCTM();
+            if (!screenCTM) return; // SVG not in DOM or not visible
+            const transformedPoint = point.matrixTransform(screenCTM.inverse());
             
             const index = Math.min(data.length - 1, Math.max(0, Math.round(((transformedPoint.x - padding.left) / (width - padding.left - padding.right)) * (data.length - 1))));
 

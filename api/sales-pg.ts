@@ -258,17 +258,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error: any) {
     console.error('❌ PostgreSQL Sales API error:', error);
-    return res.status(500).json({
+    
+    // Return 200 with error flag (not 500) so frontend can handle fallback gracefully
+    // Frontend will automatically fallback to legacy provider
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const month = req.query.month ? parseInt(req.query.month as string) - 1 : undefined;
+    const day = req.query.day ? parseInt(req.query.day as string) : undefined;
+    
+    const startDate = new Date(Date.UTC(year, month || 0, day || 1, 0, 0, 0));
+    let endDate: Date;
+    if (month !== undefined) {
+      if (day !== undefined) {
+        endDate = new Date(Date.UTC(year, month, day, 23, 59, 59));
+      } else {
+        const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0));
+        endDate = new Date(Date.UTC(
+          lastDayOfMonth.getUTCFullYear(),
+          lastDayOfMonth.getUTCMonth(),
+          lastDayOfMonth.getUTCDate(),
+          23, 59, 59
+        ));
+      }
+    } else {
+      endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59));
+    }
+    
+    return res.status(200).json({
       success: false,
-      error: error.message,
-      range: { from: '', to: '', year: 0 },
+      range: {
+        from: startDate.toISOString().split('T')[0],
+        to: endDate.toISOString().split('T')[0],
+        year,
+        ...(month !== undefined && { month: month + 1 }),
+        ...(day !== undefined && { day }),
+      },
       byStore: [],
       byDay: [],
       byEmployee: [],
       totals: { salesAmount: 0, invoices: 0, kpis: { atv: 0, customerValue: 0 } },
       debug: {
         source: 'postgresql',
-        notes: [`Error: ${error.message}`],
+        notes: [`PostgreSQL connection failed: ${error.message}`, `Frontend will use legacy fallback`],
       },
     });
   }
