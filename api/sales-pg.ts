@@ -205,6 +205,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       invoices: number;
     }>>();
 
+    // Aggregate by employee and store
+    const employeeMap = new Map<string, {
+      employeeId: string;
+      employeeName: string;
+      storeId: string;
+      storeName: string;
+      salesAmount: number;
+      invoices: number;
+    }>();
+
     salesRows.forEach(row => {
       const outletName = row.outlet_name;
       // Use dynamic_number as storeId (matches OperatingUnitNumber from D365)
@@ -212,6 +222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const storeInfo = storeMapping.get(outletName);
       const storeName = storeInfo?.name || outletName;
       const dateStr = row.bill_date.toISOString().split('T')[0];
+      const salesman = row.salesman || null;
 
       // Store-level aggregation
       if (!storeMap.has(storeId)) {
@@ -240,6 +251,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const dayStoreData = dayStores.get(storeId)!;
       dayStoreData.salesAmount += row.net_amount || 0;
       dayStoreData.invoices += 1;
+
+      // Employee-level aggregation (if salesman exists)
+      if (salesman && salesman.trim() !== '') {
+        const employeeKey = `${salesman}_${storeId}`;
+        if (!employeeMap.has(employeeKey)) {
+          employeeMap.set(employeeKey, {
+            employeeId: salesman.split(/[-_]/)[0] || salesman, // Extract ID if present
+            employeeName: salesman,
+            storeId,
+            storeName,
+            salesAmount: 0,
+            invoices: 0,
+          });
+        }
+        const employeeData = employeeMap.get(employeeKey)!;
+        employeeData.salesAmount += row.net_amount || 0;
+        employeeData.invoices += 1;
+      }
     });
 
     // Convert to response format
@@ -259,10 +288,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .map(([date, stores]) => ({
         date,
         byStore: Array.from(stores.entries()).map(([storeId, data]) => {
-          const storeInfo = storeMapping.get(storeId);
+          // Find outlet_name by storeId (dynamic_number)
+          let outletName = '';
+          for (const [outlet, dynamicNum] of outletNameToStoreId.entries()) {
+            if (dynamicNum === storeId) {
+              outletName = outlet;
+              break;
+            }
+          }
+          const storeInfo = storeMapping.get(outletName || storeId);
           return {
             storeId,
-            storeName: storeInfo?.name || storeId,
+            storeName: storeInfo?.name || outletName || storeId,
             salesAmount: data.salesAmount,
             invoices: data.invoices,
             kpis: {
@@ -300,13 +337,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       byStore,
       byDay,
-      byEmployee: [], // Legacy data doesn't have employee breakdown
+      byEmployee: Array.from(employeeMap.values()).map(emp => ({
+        employeeId: emp.employeeId,
+        employeeName: emp.employeeName,
+        storeId: emp.storeId,
+        storeName: emp.storeName,
+        salesAmount: emp.salesAmount,
+        invoices: emp.invoices,
+        kpis: {
+          atv: emp.invoices > 0 ? emp.salesAmount / emp.invoices : 0,
+          customerValue: emp.invoices > 0 ? emp.salesAmount / emp.invoices : 0,
+        },
+      })),
       totals,
       debug: {
         source: 'postgresql',
         notes: [
           `PostgreSQL: ${salesRows.length} sales records`,
           `Stores: ${byStore.length}`,
+          `Employees: ${employeeMap.size}`,
           `Daily breakdown: ${byDay.length} days`,
         ],
       },
