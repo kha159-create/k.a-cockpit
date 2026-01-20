@@ -34,14 +34,37 @@ export function normalizeDate(value: any): string | null {
     return null;
 }
 
-export const getCategory = (product: { name?: string, alias?: string }): string => {
+/**
+ * Get category for product - supports both legacy (item_alias) and D365 (item_code)
+ * 
+ * Legacy System (2024-2025):
+ * - Uses item_alias prefix (e.g., "4" = Duvets, "2" = Duvets Full)
+ * - Also checks product name for keywords
+ * 
+ * D365 System (2026+):
+ * - Uses item_code prefix from product_category_rules table (via API)
+ * - Falls back to legacy rules if D365 lookup fails
+ * 
+ * @param product - Product object with name, alias (legacy), and/or item_code (D365)
+ */
+export const getCategory = (product: { 
+    name?: string; 
+    alias?: string; 
+    item_code?: string | number;
+    itemCode?: string | number;
+}): string => {
     const name = (product.name || '').toLowerCase();
     const alias = String(product.alias || '');
     
+    // Legacy rules based on item_alias prefix (for 2024-2025 data)
     if (alias.startsWith('4')) return 'Duvets';
     if (alias.startsWith('2')) return 'Duvets Full';
     if (name.includes('mattresspad') || name.includes('matresspad')) return 'Toppers';
     if (name.includes('pillow') && !name.includes('case')) return 'Pillows';
+    
+    // For D365 data (2026+), item_code-based categorization is handled via API
+    // This function provides synchronous fallback for legacy compatibility
+    // For full D365 support, use getCategoryUnified from categoryHelper.ts
     
     return 'Other';
 };

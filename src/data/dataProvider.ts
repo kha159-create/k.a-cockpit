@@ -203,55 +203,77 @@ export async function getSalesData(params: SalesParams): Promise<NormalizedSales
   const { year, month, day, storeId, employeeId } = params;
 
   if (year <= 2025) {
-    // Use legacy provider
-    const legacyResult = await getLegacyMetrics({ year, month, day, storeId });
-    
-    // Convert legacy response to normalized format
-    return {
-      success: legacyResult.success,
-      range: legacyResult.debug.range,
-      byStore: legacyResult.byStore.map(store => ({
-        storeId: store.storeId,
-        storeName: store.storeName,
-        salesAmount: store.salesAmount,
-        invoices: store.invoices,
-        visitors: store.visitors,
-        kpis: {
-          atv: store.atv,
-          conversion: store.conversion,
-          customerValue: store.atv,
-        },
-      })),
-      byDay: legacyResult.byDay?.map(day => ({
-        date: day.date,
-        byStore: day.byStore.map(store => ({
+    // Use PostgreSQL API for 2024-2025 data (replaces legacy file-based system)
+    try {
+      const monthParam = month !== undefined ? `&month=${month + 1}` : ''; // API expects 1-12
+      const dayParam = day !== undefined ? `&day=${day}` : '';
+      const storeParam = storeId ? `&storeId=${encodeURIComponent(storeId)}` : '';
+      
+      const url = apiUrl(`/api/sales-pg?year=${year}${monthParam}${dayParam}${storeParam}`);
+      console.log(`🔗 Fetching PostgreSQL data from: ${url}`);
+      
+      const response: Response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`PostgreSQL API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const result: NormalizedSalesResponse = await response.json();
+      
+      // Add visitors from orange-dashboard (frontend-side merge, like before)
+      // Visitors will be merged in DataProvider during initialization
+      return result;
+    } catch (error: any) {
+      console.error('❌ Error fetching PostgreSQL sales:', error);
+      // Fallback to legacy provider if PostgreSQL fails
+      console.warn('⚠️ Falling back to legacy provider...');
+      const legacyResult = await getLegacyMetrics({ year, month, day, storeId });
+      
+      return {
+        success: legacyResult.success,
+        range: legacyResult.debug.range,
+        byStore: legacyResult.byStore.map(store => ({
           storeId: store.storeId,
           storeName: store.storeName,
           salesAmount: store.salesAmount,
           invoices: store.invoices,
+          visitors: store.visitors,
           kpis: {
             atv: store.atv,
             conversion: store.conversion,
             customerValue: store.atv,
           },
         })),
-      })),
-      byEmployee: [], // ALWAYS EMPTY for legacy
-      totals: {
-        salesAmount: legacyResult.totals.salesAmount,
-        invoices: legacyResult.totals.invoices,
-        visitors: legacyResult.totals.visitors,
-        kpis: {
-          atv: legacyResult.totals.atv,
-          conversion: legacyResult.totals.conversion,
-          customerValue: legacyResult.totals.atv,
+        byDay: legacyResult.byDay?.map(day => ({
+          date: day.date,
+          byStore: day.byStore.map(store => ({
+            storeId: store.storeId,
+            storeName: store.storeName,
+            salesAmount: store.salesAmount,
+            invoices: store.invoices,
+            kpis: {
+              atv: store.atv,
+              conversion: store.conversion,
+              customerValue: store.atv,
+            },
+          })),
+        })),
+        byEmployee: [],
+        totals: {
+          salesAmount: legacyResult.totals.salesAmount,
+          invoices: legacyResult.totals.invoices,
+          visitors: legacyResult.totals.visitors,
+          kpis: {
+            atv: legacyResult.totals.atv,
+            conversion: legacyResult.totals.conversion,
+            customerValue: legacyResult.totals.atv,
+          },
         },
-      },
-      debug: {
-        source: 'legacy',
-        notes: [`Legacy data from management_data.json`, `Stores: ${legacyResult.debug.counts.stores}`, `Daily breakdown: ${legacyResult.byDay?.length || 0} days`],
-      },
-    };
+        debug: {
+          source: 'legacy-fallback',
+          notes: [`PostgreSQL failed, using legacy fallback`, `Error: ${error.message}`],
+        },
+      };
+    }
   } else {
     // Use D365 API (2026+)
     try {
