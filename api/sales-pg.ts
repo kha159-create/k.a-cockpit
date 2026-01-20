@@ -109,28 +109,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let paramIndex = 3;
 
     if (storeId) {
-      salesQuery += ` AND outlet_name = $${paramIndex}`;
-      queryParams.push(storeId);
+      // If storeId is provided, it might be dynamic_number (Store Number) or outlet_name
+      // Try to match both
+      const storeMappingCheck = await pool.query(`
+        SELECT outlet_name FROM gofrugal_outlets_mapping 
+        WHERE dynamic_number = $1 OR outlet_name = $1
+        LIMIT 1
+      `, [storeId]);
+      
+      if (storeMappingCheck.rows.length > 0) {
+        // Found by dynamic_number or outlet_name, use outlet_name for query
+        salesQuery += ` AND outlet_name = $${paramIndex}`;
+        queryParams.push(storeMappingCheck.rows[0].outlet_name);
+      } else {
+        // Direct match on outlet_name
+        salesQuery += ` AND outlet_name = $${paramIndex}`;
+        queryParams.push(storeId);
+      }
+      paramIndex++;
+    }
+
+    // Load store mapping FIRST (needed for storeId filtering)
+    const storeMappingResult = await pool.query(`
+      SELECT outlet_name, dynamic_number, area_manager, city
+      FROM gofrugal_outlets_mapping
+      WHERE dynamic_number IS NOT NULL
+    `);
+    const storeMapping = new Map<string, { name: string; number: string | null; areaManager: string | null; city: string | null }>();
+    const outletNameToStoreId = new Map<string, string>(); // outlet_name -> dynamic_number (storeId)
+    
+    storeMappingResult.rows.forEach(row => {
+      const outletName = row.outlet_name;
+      const storeId = row.dynamic_number; // dynamic_number is the Store Number (OperatingUnitNumber)
+      
+      storeMapping.set(outletName, {
+        name: outletName,
+        number: storeId,
+        areaManager: row.area_manager,
+        city: row.city,
+      });
+      
+      // Map outlet_name to storeId (dynamic_number) for matching
+      outletNameToStoreId.set(outletName, storeId);
+    });
+    console.log(`✅ Loaded ${storeMapping.size} store mappings (using dynamic_number as storeId)`);
+
+    // Build SQL query for gofrugal_sales
+    let salesQuery = `
+      SELECT 
+        outlet_name,
+        bill_no,
+        bill_date,
+        net_amount,
+        transaction_type,
+        salesman
+      FROM gofrugal_sales
+      WHERE bill_date >= $1 AND bill_date <= $2
+    `;
+    const queryParams: any[] = [startDate, endDate];
+    let paramIndex = 3;
+
+    // Handle storeId filter - convert dynamic_number to outlet_name if needed
+    if (storeId) {
+      const storeMappingCheck = await pool.query(`
+        SELECT outlet_name FROM gofrugal_outlets_mapping 
+        WHERE dynamic_number = $1 OR outlet_name = $1
+        LIMIT 1
+      `, [storeId]);
+      
+      if (storeMappingCheck.rows.length > 0) {
+        // Found by dynamic_number or outlet_name, use outlet_name for query
+        salesQuery += ` AND outlet_name = $${paramIndex}`;
+        queryParams.push(storeMappingCheck.rows[0].outlet_name);
+      } else {
+        // Direct match on outlet_name
+        salesQuery += ` AND outlet_name = $${paramIndex}`;
+        queryParams.push(storeId);
+      }
       paramIndex++;
     }
 
     salesQuery += ` ORDER BY bill_date, outlet_name, bill_no`;
-
-    // Load store mapping for better store names
-    const storeMappingResult = await pool.query(`
-      SELECT outlet_name, dynamic_number, area_manager, city
-      FROM gofrugal_outlets_mapping
-    `);
-    const storeMapping = new Map<string, { name: string; number: string | null; areaManager: string | null; city: string | null }>();
-    storeMappingResult.rows.forEach(row => {
-      storeMapping.set(row.outlet_name, {
-        name: row.outlet_name,
-        number: row.dynamic_number,
-        areaManager: row.area_manager,
-        city: row.city,
-      });
-    });
-    console.log(`✅ Loaded ${storeMapping.size} store mappings`);
 
     console.log(`🔍 Executing sales query...`);
     const salesResult = await pool.query<SalesRow>(salesQuery, queryParams);
@@ -152,9 +211,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }>>();
 
     salesRows.forEach(row => {
-      const storeId = row.outlet_name;
-      const storeInfo = storeMapping.get(storeId);
-      const storeName = storeInfo?.name || storeId;
+      const outletName = row.outlet_name;
+      // Use dynamic_number as storeId (matches OperatingUnitNumber from D365)
+      const storeId = outletNameToStoreId.get(outletName) || outletName;
+      const storeInfo = storeMapping.get(outletName);
+      const storeName = storeInfo?.name || outletName;
       const dateStr = row.bill_date.toISOString().split('T')[0];
 
       // Store-level aggregation
