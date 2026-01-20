@@ -24,110 +24,14 @@ const PendingApprovalsPage: React.FC = () => {
   const [processing, setProcessing] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub1 = db
-      .collection('pendingEmployees')
-      .where('status', '==', 'pending')
-      .onSnapshot(
-        (snapshot) => {
-          try {
-            const list = snapshot.docs.map((doc) => {
-              const d = doc.data();
-              return {
-                id: doc.id,
-                employeeId: d.employeeId ?? '',
-                email: d.email ?? '',
-                name: d.name ?? '',
-                role: d.role ?? 'employee',
-                status: d.status ?? 'pending',
-                createdAt: d.createdAt,
-                userId: d.userId ?? '',
-                source: 'pendingEmployees' as const,
-                ...d,
-              } as PendingEmployee;
-            });
-
-            setPendingEmployees((prev) => {
-              // سنُدمج لاحقاً مع users في الاشتراك الآخر؛ هنا نُحدّث جزئية المصدر هذا فقط
-              const others = prev.filter((p) => p.source === 'users');
-              const combined = [...list, ...others];
-              combined.sort((a, b) => {
-                const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-                const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-                return bTime.getTime() - aTime.getTime();
-              });
-              return combined;
-            });
-            setLoading(false);
-          } catch (err: any) {
-            console.debug('Error processing pendingEmployees snapshot:', err?.message);
-            setLoading(false);
-          }
-        },
-        (err: any) => {
-          // Silently ignore network errors (QUIC, DNS, etc.)
-          const errorMessage = err?.message || String(err);
-          if (errorMessage.includes('QUIC') || errorMessage.includes('DNS') || errorMessage.includes('NETWORK')) {
-            console.debug('Firestore network error (ignored):', errorMessage);
-          } else {
-            console.warn('Firestore pendingEmployees error:', errorMessage);
-          }
-          setLoading(false);
-        }
-      );
-
-    const unsub2 = db
-      .collection('users')
-      .where('status', '==', 'pending')
-      .onSnapshot(
-        (snapshot) => {
-          try {
-            const list = snapshot.docs.map((doc) => {
-              const d = doc.data() as any;
-              return {
-                id: doc.id,
-                employeeId: d.employeeId ?? '',
-                email: d.email ?? '',
-                name: d.name ?? '',
-                role: d.role ?? 'employee',
-                status: d.status ?? 'pending',
-                createdAt: d.createdAt || d.approvedAt || new Date(),
-                userId: doc.id,
-                source: 'users' as const,
-                ...d,
-              } as PendingEmployee;
-            });
-
-            setPendingEmployees((prev) => {
-              const others = prev.filter((p) => p.source === 'pendingEmployees');
-              const combined = [...others, ...list];
-              combined.sort((a, b) => {
-                const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-                const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-                return bTime.getTime() - aTime.getTime();
-              });
-              return combined;
-            });
-            setLoading(false);
-          } catch (err: any) {
-            console.debug('Error processing users snapshot:', err?.message);
-            setLoading(false);
-          }
-        },
-        (err: any) => {
-          // Silently ignore network errors (QUIC, DNS, etc.)
-          const errorMessage = err?.message || String(err);
-          if (errorMessage.includes('QUIC') || errorMessage.includes('DNS') || errorMessage.includes('NETWORK')) {
-            console.debug('Firestore network error (ignored):', errorMessage);
-          } else {
-            console.warn('Firestore users error:', errorMessage);
-          }
-          setLoading(false);
-        }
-      );
+    // NO Firestore - All data from PostgreSQL (SQL) and D365 API only
+    // Pending approvals will come from PostgreSQL in the future
+    console.log('📊 PendingApprovalsPage: No Firestore listeners - using SQL and D365 only');
+    setPendingEmployees([]);
+    setLoading(false);
 
     return () => {
-      unsub1();
-      unsub2();
+      // No Firestore unsubscribers needed
     };
   }, []);
 

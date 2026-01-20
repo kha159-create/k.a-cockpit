@@ -25,6 +25,11 @@ interface SalesRow {
   salesman: string | null;
 }
 
+interface EmployeeStoreMapping {
+  employee_name: string;
+  outlet_name: string;
+}
+
 interface ItemSalesRow {
   outlet_name: string;
   bill_no: string;
@@ -117,6 +122,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       outletNameToStoreId.set(outletName, storeId);
     });
     console.log(`✅ Loaded ${storeMapping.size} store mappings (using dynamic_number as storeId)`);
+
+    // Load employee-store mapping (for employee data)
+    const employeeStoreMappingResult = await pool.query(`
+      SELECT DISTINCT
+        COALESCE(item_sales.salesman_name, sales.salesman) as employee_name,
+        COALESCE(item_sales.outlet_name, sales.outlet_name) as outlet_name
+      FROM gofrugal_item_sales item_sales
+      FULL OUTER JOIN gofrugal_sales sales 
+        ON item_sales.outlet_name = sales.outlet_name
+      WHERE (
+        (item_sales.salesman_name IS NOT NULL AND item_sales.salesman_name != '')
+        OR (sales.salesman IS NOT NULL AND sales.salesman != '')
+      )
+      AND (
+        (item_sales.outlet_name IS NOT NULL AND item_sales.outlet_name != '')
+        OR (sales.outlet_name IS NOT NULL AND sales.outlet_name != '')
+      )
+    `);
+    const employeeStoreMapping = new Map<string, Set<string>>(); // employee_name -> Set<outlet_name>
+    employeeStoreMappingResult.rows.forEach(row => {
+      const empName = row.employee_name;
+      const outletName = row.outlet_name;
+      if (empName && outletName) {
+        if (!employeeStoreMapping.has(empName)) {
+          employeeStoreMapping.set(empName, new Set());
+        }
+        employeeStoreMapping.get(empName)!.add(outletName);
+      }
+    });
+    console.log(`✅ Loaded ${employeeStoreMapping.size} employee-store mappings`);
 
     // Build SQL query for gofrugal_sales
     let salesQuery = `

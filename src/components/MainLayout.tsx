@@ -372,50 +372,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     
     loadEmployeesFromAPI();
     
-    // NO Firestore listeners for sales data - ALL data from API/local JSON (2024+)
-    // Removed: kingDuvetSales, salesTransactions, businessRules, tasks
-    // These collections are no longer used - all data comes from API (D365) or local JSON (legacy)
-    console.log('📊 Firestore listeners removed for sales data - using API/local JSON only (NO Firestore)');
+    // NO Firestore listeners - ALL data from PostgreSQL (SQL) and D365 API only
+    // Removed: all Firestore connections - using SQL and D365 only
+    console.log('📊 All Firestore listeners removed - using PostgreSQL (SQL) and D365 API only');
     
-    // Only keep users collection for authentication (if admin/general_manager)
-    // All other data (stores, employees, metrics) comes from API/local JSON
-    let usersUnsubscriber: () => void = () => {};
-    if (profile?.role === 'admin' || profile?.role === 'general_manager') {
-        const usersRef = db.collection('users');
-        usersUnsubscriber = usersRef.onSnapshot(
-            (snapshot) => {
-                try {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (UserProfile & { id: string })[];
-                    setAllUsers(data);
-                } catch (err: any) {
-                    // Silently ignore errors (network issues)
-                    console.debug('Error processing users snapshot:', err?.message);
-                }
-            },
-            (err: any) => {
-                // Silently ignore network errors (QUIC, DNS, etc.)
-                // These are common and don't affect functionality
-                const errorMessage = err?.message || String(err);
-                if (errorMessage.includes('QUIC') || errorMessage.includes('DNS') || errorMessage.includes('NETWORK')) {
-                    console.debug('Firestore network error (ignored):', errorMessage);
-                } else {
-                    console.warn('Firestore users error:', errorMessage);
-                }
-            }
-        );
-    }
-
     // Set empty arrays for removed Firestore collections (no longer used)
     setKingDuvetSales([]);
     setSalesTransactions([]);
     setBusinessRules([]);
     setTasks([]);
+    setAllUsers([]); // Users will come from PostgreSQL in the future
     
     // Mark data as loaded (no Firestore data to wait for)
-                        setDataLoading(false);
+    setDataLoading(false);
 
     return () => {
-        usersUnsubscriber();
+        // No Firestore unsubscribers needed
     };
 }, [profile, activeYear]); // Reload stores/employees when active year changes
 
