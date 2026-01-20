@@ -22,37 +22,17 @@ interface OrangeDashboardManagementData {
 let cachedTargetsAndVisitors: OrangeDashboardManagementData | null = null;
 
 export async function loadTargetsAndVisitors(): Promise<{ targets: OrangeDashboardManagementData['targets']; visitors: OrangeDashboardManagementData['visitors'] }> {
-  if (cachedTargetsAndVisitors) {
-    return {
-      targets: cachedTargetsAndVisitors.targets || {},
-      visitors: cachedTargetsAndVisitors.visitors || [],
-    };
-  }
-
-  try {
-    console.log('📥 Loading targets and visitors from orange-dashboard (frontend)...');
-    const response: Response = await fetch('https://raw.githubusercontent.com/ALAAWF2/orange-dashboard/main/management_data.json');
-    
-    if (!response.ok) {
-      console.warn('⚠️ Could not fetch targets/visitors from orange-dashboard');
-      return { targets: {}, visitors: [] };
-    }
-    
-    const data: OrangeDashboardManagementData = await response.json();
-    cachedTargetsAndVisitors = data;
-    console.log(`✅ Loaded targets for ${Object.keys(data.targets || {}).length} years, ${(data.visitors || []).length} visitor entries (frontend)`);
-    return {
-      targets: data.targets || {},
-      visitors: data.visitors || [],
-    };
-  } catch (error: any) {
-    console.error('❌ Error loading targets/visitors from orange-dashboard:', error.message);
-    return { targets: {}, visitors: [] };
-  }
+  // NOTE: Targets and visitors are now loaded directly from PostgreSQL in api/sales-pg.ts
+  // This function is kept for backwards compatibility but returns empty data
+  // The API now includes targets and visitors in the response
+  console.log('📥 Targets and visitors are now loaded from PostgreSQL (included in API response)');
+  return { targets: {}, visitors: [] };
 }
 
 /**
- * Merge Targets & Visitors into D365 response (frontend-side, reduces API load)
+ * Merge Targets & Visitors into D365 response (frontend-side)
+ * NOTE: For PostgreSQL (2024-2025), targets and visitors are already included in the API response
+ * This function is kept for D365 (2026+) compatibility
  * IMPORTANT: This function should be called ONCE during initialization, NOT in render loop
  */
 export function mergeTargetsAndVisitors(
@@ -62,6 +42,14 @@ export function mergeTargetsAndVisitors(
   year: number,
   month?: number
 ): NormalizedSalesResponse {
+  // If response already has visitors/targets (from PostgreSQL), return as-is
+  if (response.byStore.length > 0 && 
+      (response.byStore[0].visitors !== undefined || response.byStore[0].target !== undefined)) {
+    console.log('📊 Response already includes targets/visitors from PostgreSQL, skipping merge');
+    return response;
+  }
+  
+  // For D365 (2026+), merge targets/visitors from orange-dashboard
   const yearKey = String(year);
   const monthKey = month !== undefined ? String(month + 1) : 'all'; // month is 0-11, target uses 1-12
   

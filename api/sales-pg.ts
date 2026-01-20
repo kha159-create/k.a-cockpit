@@ -70,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         range: { from: '', to: '', year },
         byStore: [],
         byEmployee: [],
-        totals: { salesAmount: 0, invoices: 0, kpis: { atv: 0, customerValue: 0 } },
+        totals: { salesAmount: 0, invoices: 0, visitors: 0, target: 0, kpis: { atv: 0, customerValue: 0, conversion: 0 } },
         debug: { source: 'postgresql', notes: ['Invalid year'] },
       });
     }
@@ -271,17 +271,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     });
 
-    // Convert to response format
-    const byStore = Array.from(storeMap.values()).map(store => ({
-      storeId: store.storeId,
-      storeName: store.storeName,
-      salesAmount: store.salesAmount,
-      invoices: store.invoices,
-      kpis: {
-        atv: store.invoices > 0 ? store.salesAmount / store.invoices : 0,
-        customerValue: store.invoices > 0 ? store.salesAmount / store.invoices : 0,
-      },
-    }));
+    // Convert to response format with targets and visitors
+    const byStore = Array.from(storeMap.values()).map(store => {
+      // Find outlet_name by storeId (dynamic_number)
+      let outletName = '';
+      for (const [outlet, dynamicNum] of outletNameToStoreId.entries()) {
+        if (dynamicNum === store.storeId) {
+          outletName = outlet;
+          break;
+        }
+      }
+      if (!outletName) {
+        outletName = store.storeName;
+      }
+      
+      // Get target for this outlet
+      const outletTargets = targetsMap.get(outletName);
+      const targetMonth = month !== undefined ? month + 1 : null;
+      const target = outletTargets?.get(targetMonth || 0) || outletTargets?.get(0) || 0;
+      
+      // Get visitors for this outlet
+      const visitors = monthlyVisitorsMap.get(outletName) || 0;
+      const conversion = visitors > 0 ? (store.invoices / visitors) * 100 : 0;
+      
+      return {
+        storeId: store.storeId,
+        storeName: store.storeName,
+        salesAmount: store.salesAmount,
+        invoices: store.invoices,
+        visitors,
+        target: Number(target) || 0,
+        kpis: {
+          atv: store.invoices > 0 ? store.salesAmount / store.invoices : 0,
+          customerValue: store.invoices > 0 ? store.salesAmount / store.invoices : 0,
+          conversion,
+        },
+      };
+    });
 
     const byDay = Array.from(dayStoreMap.entries())
       .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
@@ -296,31 +322,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               break;
             }
           }
-          const storeInfo = storeMapping.get(outletName || storeId);
+          if (!outletName) {
+            outletName = storeId;
+          }
+          const storeInfo = storeMapping.get(outletName);
+          
+          // Get visitors for this outlet on this day
+          const dateKey = `${date}_${outletName}`;
+          const visitors = dailyVisitorsMap.get(dateKey) || 0;
+          const conversion = visitors > 0 ? (data.invoices / visitors) * 100 : 0;
+          
           return {
             storeId,
             storeName: storeInfo?.name || outletName || storeId,
             salesAmount: data.salesAmount,
             invoices: data.invoices,
+            visitors,
             kpis: {
               atv: data.invoices > 0 ? data.salesAmount / data.invoices : 0,
               customerValue: data.invoices > 0 ? data.salesAmount / data.invoices : 0,
+              conversion,
             },
           };
         }),
       }));
 
     // Calculate totals
+    const totalSales = byStore.reduce((sum, s) => sum + s.salesAmount, 0);
+    const totalInvoices = byStore.reduce((sum, s) => sum + s.invoices, 0);
+    const totalVisitors = byStore.reduce((sum, s) => sum + (s.visitors || 0), 0);
+    const totalTarget = byStore.reduce((sum, s) => sum + (s.target || 0), 0);
+    
     const totals = {
-      salesAmount: byStore.reduce((sum, s) => sum + s.salesAmount, 0),
-      invoices: byStore.reduce((sum, s) => sum + s.invoices, 0),
+      salesAmount: totalSales,
+      invoices: totalInvoices,
+      visitors: totalVisitors,
+      target: totalTarget,
       kpis: {
-        atv: byStore.reduce((sum, s) => sum + s.invoices, 0) > 0
-          ? byStore.reduce((sum, s) => sum + s.salesAmount, 0) / byStore.reduce((sum, s) => sum + s.invoices, 0)
-          : 0,
-        customerValue: byStore.reduce((sum, s) => sum + s.invoices, 0) > 0
-          ? byStore.reduce((sum, s) => sum + s.salesAmount, 0) / byStore.reduce((sum, s) => sum + s.invoices, 0)
-          : 0,
+        atv: totalInvoices > 0 ? totalSales / totalInvoices : 0,
+        customerValue: totalInvoices > 0 ? totalSales / totalInvoices : 0,
+        conversion: totalVisitors > 0 ? (totalInvoices / totalVisitors) * 100 : 0,
       },
     };
 
@@ -356,6 +397,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           `PostgreSQL: ${salesRows.length} sales records`,
           `Stores: ${byStore.length}`,
           `Employees: ${employeeMap.size}`,
+          `Targets: ${targetsResult.rows.length} records`,
+          `Visitors: ${visitorsResult.rows.length} records`,
           `Daily breakdown: ${byDay.length} days`,
         ],
       },
