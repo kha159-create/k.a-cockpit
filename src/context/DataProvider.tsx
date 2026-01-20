@@ -69,43 +69,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Process 2024 - Merge targets/visitors ONCE during initialization (NOT in render loop)
         if (year2024.status === 'fulfilled' && year2024.value.success) {
-          // Merge targets/visitors with legacy data ONCE here (like orange-dashboard init)
           const merged2024 = mergeTargetsAndVisitors(year2024.value, targets, visitors, 2024);
           newData[2024] = merged2024;
           newLoadedYears.add(2024);
-          console.log(`✅ DataProvider: Loaded 2024 (legacy) - ${merged2024.byStore.length} stores, ${merged2024.byDay?.length || 0} days (merged with targets/visitors)`);
         } else {
-          console.warn('⚠️ DataProvider: Failed to load 2024:', year2024.status === 'rejected' ? year2024.reason : 'unknown error');
           newData[2024] = null;
         }
         
         // Process 2025 - Merge targets/visitors ONCE during initialization (NOT in render loop)
         if (year2025.status === 'fulfilled' && year2025.value.success) {
-          // Merge targets/visitors with legacy data ONCE here (like orange-dashboard init)
           const merged2025 = mergeTargetsAndVisitors(year2025.value, targets, visitors, 2025);
           newData[2025] = merged2025;
           newLoadedYears.add(2025);
-          console.log(`✅ DataProvider: Loaded 2025 (legacy) - ${merged2025.byStore.length} stores, ${merged2025.byDay?.length || 0} days (merged with targets/visitors)`);
         } else {
-          console.warn('⚠️ DataProvider: Failed to load 2025:', year2025.status === 'rejected' ? year2025.reason : 'unknown error');
           newData[2025] = null;
         }
         
         // Process 2026 - Merge targets/visitors ONCE during initialization (NOT in render loop)
         if (year2026.status === 'fulfilled' && year2026.value.success) {
-          // Merge targets/visitors with D365 data ONCE here (like orange-dashboard init)
           const merged2026 = mergeTargetsAndVisitors(year2026.value, targets, visitors, 2026);
           newData[2026] = merged2026;
           newLoadedYears.add(2026);
-          console.log(`✅ DataProvider: Loaded 2026 (D365) - ${merged2026.byStore.length} stores, ${merged2026.byDay?.length || 0} days, ${merged2026.byEmployee.length} employees (merged with targets/visitors)`);
         } else {
-          console.warn('⚠️ DataProvider: Failed to load 2026:', year2026.status === 'rejected' ? year2026.reason : 'unknown error');
           newData[2026] = null;
         }
 
+        if (cancelled) return;
+        
         setAllSalesData(newData);
         setLoadedYears(newLoadedYears);
-        console.log(`🎉 DataProvider: Completed loading - Loaded years: ${Array.from(newLoadedYears).join(', ')}`);
 
       } catch (err: any) {
         console.error('❌ DataProvider: Error loading all years:', err);

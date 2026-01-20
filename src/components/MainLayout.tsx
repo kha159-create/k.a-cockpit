@@ -436,17 +436,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
       return [];
     }
     
-    // Debug: Log data structure
-    console.log(`📊 Processing data for year ${year}:`, {
-      hasByDay: !!result.byDay,
-      byDayLength: result.byDay?.length || 0,
-      hasByStore: !!result.byStore,
-      byStoreLength: result.byStore?.length || 0,
-      hasByEmployee: !!result.byEmployee,
-      byEmployeeLength: result.byEmployee?.length || 0,
-      storesCount: stores.length,
-    });
-    
     // Build mapping: storeId -> storeName from current stores list (for proper matching)
     const storeNameMap = new Map<string, string>();
     stores.forEach(s => {
@@ -455,6 +444,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     });
     
     const apiMetrics: DailyMetric[] = [];
+    
+    // Use Set for O(1) lookup instead of O(n) array.some() (performance optimization)
+    const employeeMetricsSet = new Set<string>(); // Key: "date_storeName"
     
     // Filter byDay by month (client-side filtering - no API call)
     if (Array.isArray(result.byDay) && result.byDay.length > 0) {
@@ -473,13 +465,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             const storeId = store.storeId || store.storeName;
             const storeName = storeNameMap.get(storeId) || store.storeName || storeId;
             
-            // Check if this store has employee metrics for this day
-            const hasEmployees = apiMetrics.some(m => 
-              m.store === storeName && 
-              m.date && 
-              (typeof m.date === 'string' ? m.date === dateStr : new Date(m.date).toISOString().split('T')[0] === dateStr) &&
-              m.employee
-            );
+            // Check if this store has employee metrics for this day (O(1) lookup)
+            const key = `${dateStr}_${storeName}`;
+            const hasEmployees = employeeMetricsSet.has(key);
             
             // Only add store-level if no employee-level exists for this day+store
             if (!hasEmployees || year <= 2025) {
@@ -509,6 +497,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             const storeId = emp.storeId || emp.storeName;
             const storeName = storeNameMap.get(storeId) || emp.storeName || storeId;
             const id = `${firstDayStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
+            const key = `${firstDayStr}_${storeName}`;
+            employeeMetricsSet.add(key); // Track employee metrics for this day+store
             apiMetrics.push({
               id,
               date: firstDayStr, // ✅ STRING (not Timestamp)
@@ -552,7 +542,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             const storeId = store.storeId || store.storeName;
             const storeName = storeNameMap.get(storeId) || store.storeName || storeId;
             
-            const hasEmployees = apiMetrics.some(m => m.store === storeName);
+            // Check if this store has employee metrics (O(1) lookup)
+            const key = `${dateStr}_${storeName}`;
+            const hasEmployees = employeeMetricsSet.has(key);
             if (!hasEmployees || year <= 2025) {
               const id = `${dateStr}_${storeName}`;
               apiMetrics.push({
@@ -569,7 +561,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
       }
     }
     
-    console.log(`📊 Converted ${apiMetrics.length} metrics from preloaded data for year ${year} (${month !== undefined ? `month ${month + 1}` : 'all months'})`);
+    // Reduced console.log frequency (performance optimization)
+    // console.log(`📊 Converted ${apiMetrics.length} metrics from preloaded data for year ${year} (${month !== undefined ? `month ${month + 1}` : 'all months'})`);
     return apiMetrics;
   }, [profile, allSalesData, dataPreloading, stores]);
 
@@ -1288,13 +1281,13 @@ const handleNotificationClick = (notificationId: string) => {
   }
   
   const pageProps = {
-    areaStoreFilter,
-    setAreaStoreFilter: (value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value),
-    allStores: stores,
-    allDateData: allDateData,
-    setModalState,
-    isRecalculating,
-    profile,
+      areaStoreFilter,
+      setAreaStoreFilter: (value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value),
+      allStores: stores,
+      allDateData: allDateData,
+      setModalState,
+      isRecalculating,
+      profile,
   };
 
   switch (activeTab) {
@@ -1336,7 +1329,7 @@ const handleNotificationClick = (notificationId: string) => {
       );
      case 'employees':
       // Use independent dateFilter and processedData for Employees page
-      return <EmployeesPage
+      return <EmployeesPage 
           {...employeesProcessedData}
           dateFilter={employeesDateFilter}
           setDateFilter={(value: DateFilter) => runWithRecalculation(setEmployeesDateFilter, value)}
