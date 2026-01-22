@@ -922,49 +922,26 @@ const handleNotificationClick = (notificationId: string) => {
         }
 
         setIsProcessing(true);
-        try {
-            const docId = data.id || data.name.replace(/\s+/g, '_');
-            const docRef = db.collection(collectionName).doc(docId);
-            
-            const dataToSave: Partial<Store | Employee> = { name: data.name };
-            if ('store' in data) (dataToSave as Employee).currentStore = data.store;
-            if ('areaManager' in data) (dataToSave as Store).areaManager = data.areaManager;
-
-            await docRef.set(dataToSave, { merge: true });
-
-            if (data.targetUpdate) {
-                const { year, month, salesTarget, duvetTarget } = data.targetUpdate;
-                const updatePayload: any = {};
-                if (salesTarget !== undefined) updatePayload[`targets.${year}.${month}`] = salesTarget;
-                if (duvetTarget !== undefined) updatePayload[`duvetTargets.${year}.${month}`] = duvetTarget;
-                
-                if (Object.keys(updatePayload).length > 0) {
-                    await docRef.update(updatePayload);
-                }
-            }
-            setAppMessage({ isOpen: true, text: t('save_success', { item: t(collectionName.slice(0, -1)) }), type: 'alert' });
-        } catch (error: any) { 
-            setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' }); 
-        } finally { 
-            setIsProcessing(false); 
-            setModalState({ type: null }); 
-        }
+        setAppMessage({ 
+            isOpen: true, 
+            text: `Store/Employee management is not available via UI. Data now comes from PostgreSQL (SQL) and D365 API. Please update data directly in PostgreSQL or D365.`, 
+            type: 'alert' 
+        });
+        setIsProcessing(false);
+        setModalState({ type: null });
     };
 
+    // NO Firestore operations for stores/employees/businessRules - data now comes from PostgreSQL and D365
+    // Only users deletion is kept for authentication management
     const handleDelete = (collectionName: 'stores' | 'employees' | 'businessRules', id: string, name: string) => {
         if (profile?.role !== 'admin') {
             setAppMessage({ isOpen: true, text: 'You do not have permission to delete items.', type: 'alert' });
             return;
         }
         setAppMessage({
-            isOpen: true, text: t('confirm_delete', { name }), type: 'confirm', onConfirm: async () => {
-                setIsProcessing(true);
-                try {
-                    await db.collection(collectionName).doc(id).delete();
-                    setAppMessage({ isOpen: true, text: t('delete_success', { name }), type: 'alert' });
-                } catch (error: any) { setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' }); }
-                finally { setIsProcessing(false); }
-            }
+            isOpen: true, 
+            text: `Deletion is not available via UI. ${collectionName} data now comes from PostgreSQL (SQL) and D365 API. Please delete data directly in PostgreSQL or D365.`, 
+            type: 'alert'
         });
     };
     
@@ -996,113 +973,23 @@ const handleNotificationClick = (notificationId: string) => {
     };
     
     const handleDeleteAllData = () => {
+        // NO Firestore operations - data now comes from PostgreSQL and D365
+        // This function is disabled - data management should be done via PostgreSQL or D365
         setAppMessage({
             isOpen: true,
-            text: t('confirm_delete_all'),
-            type: 'confirm',
-            onConfirm: async () => {
-                setIsProcessing(true);
-                const collectionsToDelete = ['dailyMetrics', 'kingDuvetSales', 'salesTransactions', 'employees', 'stores', 'businessRules'];
-                try {
-                    for (const name of collectionsToDelete) {
-                        const querySnapshot = await db.collection(name).get();
-                        const batch = db.batch();
-                        querySnapshot.docs.forEach(d => batch.delete(d.ref));
-                        await batch.commit();
-                    }
-                    setAppMessage({ isOpen: true, text: t('delete_all_success'), type: 'alert' });
-                } catch (error: any) {
-                    setAppMessage({ isOpen: true, text: `${t('error_deleting_data')}: ${error.message}`, type: 'alert' });
-                } finally {
-                    setIsProcessing(false);
-                }
-            }
+            text: 'Data deletion is not available. Data now comes from PostgreSQL (SQL) and D365 API.',
+            type: 'alert'
         });
     };
 
-    // FIX: Added missing handleSelectiveDelete function for targeted data removal.
+    // NO Firestore operations - data now comes from PostgreSQL and D365
+    // This function is disabled - data deletion should be done via PostgreSQL or D365
     const handleSelectiveDelete = async (dataType: 'visitors' | 'sales' | 'products', year: number, month: number) => {
         const monthName = new Date(year, month).toLocaleString(locale, { month: 'long' });
-        const confirmationKey = dataType === 'visitors' ? 'confirm_delete_visitors_data' : (dataType === 'sales' ? 'confirm_delete_sales_data' : 'confirm_delete_products_data');
-        const confirmationText = t(confirmationKey, { month: monthName, year: year.toString() });
-    
         setAppMessage({
             isOpen: true,
-            text: confirmationText,
-            type: 'confirm',
-            onConfirm: async () => {
-                setIsProcessing(true);
-                try {
-                    const startDate = Timestamp.fromDate(new Date(year, month, 1));
-                    const endDate = Timestamp.fromDate(new Date(year, month + 1, 0, 23, 59, 59));
-                    const batch = db.batch();
-    
-                    if (dataType === 'visitors') {
-                        const metricsQuery = db.collection('dailyMetrics').where('date', '>=', startDate).where('date', '<=', endDate);
-                        const metricsSnapshot = await metricsQuery.get();
-                        metricsSnapshot.forEach(doc => {
-                            batch.update(doc.ref, { visitors: firebase.firestore.FieldValue.delete() });
-                        });
-                    } else if (dataType === 'sales') {
-                        // 1. Update dailyMetrics
-                        const metricsQuery = db.collection('dailyMetrics').where('date', '>=', startDate).where('date', '<=', endDate);
-                        const metricsSnapshot = await metricsQuery.get();
-                        metricsSnapshot.forEach(doc => {
-                            batch.update(doc.ref, { 
-                                totalSales: firebase.firestore.FieldValue.delete(), 
-                                transactionCount: firebase.firestore.FieldValue.delete(),
-                                employee: firebase.firestore.FieldValue.delete(),
-                                employeeId: firebase.firestore.FieldValue.delete()
-                            });
-                        });
-    
-                        // 2. Delete salesTransactions
-                        const salesQuery = db.collection('salesTransactions').where('Bill Dt.', '>=', startDate).where('Bill Dt.', '<=', endDate);
-                        const salesSnapshot = await salesQuery.get();
-                        salesSnapshot.forEach(doc => batch.delete(doc.ref));
-    
-                        // 3. Delete kingDuvetSales
-                        const duvetQuery = db.collection('kingDuvetSales').where('Bill Dt.', '>=', startDate).where('Bill Dt.', '<=', endDate);
-                        const duvetSnapshot = await duvetQuery.get();
-                        duvetSnapshot.forEach(doc => batch.delete(doc.ref));
-                    } else if (dataType === 'products') {
-                        const startDate = Timestamp.fromDate(new Date(year, month, 1));
-                        const endDate = Timestamp.fromDate(new Date(year, month + 1, 0, 23, 59, 59));
-
-                        const deleteInChunks = async (collectionName: string) => {
-                            const snap = await db.collection(collectionName)
-                                .where('Bill Dt.', '>=', startDate)
-                                .where('Bill Dt.', '<=', endDate)
-                                .get();
-                            console.log(`[SelectiveDelete] ${collectionName} matched:`, snap.size);
-                            let count = 0;
-                            let localBatch = db.batch();
-                            for (const d of snap.docs) {
-                                localBatch.delete(d.ref);
-                                count++;
-                                if (count % 400 === 0) {
-                                    await localBatch.commit();
-                                    console.log(`[SelectiveDelete] ${collectionName} committed 400 deletes`);
-                                    localBatch = db.batch();
-                                }
-                            }
-                            await localBatch.commit();
-                            console.log(`[SelectiveDelete] ${collectionName} final commit; total deleted: ${count}`);
-                        };
-
-                        await deleteInChunks('salesTransactions');
-                        await deleteInChunks('kingDuvetSales');
-                    }
-    
-                    await batch.commit();
-                    const successText = t('delete_success_for_period', { dataType: t(dataType), month: monthName, year: year.toString() });
-                    setAppMessage({ isOpen: true, text: successText, type: 'alert' });
-                } catch (error: any) {
-                    setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
-                } finally {
-                    setIsProcessing(false);
-                }
-            }
+            text: `Data deletion is not available. Data now comes from PostgreSQL (SQL) and D365 API. To delete ${dataType} for ${monthName} ${year}, use PostgreSQL directly.`,
+            type: 'alert'
         });
     };
 
