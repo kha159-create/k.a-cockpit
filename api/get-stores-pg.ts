@@ -1,3 +1,7 @@
+/**
+ * PostgreSQL Stores API - Returns stores from gofrugal_outlets_mapping for 2024-2025
+ */
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Pool } from 'pg';
 
@@ -10,11 +14,6 @@ const pool = new Pool({
   port: parseInt(process.env.PG_PORT || '5432'),
   ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
-
-interface CategoryRule {
-  prefix_pattern: string;
-  category_name: string;
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS
@@ -33,29 +32,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    console.log('📥 Fetching category rules from PostgreSQL...');
+    console.log('📥 Fetching stores from PostgreSQL...');
 
-    const result = await pool.query<CategoryRule>(
-      `SELECT prefix_pattern, category_name 
-       FROM product_category_rules 
-       ORDER BY LENGTH(prefix_pattern) DESC, prefix_pattern ASC`
-    );
+    const result = await pool.query(`
+      SELECT 
+        outlet_name as name,
+        dynamic_number as id,
+        area_manager as areaManager,
+        city
+      FROM gofrugal_outlets_mapping
+      WHERE dynamic_number IS NOT NULL
+      ORDER BY outlet_name
+    `);
 
-    const rules = result.rows;
+    const stores = result.rows.map(row => ({
+      id: row.id || row.name, // Use dynamic_number as id, fallback to outlet_name
+      store_id: row.id, // Also include as store_id for compatibility
+      name: row.name,
+      areaManager: row.areamanager || '',
+      ...(row.city && { city: row.city }),
+    })).filter(store => store.areaManager); // Only stores with area managers
 
-    console.log(`✅ Loaded ${rules.length} category rules from PostgreSQL`);
+    console.log(`✅ Loaded ${stores.length} stores from PostgreSQL`);
 
     return res.status(200).json({
       success: true,
-      rules,
-      count: rules.length,
+      stores,
+      count: stores.length,
     });
   } catch (error: any) {
-    console.error('❌ Error fetching category rules:', error.message);
+    console.error('❌ Error fetching stores from PostgreSQL:', error);
     return res.status(500).json({
       success: false,
       error: error.message,
-      rules: [],
+      stores: [],
       count: 0,
     });
   }

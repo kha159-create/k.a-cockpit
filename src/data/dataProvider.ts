@@ -236,26 +236,50 @@ export async function getSalesData(params: SalesParams): Promise<NormalizedSales
     // Visitors will be merged in DataProvider during initialization
     return result;
   } else {
-    // Use D365 API (2026+)
+    // Use D365 SQL API ONLY (2026+) - unified SQL source
+    // All data comes from PostgreSQL dynamic_sales_bills and dynamic_sales_items
+    const monthParam = month !== undefined ? `&month=${month}` : '';
+    const dayParam = day !== undefined ? `&day=${day}` : '';
+    const storeParam = storeId ? `&storeId=${encodeURIComponent(storeId)}` : '';
+    
+    const url = apiUrl(`/api/sales-d365-sql?year=${year}${monthParam}${dayParam}${storeParam}`);
+    console.log(`🔗 Fetching D365 SQL data from: ${url}`);
+    
     try {
-      const monthParam = month !== undefined ? `&month=${month}` : '';
-      const dayParam = day !== undefined ? `&day=${day}` : '';
-      const storeParam = storeId ? `&storeId=${encodeURIComponent(storeId)}` : '';
-      const empParam = employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : '';
-      
-      const url = apiUrl(`/api/sales?year=${year}${monthParam}${dayParam}${storeParam}${empParam}`);
-      console.log(`🔗 Fetching D365 data from: ${url}`);
-      
       const response: Response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
+        throw new Error(`D365 SQL API error: ${response.status} ${response.statusText}`);
       }
       
       const result: NormalizedSalesResponse = await response.json();
       
-      // IMPORTANT: DO NOT merge Targets & Visitors here (causes 20s freeze in render loop)
-      // Merging will be done ONCE in DataProvider during initialization (like orange-dashboard)
-      // Return raw D365 data without targets/visitors to avoid performance issues
+      if (!result.success) {
+        console.warn('⚠️ D365 SQL returned error:', result.debug?.notes);
+        // Return empty data instead of fallback (SQL is the only source)
+        const startDate = new Date(year, month || 0, day || 1);
+        const endDate = new Date(year, month !== undefined ? month + 1 : 12, day || 31);
+        
+        return {
+          success: false,
+          range: {
+            from: startDate.toISOString().split('T')[0],
+            to: endDate.toISOString().split('T')[0],
+            year,
+            ...(month !== undefined && { month: month + 1 }),
+            ...(day !== undefined && { day }),
+          },
+          byStore: [],
+          byDay: [],
+          byEmployee: [],
+          totals: { salesAmount: 0, invoices: 0, kpis: { atv: 0, customerValue: 0 } },
+          debug: {
+            source: 'sql-d365',
+            notes: result.debug?.notes || ['SQL connection failed - no data available'],
+          },
+        };
+      }
+      
+      // D365 SQL data already includes targets/visitors
       return result;
     } catch (error: any) {
       console.error('❌ Error fetching D365 sales:', error);
@@ -314,15 +338,30 @@ export async function getLiveSales(): Promise<any> {
 }
 
 /**
- * Get stores list (hybrid: legacy for 2024/2025, API for 2026+)
+ * Get stores list (hybrid: PostgreSQL for 2024/2025, D365 API for 2026+)
  */
 export async function getStores(year?: number): Promise<Array<{ id: string; name: string; areaManager: string; city?: string }>> {
-  // For 2024/2025, use legacy stores
+  // For 2024/2025, use PostgreSQL
   if (year && year <= 2025) {
-    return getLegacyStores();
+    try {
+      const url = apiUrl('/api/get-stores-pg');
+      const response: Response = await fetch(url);
+      
+      if (response.ok) {
+        const result: any = await response.json();
+        if (result.success && Array.isArray(result.stores)) {
+          console.log(`✅ Loaded ${result.stores.length} stores from PostgreSQL for year ${year}`);
+          return result.stores;
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Error fetching stores from PostgreSQL:', error);
+      // Fallback to legacy stores if PostgreSQL fails
+      return getLegacyStores();
+    }
   }
   
-  // For 2026+, try API (fallback to empty if fails)
+  // For 2026+, try D365 API (fallback to empty if fails)
   try {
     const url = apiUrl('/api/get-stores');
     const response: Response = await fetch(url);
@@ -330,11 +369,12 @@ export async function getStores(year?: number): Promise<Array<{ id: string; name
     if (response.ok) {
       const result: any = await response.json();
       if (result.success && Array.isArray(result.stores)) {
+        console.log(`✅ Loaded ${result.stores.length} stores from D365 API for year ${year}`);
         return result.stores;
       }
     }
   } catch (error: any) {
-    console.error('❌ Error fetching stores from API:', error);
+    console.error('❌ Error fetching stores from D365 API:', error);
   }
   
   // Fallback: empty array

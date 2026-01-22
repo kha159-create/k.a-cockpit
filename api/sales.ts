@@ -406,6 +406,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`📅 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
+    // Step 0: ALWAYS read from SQL first (unified source)
+    // If data doesn't exist, fetch from D365 and save to SQL, then read from SQL
+    try {
+      const { Pool } = await import('pg');
+      const sqlPool = new Pool({
+        host: process.env.PG_HOST || 'localhost',
+        database: process.env.PG_DATABASE || 'showroom_sales',
+        user: process.env.PG_USER || 'postgres',
+        password: process.env.PG_PASSWORD || '',
+        port: parseInt(process.env.PG_PORT || '5432'),
+        ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      });
+
+      // Check if data exists in SQL
+      let sqlQuery = `
+        SELECT COUNT(*) as count
+        FROM dynamic_sales_bills
+        WHERE bill_date >= $1 AND bill_date <= $2
+      `;
+      const sqlParams: any[] = [startDate, endDate];
+      if (storeId) {
+        sqlQuery += ` AND store_number = $3`;
+        sqlParams.push(storeId);
+      }
+
+      const sqlCheck = await sqlPool.query(sqlQuery, sqlParams);
+      const sqlCount = parseInt(sqlCheck.rows[0]?.count || '0');
+
+      if (sqlCount > 0) {
+        console.log(`✅ Found ${sqlCount} records in SQL, using SQL data`);
+        sqlPool.end();
+        
+        // Use sales-d365-sql endpoint to read from SQL
+        const sqlUrl = new URL(req.url || '', 'http://localhost');
+        sqlUrl.pathname = '/api/sales-d365-sql';
+        const sqlResponse = await fetch(sqlUrl.toString());
+        const sqlResult = await sqlResponse.json();
+        return res.status(200).json(sqlResult);
+      } else {
+        console.log(`⚠️ No data in SQL (${sqlCount} records), fetching from D365 and saving to SQL...`);
+        sqlPool.end();
+        
+        // Fetch raw data from D365 and save to SQL
+        // This will be done in the background, then we'll read from SQL
+        // For now, continue to D365 fetch and save at the end
+      }
+    } catch (sqlError: any) {
+      console.warn('⚠️ SQL check failed, will fetch from D365:', sqlError.message);
+      // Continue to D365 fetch
+    }
+
     // Step 1: Get access token (with error isolation)
     let token: string;
     try {
@@ -710,6 +761,82 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const totalTransactionsCount = aggregatedGroups.reduce((sum, g) => sum + g.InvoiceCount, 0);
     console.log(`📅 Built ${byDay.length} days of data from ${aggregatedGroups.length} aggregated groups (~${totalTransactionsCount} transactions)`);
+
+    // Save aggregated data to SQL in background (for quick access)
+    // Note: This saves aggregated data. For full raw data, use /api/fetch-d365-raw endpoint
+    try {
+      const { Pool } = await import('pg');
+      const sqlPool = new Pool({
+        host: process.env.PG_HOST || 'localhost',
+        database: process.env.PG_DATABASE || 'showroom_sales',
+        user: process.env.PG_USER || 'postgres',
+        password: process.env.PG_PASSWORD || '',
+        port: parseInt(process.env.PG_PORT || '5432'),
+        ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      });
+
+      // Convert aggregatedGroups to bills format for SQL
+      const bills = aggregatedGroups.map(group => ({
+        '@odata.etag': null,
+        OperatingUnitNumber: group.OperatingUnitNumber,
+        TransactionDate: group.TransactionDate,
+        PaymentAmount: group.TotalAmount,
+        TransactionId: `${group.OperatingUnitNumber}_${group.TransactionDate}_${Math.random().toString(36).substr(2, 9)}`,
+        ItemLinesCount: group.InvoiceCount,
+      }));
+
+      // Save in background (fire and forget)
+      (async () => {
+        try {
+          const client = await sqlPool.connect();
+          try {
+            await client.query('BEGIN');
+
+            // Delete existing data for this period
+            await client.query(
+              `DELETE FROM dynamic_sales_bills WHERE bill_date >= $1 AND bill_date <= $2`,
+              [startDate, endDate]
+            );
+
+            // Insert bills in batches
+            const batchSize = 1000;
+            for (let i = 0; i < bills.length; i += batchSize) {
+              const batch = bills.slice(i, i + batchSize);
+              const values = batch.map((bill, idx) => 
+                `($${idx * 6 + 1}, $${idx * 6 + 2}, $${idx * 6 + 3}, $${idx * 6 + 4}, $${idx * 6 + 5}, $${idx * 6 + 6})`
+              ).join(', ');
+              const params = batch.flatMap(bill => [
+                bill['@odata.etag'],
+                bill.OperatingUnitNumber,
+                bill.TransactionDate ? new Date(bill.TransactionDate) : null,
+                bill.PaymentAmount || 0,
+                bill.TransactionId,
+                bill.ItemLinesCount || 0,
+              ]);
+
+              await client.query(
+                `INSERT INTO dynamic_sales_bills ("@odata.etag", store_number, bill_date, payment_amount, transaction_id, item_lines_count) VALUES ${values} ON CONFLICT DO NOTHING`,
+                params
+              );
+            }
+
+            await client.query('COMMIT');
+            console.log(`✅ Saved ${bills.length} aggregated bills to SQL (background)`);
+          } catch (err: any) {
+            await client.query('ROLLBACK');
+            throw err;
+          } finally {
+            client.release();
+          }
+        } catch (err: any) {
+          console.warn('⚠️ Failed to save to SQL (non-critical):', err.message);
+        } finally {
+          sqlPool.end();
+        }
+      })();
+    } catch (saveError: any) {
+      console.warn('⚠️ Error preparing SQL save (non-critical):', saveError.message);
+    }
 
     return res.status(200).json({
       success: true,

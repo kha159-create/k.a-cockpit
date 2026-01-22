@@ -11,7 +11,7 @@ const pool = new Pool({
   host: process.env.PG_HOST || 'localhost',
   database: process.env.PG_DATABASE || 'showroom_sales',
   user: process.env.PG_USER || 'postgres',
-  password: process.env.PG_PASSWORD || 'KhaKha11@',
+  password: process.env.PG_PASSWORD || '',
   port: parseInt(process.env.PG_PORT || '5432'),
   ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
@@ -106,71 +106,86 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `);
     const storeMapping = new Map<string, { name: string; number: string | null; areaManager: string | null; city: string | null }>();
     const outletNameToStoreId = new Map<string, string>(); // outlet_name -> dynamic_number (storeId)
-    
+
     storeMappingResult.rows.forEach(row => {
       const outletName = row.outlet_name;
       const storeId = row.dynamic_number; // dynamic_number is the Store Number (OperatingUnitNumber)
-      
+
       storeMapping.set(outletName, {
         name: outletName,
         number: storeId,
         areaManager: row.area_manager,
         city: row.city,
       });
-      
+
       // Map outlet_name to storeId (dynamic_number) for matching
       outletNameToStoreId.set(outletName, storeId);
     });
     console.log(`✅ Loaded ${storeMapping.size} store mappings (using dynamic_number as storeId)`);
 
-    // Load employee-store mapping (for employee data)
-    const employeeStoreMappingResult = await pool.query(`
-      SELECT DISTINCT
-        COALESCE(item_sales.salesman_name, sales.salesman) as employee_name,
-        COALESCE(item_sales.outlet_name, sales.outlet_name) as outlet_name
-      FROM gofrugal_item_sales item_sales
-      FULL OUTER JOIN gofrugal_sales sales 
-        ON item_sales.outlet_name = sales.outlet_name
-      WHERE (
-        (item_sales.salesman_name IS NOT NULL AND item_sales.salesman_name != '')
-        OR (sales.salesman IS NOT NULL AND sales.salesman != '')
-      )
-      AND (
-        (item_sales.outlet_name IS NOT NULL AND item_sales.outlet_name != '')
-        OR (sales.outlet_name IS NOT NULL AND sales.outlet_name != '')
-      )
-    `);
-    const employeeStoreMapping = new Map<string, Set<string>>(); // employee_name -> Set<outlet_name>
-    employeeStoreMappingResult.rows.forEach(row => {
-      const empName = row.employee_name;
-      const outletName = row.outlet_name;
-      if (empName && outletName) {
-        if (!employeeStoreMapping.has(empName)) {
-          employeeStoreMapping.set(empName, new Set());
-        }
-        employeeStoreMapping.get(empName)!.add(outletName);
-      }
-    });
-    console.log(`✅ Loaded ${employeeStoreMapping.size} employee-store mappings`);
+    // NOTE: Employee-store mapping removed - not needed for response, employee data comes from aggregation query
 
-    // Build SQL query for gofrugal_sales
-    let salesQuery = `
+    // Load targets and visitors
+    const targetsQuery = `
+      SELECT outlet_name, target_amount, year, month
+      FROM gofrugal_targets
+      WHERE year = $1 AND (month = $2 OR $2 IS NULL)
+    `;
+    const targetsParams = [year, month !== undefined ? month + 1 : null]; // month is 0-11, DB is 1-12
+    const targetsResult = await pool.query(targetsQuery, targetsParams);
+    const targetsMap = new Map<string, Map<number, number>>(); // Key: outlet_name, Value: Map<month, target_amount>
+    targetsResult.rows.forEach(row => {
+      const outletName = row.outlet_name;
+      const targetMonth = row.month || 0; // 0 = yearly target
+      const targetAmount = Number(row.target_amount) || 0;
+      
+      if (!targetsMap.has(outletName)) {
+        targetsMap.set(outletName, new Map());
+      }
+      targetsMap.get(outletName)!.set(targetMonth, targetAmount);
+    });
+    console.log(`✅ Loaded ${targetsMap.size} outlet targets`);
+
+    const visitorsQuery = `
+      SELECT outlet_name, visit_date, visitor_count
+      FROM gofrugal_visitors
+      WHERE visit_date >= $1 AND visit_date <= $2
+    `;
+    const visitorsParams = [startDate, endDate];
+    const visitorsResult = await pool.query(visitorsQuery, visitorsParams);
+    const monthlyVisitorsMap = new Map<string, number>(); // Key: outlet_name
+    const dailyVisitorsMap = new Map<string, number>(); // Key: "YYYY-MM-DD_OUTLET_NAME"
+    visitorsResult.rows.forEach(row => {
+      const outletName = row.outlet_name;
+      const dateStr = row.visit_date.toISOString().split('T')[0];
+      
+      // Monthly
+      const currentMonthlyCount = monthlyVisitorsMap.get(outletName) || 0;
+      monthlyVisitorsMap.set(outletName, currentMonthlyCount + (Number(row.visitor_count) || 0));
+
+      // Daily
+      const dailyKey = `${dateStr}_${outletName}`;
+      const currentDailyCount = dailyVisitorsMap.get(dailyKey) || 0;
+      dailyVisitorsMap.set(dailyKey, currentDailyCount + (Number(row.visitor_count) || 0));
+    });
+    console.log(`✅ Loaded ${visitorsResult.rows.length} visitor entries`);
+
+    // --- OPTIMIZED QUERY: Aggregation at DB Level ---
+
+    // 1. Store Aggregation
+    let storeQuery = `
       SELECT 
-        outlet_name,
-        bill_no,
-        bill_date,
-        net_amount,
-        transaction_type,
-        salesman
-      FROM gofrugal_sales
+        outlet_name, 
+        SUM(net_amount) as total_sales, 
+        COUNT(*) as invoice_count 
+      FROM gofrugal_sales 
       WHERE bill_date >= $1 AND bill_date <= $2
     `;
     const queryParams: any[] = [startDate, endDate];
     let paramIndex = 3;
 
-    // Handle storeId filter - convert dynamic_number to outlet_name if needed
     if (storeId) {
-      // Find outlet_name by dynamic_number or direct match
+      // Resolve storeId to outlet_name
       let targetOutletName = storeId;
       for (const [outletName, dynamicNum] of outletNameToStoreId.entries()) {
         if (dynamicNum === storeId || outletName === storeId) {
@@ -178,181 +193,171 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           break;
         }
       }
-      
-      salesQuery += ` AND outlet_name = $${paramIndex}`;
+      storeQuery += ` AND outlet_name = $${paramIndex}`;
       queryParams.push(targetOutletName);
       paramIndex++;
     }
 
-    salesQuery += ` ORDER BY bill_date, outlet_name, bill_no`;
+    storeQuery += ` GROUP BY outlet_name`;
 
-    console.log(`🔍 Executing sales query...`);
-    const salesResult = await pool.query<SalesRow>(salesQuery, queryParams);
-    const salesRows = salesResult.rows;
-    console.log(`✅ Found ${salesRows.length} sales records`);
+    // 2. Daily Aggregation
+    // To minimize payload, we only group by date and outlet
+    let dailyQuery = `
+      SELECT 
+        DATE(bill_date) as date_str, 
+        outlet_name, 
+        SUM(net_amount) as total_sales, 
+        COUNT(*) as invoice_count 
+      FROM gofrugal_sales 
+      WHERE bill_date >= $1 AND bill_date <= $2
+    `;
+    // Reuse params 1 & 2 (startDate, endDate)
+    const dailyParams: any[] = [startDate, endDate];
+    let dailyParamIndex = 3;
+    if (storeId && queryParams.length > 2) { // Logic to match storeId filter if active
+      dailyQuery += ` AND outlet_name = $${dailyParamIndex}`;
+      dailyParams.push(queryParams[2]); // The targetOutletName
+    }
+    dailyQuery += ` GROUP BY DATE(bill_date), outlet_name ORDER BY date_str`;
 
-    // Aggregate by store
-    const storeMap = new Map<string, {
-      storeId: string;
-      storeName: string;
-      salesAmount: number;
-      invoices: number;
-    }>();
+    // 3. Employee Aggregation
+    let empQuery = `
+      SELECT 
+        salesman,
+        outlet_name,
+        SUM(net_amount) as total_sales, 
+        COUNT(*) as invoice_count 
+      FROM gofrugal_sales 
+      WHERE bill_date >= $1 AND bill_date <= $2 
+        AND salesman IS NOT NULL AND salesman != ''
+    `;
+    const empParams: any[] = [startDate, endDate];
+    if (storeId && queryParams.length > 2) {
+      empQuery += ` AND outlet_name = $3`;
+      empParams.push(queryParams[2]);
+    }
+    empQuery += ` GROUP BY salesman, outlet_name`;
 
-    // Aggregate by day and store
-    const dayStoreMap = new Map<string, Map<string, {
-      salesAmount: number;
-      invoices: number;
-    }>>();
 
-    // Aggregate by employee and store
-    const employeeMap = new Map<string, {
-      employeeId: string;
-      employeeName: string;
-      storeId: string;
-      storeName: string;
-      salesAmount: number;
-      invoices: number;
-    }>();
+    console.log(`🔍 Executing Optimized SQL Queries...`);
+    const [storeRes, dailyRes, empRes] = await Promise.all([
+      pool.query(storeQuery, queryParams),
+      pool.query(dailyQuery, dailyParams),
+      pool.query(empQuery, empParams)
+    ]);
 
-    salesRows.forEach(row => {
+    console.log(`✅ Fetched: ${storeRes.rowCount} store stats, ${dailyRes.rowCount} daily stats, ${empRes.rowCount} emp stats`);
+
+
+    // --- Post-Processing (Lightweight Map Operations) ---
+
+    // Process Store Data
+    const byStore = storeRes.rows.map(row => {
       const outletName = row.outlet_name;
-      // Use dynamic_number as storeId (matches OperatingUnitNumber from D365)
       const storeId = outletNameToStoreId.get(outletName) || outletName;
       const storeInfo = storeMapping.get(outletName);
-      const storeName = storeInfo?.name || outletName;
-      const dateStr = row.bill_date.toISOString().split('T')[0];
-      const salesman = row.salesman || null;
 
-      // Store-level aggregation
-      if (!storeMap.has(storeId)) {
-        storeMap.set(storeId, {
-          storeId,
-          storeName,
-          salesAmount: 0,
-          invoices: 0,
-        });
-      }
-      const storeData = storeMap.get(storeId)!;
-      storeData.salesAmount += row.net_amount || 0;
-      storeData.invoices += 1;
+      const salesAmount = Number(row.total_sales);
+      const invoices = Number(row.invoice_count);
 
-      // Day-store aggregation
-      if (!dayStoreMap.has(dateStr)) {
-        dayStoreMap.set(dateStr, new Map());
-      }
-      const dayStores = dayStoreMap.get(dateStr)!;
-      if (!dayStores.has(storeId)) {
-        dayStores.set(storeId, {
-          salesAmount: 0,
-          invoices: 0,
-        });
-      }
-      const dayStoreData = dayStores.get(storeId)!;
-      dayStoreData.salesAmount += row.net_amount || 0;
-      dayStoreData.invoices += 1;
-
-      // Employee-level aggregation (if salesman exists)
-      if (salesman && salesman.trim() !== '') {
-        const employeeKey = `${salesman}_${storeId}`;
-        if (!employeeMap.has(employeeKey)) {
-          employeeMap.set(employeeKey, {
-            employeeId: salesman.split(/[-_]/)[0] || salesman, // Extract ID if present
-            employeeName: salesman,
-            storeId,
-            storeName,
-            salesAmount: 0,
-            invoices: 0,
-          });
-        }
-        const employeeData = employeeMap.get(employeeKey)!;
-        employeeData.salesAmount += row.net_amount || 0;
-        employeeData.invoices += 1;
-      }
-    });
-
-    // Convert to response format with targets and visitors
-    const byStore = Array.from(storeMap.values()).map(store => {
-      // Find outlet_name by storeId (dynamic_number)
-      let outletName = '';
-      for (const [outlet, dynamicNum] of outletNameToStoreId.entries()) {
-        if (dynamicNum === store.storeId) {
-          outletName = outlet;
-          break;
-        }
-      }
-      if (!outletName) {
-        outletName = store.storeName;
-      }
-      
-      // Get target for this outlet
+      // Get target
       const outletTargets = targetsMap.get(outletName);
       const targetMonth = month !== undefined ? month + 1 : null;
       const target = outletTargets?.get(targetMonth || 0) || outletTargets?.get(0) || 0;
-      
-      // Get visitors for this outlet
+
+      // Get visitors
       const visitors = monthlyVisitorsMap.get(outletName) || 0;
-      const conversion = visitors > 0 ? (store.invoices / visitors) * 100 : 0;
-      
+      const conversion = visitors > 0 ? (invoices / visitors) * 100 : 0;
+
       return {
-        storeId: store.storeId,
-        storeName: store.storeName,
-        salesAmount: store.salesAmount,
-        invoices: store.invoices,
+        storeId,
+        storeName: storeInfo?.name || outletName,
+        salesAmount,
+        invoices,
         visitors,
         target: Number(target) || 0,
         kpis: {
-          atv: store.invoices > 0 ? store.salesAmount / store.invoices : 0,
-          customerValue: store.invoices > 0 ? store.salesAmount / store.invoices : 0,
+          atv: invoices > 0 ? salesAmount / invoices : 0,
+          customerValue: invoices > 0 ? salesAmount / invoices : 0,
           conversion,
         },
       };
     });
 
-    const byDay = Array.from(dayStoreMap.entries())
+    // Process Daily Data (Reconstruct logical structure)
+    // Map: Date -> Store[]
+    const dateMap = new Map<string, any[]>();
+
+    dailyRes.rows.forEach(row => {
+      // Fix timezone offset for DATE() string if needed, generally pg returns YYYY-MM-DD
+      const dateStr = new Date(row.date_str).toISOString().split('T')[0];
+      const outletName = row.outlet_name;
+      const storeId = outletNameToStoreId.get(outletName) || outletName;
+      const storeInfo = storeMapping.get(outletName);
+
+      const salesAmount = Number(row.total_sales);
+      const invoices = Number(row.invoice_count);
+
+      // Daily visitors
+      const dateKey = `${dateStr}_${outletName}`;
+      const visitors = dailyVisitorsMap.get(dateKey) || 0;
+      const conversion = visitors > 0 ? (invoices / visitors) * 100 : 0;
+
+      const entry = {
+        storeId,
+        storeName: storeInfo?.name || outletName || storeId,
+        salesAmount,
+        invoices,
+        visitors,
+        kpis: {
+          atv: invoices > 0 ? salesAmount / invoices : 0,
+          customerValue: invoices > 0 ? salesAmount / invoices : 0,
+          conversion,
+        },
+      };
+
+      if (!dateMap.has(dateStr)) dateMap.set(dateStr, []);
+      dateMap.get(dateStr)!.push(entry);
+    });
+
+    const byDay = Array.from(dateMap.entries())
       .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
       .map(([date, stores]) => ({
         date,
-        byStore: Array.from(stores.entries()).map(([storeId, data]) => {
-          // Find outlet_name by storeId (dynamic_number)
-          let outletName = '';
-          for (const [outlet, dynamicNum] of outletNameToStoreId.entries()) {
-            if (dynamicNum === storeId) {
-              outletName = outlet;
-              break;
-            }
-          }
-          if (!outletName) {
-            outletName = storeId;
-          }
-          const storeInfo = storeMapping.get(outletName);
-          
-          // Get visitors for this outlet on this day
-          const dateKey = `${date}_${outletName}`;
-          const visitors = dailyVisitorsMap.get(dateKey) || 0;
-          const conversion = visitors > 0 ? (data.invoices / visitors) * 100 : 0;
-          
-          return {
-            storeId,
-            storeName: storeInfo?.name || outletName || storeId,
-            salesAmount: data.salesAmount,
-            invoices: data.invoices,
-            visitors,
-            kpis: {
-              atv: data.invoices > 0 ? data.salesAmount / data.invoices : 0,
-              customerValue: data.invoices > 0 ? data.salesAmount / data.invoices : 0,
-              conversion,
-            },
-          };
-        }),
+        byStore: stores
       }));
+
+    // Process Employee Data
+    const byEmployee = empRes.rows.map(row => {
+      const salesman = row.salesman;
+      const outletName = row.outlet_name;
+      const storeId = outletNameToStoreId.get(outletName) || outletName;
+      const storeInfo = storeMapping.get(outletName);
+
+      const salesAmount = Number(row.total_sales);
+      const invoices = Number(row.invoice_count);
+
+      return {
+        employeeId: salesman.split(/[-_]/)[0] || salesman,
+        employeeName: salesman,
+        storeId,
+        storeName: storeInfo?.name || outletName,
+        salesAmount,
+        invoices,
+        kpis: {
+          atv: invoices > 0 ? salesAmount / invoices : 0,
+          customerValue: invoices > 0 ? salesAmount / invoices : 0,
+        },
+      };
+    });
+
 
     // Calculate totals
     const totalSales = byStore.reduce((sum, s) => sum + s.salesAmount, 0);
     const totalInvoices = byStore.reduce((sum, s) => sum + s.invoices, 0);
     const totalVisitors = byStore.reduce((sum, s) => sum + (s.visitors || 0), 0);
     const totalTarget = byStore.reduce((sum, s) => sum + (s.target || 0), 0);
-    
+
     const totals = {
       salesAmount: totalSales,
       invoices: totalInvoices,
@@ -378,25 +383,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       byStore,
       byDay,
-      byEmployee: Array.from(employeeMap.values()).map(emp => ({
-        employeeId: emp.employeeId,
-        employeeName: emp.employeeName,
-        storeId: emp.storeId,
-        storeName: emp.storeName,
-        salesAmount: emp.salesAmount,
-        invoices: emp.invoices,
-        kpis: {
-          atv: emp.invoices > 0 ? emp.salesAmount / emp.invoices : 0,
-          customerValue: emp.invoices > 0 ? emp.salesAmount / emp.invoices : 0,
-        },
-      })),
+      byEmployee,
       totals,
       debug: {
         source: 'postgresql',
         notes: [
-          `PostgreSQL: ${salesRows.length} sales records`,
+          `PostgreSQL: ${storeRes.rowCount} store aggregations, ${dailyRes.rowCount} daily aggregations, ${empRes.rowCount} employee aggregations`,
           `Stores: ${byStore.length}`,
-          `Employees: ${employeeMap.size}`,
+          `Employees: ${byEmployee.length}`,
           `Targets: ${targetsResult.rows.length} records`,
           `Visitors: ${visitorsResult.rows.length} records`,
           `Daily breakdown: ${byDay.length} days`,
@@ -406,13 +400,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error: any) {
     console.error('❌ PostgreSQL Sales API error:', error);
-    
+
     // Return 200 with error flag (not 500) so frontend can handle fallback gracefully
     // Frontend will automatically fallback to legacy provider
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
     const month = req.query.month ? parseInt(req.query.month as string) - 1 : undefined;
     const day = req.query.day ? parseInt(req.query.day as string) : undefined;
-    
+
     const startDate = new Date(Date.UTC(year, month || 0, day || 1, 0, 0, 0));
     let endDate: Date;
     if (month !== undefined) {
@@ -430,7 +424,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59));
     }
-    
+
     return res.status(200).json({
       success: false,
       range: {
