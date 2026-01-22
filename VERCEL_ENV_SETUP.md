@@ -9,12 +9,12 @@
 ### 1️⃣ **Firebase Configuration** (مطلوب)
 
 ```
-VITE_FIREBASE_API_KEY=AIzaSyDgvxzQBWIo9mXx5xyN_xKRFqsVZ8L8Y8g
-VITE_FIREBASE_AUTH_DOMAIN=alsanicockpit.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=alsanicockpit
-VITE_FIREBASE_STORAGE_BUCKET=alsanicockpit.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=570974893088
-VITE_FIREBASE_APP_ID=1:570974893088:web:4c8f4a93f8e3c8a8b8e8e8
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
 ```
 
 **كيفية الحصول عليها:**
