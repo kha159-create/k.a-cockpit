@@ -13,15 +13,16 @@ if (!GEMINI_API_KEY || GEMINI_API_KEY.trim() === '') {
     const isProduction = import.meta.env.PROD;
     const errorMsg = isProduction 
         ? 'Missing VITE_GEMINI_API_KEY in GitHub Secrets. Please add it in Repository Settings → Secrets → Actions.'
-        : 'Missing VITE_GEMINI_API_KEY. Please set it in .env.local for local development.';
+        : 'Missing VITE_GEMINI_API_KEY. Please set it in .env for local development.';
     
-    console.error('❌ VITE_GEMINI_API_KEY is missing or empty');
-    console.error('Environment:', isProduction ? 'Production' : 'Development');
-    console.error('Available VITE_ env vars:', availableVars);
-    throw new Error(errorMsg);
+    console.warn('⚠️ VITE_GEMINI_API_KEY is missing or empty - AI features will be disabled');
+    console.warn('Environment:', isProduction ? 'Production' : 'Development');
+    console.warn('Available VITE_ env vars:', availableVars);
+    console.warn(errorMsg);
+    // Don't throw - allow app to continue without AI features
 }
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
 // Helper function to reduce data size for Gemini API
 const reduceDataSize = (data: any, maxLength = 5000): string => {
@@ -68,6 +69,9 @@ const callGeminiWithRetry = async (
 
     while (retries < maxRetries) {
         try {
+            if (!genAI) {
+                throw new Error('Gemini AI is not initialized (missing API key)');
+            }
             console.log(`🔍 Gemini API call attempt ${retries + 1}/${maxRetries} with model: ${model}`);
             const generativeModel = genAI.getGenerativeModel({ model });
 

@@ -39,7 +39,7 @@
 - `PG_HOST`
 - `PG_DATABASE` (showroom_sales)
 - `PG_USER` (postgres)
-- `PG_PASSWORD` (KhaKha11@)
+- `PG_PASSWORD` (your_postgres_password)
 - `PG_PORT` (5432)
 - `PG_SSL` (false للتطوير المحلي)
 
@@ -82,7 +82,7 @@ PG_USER=postgres
 
 ### 4. `PG_PASSWORD`
 ```
-PG_PASSWORD=KhaKha11@
+PG_PASSWORD=your_postgres_password
 ```
 
 ---
@@ -169,7 +169,7 @@ Restart-Service postgresql-x64-18
 - `PG_HOST` = `YOUR_PUBLIC_IP` (IP العام الذي حصلت عليه من الخطوة 1)
 - `PG_DATABASE` = `showroom_sales`
 - `PG_USER` = `postgres`
-- `PG_PASSWORD` = `KhaKha11@`
+- `PG_PASSWORD` = `your_postgres_password`
 - `PG_PORT` = `5432`
 - `PG_SSL` = `false`
 
@@ -304,7 +304,7 @@ Restart-Service postgresql-x64-18
 - `PG_HOST` = `YOUR_PUBLIC_IP` (IP العام الذي حصلت عليه من الخطوة 1)
 - `PG_DATABASE` = `showroom_sales`
 - `PG_USER` = `postgres`
-- `PG_PASSWORD` = `KhaKha11@`
+- `PG_PASSWORD` = `your_postgres_password`
 - `PG_PORT` = `5432`
 - `PG_SSL` = `false`
 
@@ -539,7 +539,7 @@ Restart-Service postgresql-x64-18
 - `PG_HOST` = `YOUR_PUBLIC_IP` (IP العام الذي حصلت عليه من الخطوة 1)
 - `PG_DATABASE` = `showroom_sales`
 - `PG_USER` = `postgres`
-- `PG_PASSWORD` = `KhaKha11@`
+- `PG_PASSWORD` = `your_postgres_password`
 - `PG_PORT` = `5432`
 - `PG_SSL` = `false`
 

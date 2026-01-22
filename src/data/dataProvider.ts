@@ -192,7 +192,7 @@ export async function getSalesData(params: SalesParams): Promise<NormalizedSales
 
   if (year <= 2025) {
     // Use PostgreSQL API ONLY for 2024-2025 data (NO legacy fallback)
-    const monthParam = month !== undefined ? `&month=${month + 1}` : ''; // API expects 1-12
+    const monthParam = month !== undefined ? `&month=${month}` : ''; // API expects 0-11 (JavaScript month format)
     const dayParam = day !== undefined ? `&day=${day}` : '';
     const storeParam = storeId ? `&storeId=${encodeURIComponent(storeId)}` : '';
     

@@ -33,7 +33,7 @@
 - `PG_HOST=localhost`
 - `PG_DATABASE=showroom_sales`
 - `PG_USER=postgres`
-- `PG_PASSWORD=KhaKha11@`
+- `PG_PASSWORD=your_postgres_password`
 - `PG_PORT=5432`
 - `PG_SSL=false`
 
