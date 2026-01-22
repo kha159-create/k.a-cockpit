@@ -74,7 +74,7 @@ Restart-Service postgresql-x64-18
 1. `PG_HOST` = `YOUR_PUBLIC_IP` (مثال: `123.45.67.89`)
 2. `PG_DATABASE` = `showroom_sales`
 3. `PG_USER` = `postgres`
-4. `PG_PASSWORD` = `KhaKha11@`
+4. `PG_PASSWORD` = `your_postgres_password`
 5. `PG_PORT` = `5432`
 6. `PG_SSL` = `false` (أو `true` إذا أردت تشفير الاتصال)
 

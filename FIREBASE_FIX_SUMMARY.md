@@ -120,7 +120,7 @@ Copy-Item "C:\Users\Orange1\Desktop\cockpit\.env" ".env" -Force
 **محتوى `.env` الصحيح**:
 ```env
 # Firebase Configuration (K.A Cockpit)
-VITE_FIREBASE_API_KEY=AIzaSyDgvxzQBWIo9mXx5xyN_xKRFqsVZ8L8Y8g
+VITE_FIREBASE_API_KEY=your_firebase_api_key
 VITE_FIREBASE_AUTH_DOMAIN=alsanicockpit.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=alsanicockpit
 VITE_FIREBASE_STORAGE_BUCKET=alsanicockpit.firebasestorage.app
@@ -131,7 +131,7 @@ VITE_FIREBASE_APP_ID=1:570974893088:web:4c8f4a93f8e3c8a8b8e8e8
 PG_HOST=localhost
 PG_DATABASE=showroom_sales
 PG_USER=postgres
-PG_PASSWORD=KhaKha11@
+PG_PASSWORD=your_postgres_password
 PG_PORT=5432
 PG_SSL=false
 
