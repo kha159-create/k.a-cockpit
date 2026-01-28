@@ -1,10 +1,21 @@
 /**
  * PostgreSQL Sales API - Replaces legacy file-based data for 2024-2025
  * Reads from gofrugal_sales and gofrugal_item_sales tables
+ * 
+ * NOTE: This API is DISABLED on Vercel. Use /api/read-json-data instead.
+ * This file is kept for local development only.
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Pool } from 'pg';
+
+// Check if running on Vercel (production)
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+
+if (isVercel) {
+  // Disable direct DB connection on Vercel - use JSON files instead
+  console.warn('⚠️ sales-pg.ts is disabled on Vercel. Use /api/read-json-data instead.');
+}
 
 // PostgreSQL connection pool
 // Validate required environment variables (fail fast in production)
@@ -75,6 +86,18 @@ interface ItemSalesRow {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Disable on Vercel - use JSON files instead
+  if (isVercel) {
+    const allowedOrigin = process.env.CORS_ALLOW_ORIGIN || '*';
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    return res.status(410).json({
+      success: false,
+      error: 'This API is disabled on Vercel. Please use /api/read-json-data instead.',
+      message: 'Direct database connections are not available on Vercel. JSON files are used instead (like the reference project).',
+    });
+  }
+
   // Handle CORS
   const allowedOrigin = process.env.CORS_ALLOW_ORIGIN || '*';
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
