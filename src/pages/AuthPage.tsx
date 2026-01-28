@@ -36,6 +36,7 @@ const AuthPage: React.FC = () => {
 
     // UI States
     const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -53,7 +54,8 @@ const AuthPage: React.FC = () => {
 
     const handleSignUp = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('Sign-up is currently disabled. Please contact the administrator.');
+        setError(null);
+        setSuccess('Sign-up is currently disabled. Please contact the administrator.');
     };
     const LoginCard = (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
