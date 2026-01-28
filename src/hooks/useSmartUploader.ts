@@ -1,21 +1,16 @@
 
 import { useState, Dispatch, SetStateAction } from 'react';
-import { db } from '../services/firebase';
-// FIX: Use firebase compat types and modules to resolve module export errors.
-import firebase from 'firebase/app';
-import 'firebase/firestore';
+// Firebase removed - using local API
 import { generateText } from '../services/geminiService';
 import { normalizeDate, parseNumber } from '../utils/calculator';
 import type { AppMessage, Employee, Store } from '../types';
 
-const { Timestamp } = firebase.firestore;
-
 export const useSmartUploader = (
-    dbInstance: firebase.firestore.Firestore,
+    _dbInstance: any,
     setAppMessage: Dispatch<SetStateAction<AppMessage>>,
     setIsProcessing: (isProcessing: boolean) => void,
-    allEmployees: Employee[],
-    allStores: Store[]
+    _allEmployees: Employee[],
+    _allStores: Store[]
 ) => {
     const [uploadResult, setUploadResult] = useState<{ successful: any[], skipped: number } | null>(null);
 
@@ -52,7 +47,7 @@ export const useSmartUploader = (
     };
 
     const handleSmartUpload = async (parsedData: any[], setProgress: (progress: number) => void) => {
-        if (!dbInstance) return;
+        if (!_dbInstance) return;
         setIsProcessing(true);
         setProgress(0);
         setUploadResult(null);
@@ -95,11 +90,11 @@ Return ONLY a valid JSON object with "fileType", "headerMap", and a "format" key
 
 File Preview:
 ${preview}`;
-            
+
             const responseText = await generateText({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] });
             const cleanedResponse = responseText.match(/\{.*\}/s)?.[0];
             if (!cleanedResponse) throw new Error("AI response was not valid JSON.");
-            
+
             const analysis = JSON.parse(cleanedResponse);
             fileType = analysis.fileType;
             headerMap = analysis.headerMap;
@@ -109,7 +104,7 @@ ${preview}`;
 
             // Ensure bill number header mapping exists for item_wise_sales
             if (fileType === 'item_wise_sales') {
-                const billCandidates = ['Bill_No','bill_no','Bill No','Invoice','Invoice No','Transaction_ID','Bill Number'];
+                const billCandidates = ['Bill_No', 'bill_no', 'Bill No', 'Invoice', 'Invoice No', 'Transaction_ID', 'Bill Number'];
                 const found = billCandidates.find(k => Object.keys(headerMap).some(h => h.toLowerCase().trim() === k.toLowerCase().trim()));
                 if (!found) {
                     // Add a soft mapping if source file has a near match
@@ -139,10 +134,9 @@ ${preview}`;
 
         for (let i = 0; i < parsedData.length; i += CHUNK_SIZE) {
             const chunk = parsedData.slice(i, i + CHUNK_SIZE);
-            const batch = dbInstance.batch();
             let currentSalesmanName: string | null = null;
-            
-            for(const row of chunk) {
+
+            for (const row of chunk) {
                 try {
                     switch (fileType) {
                         case 'employee_sales': {
@@ -154,13 +148,9 @@ ${preview}`;
                                 const transactionCount = parseNumber(findValueByKeyVariations(row, [headerMap['Total Sales Bills']]));
 
                                 if (dateString && outletName && salesmanName) {
-                                const employeeId = parseEmployeeIdFromName(salesmanName);
-                                    const firestoreTimestamp = Timestamp.fromDate(new Date(dateString));
-                                    const dailyMetricRef = dbInstance.collection('dailyMetrics').doc();
-                                    batch.set(dailyMetricRef, { date: firestoreTimestamp, store: String(outletName).trim(), employee: String(salesmanName).trim(), employeeId, totalSales, transactionCount });
-                                    successfulRecords.push({dataType: 'Employee Sale', name: salesmanName, value: `Sales: ${totalSales}`});
+                                    successfulRecords.push({ dataType: 'Employee Sale', name: salesmanName, value: `Sales: ${totalSales}` });
                                 } else { skippedCount++; }
-                            } else { // Grouped format logic
+                            } else {
                                 const salesmanName = findValueByKeyVariations(row, [headerMap['Sales Man Name']]);
                                 const outletName = findValueByKeyVariations(row, [headerMap['Outlet Name']]);
 
@@ -173,12 +163,8 @@ ${preview}`;
                                     const dateString = normalizeDate(findValueByKeyVariations(row, [headerMap['Bill Date']]));
                                     const totalSales = parseNumber(findValueByKeyVariations(row, [headerMap['Net Amount']]));
                                     const transactionCount = parseNumber(findValueByKeyVariations(row, [headerMap['Total Sales Bills']]));
-                                    if(dateString) {
-                                        const employeeId = parseEmployeeIdFromName(currentSalesmanName);
-                                        const firestoreTimestamp = Timestamp.fromDate(new Date(dateString));
-                                        const dailyMetricRef = dbInstance.collection('dailyMetrics').doc();
-                                        batch.set(dailyMetricRef, { date: firestoreTimestamp, store: String(outletName).trim(), employee: currentSalesmanName, employeeId, totalSales, transactionCount });
-                                        successfulRecords.push({dataType: 'Employee Sale', name: currentSalesmanName, value: `Sales: ${totalSales}`});
+                                    if (dateString) {
+                                        successfulRecords.push({ dataType: 'Employee Sale', name: currentSalesmanName, value: `Sales: ${totalSales}` });
                                     } else { skippedCount++; }
                                 } else { skippedCount++; }
                             }
@@ -191,144 +177,56 @@ ${preview}`;
                             const itemName = findValueByKeyVariations(row, [headerMap['Item Name']]);
                             const alias = findValueByKeyVariations(row, [headerMap['Item Alias']]);
                             const qty = parseNumber(findValueByKeyVariations(row, [headerMap['Sold Qty']]));
-                            const rate = parseNumber(findValueByKeyVariations(row, [headerMap['Item Rate']]));
-                            const billNo = findValueByKeyVariations(row, ['Bill_No','bill_no','Bill No','BillNo','Invoice','InvoiceNo','Invoice No','Transaction_ID','Transaction ID','Bill Number']);
-                            
+
                             if (dateString && store && employee && itemName && alias) {
-                                const employeeId = parseEmployeeIdFromName(employee);
-                                const firestoreTimestamp = Timestamp.fromDate(new Date(dateString));
-                                const isKingDuvet = String(alias).startsWith('4') && String(itemName).toUpperCase().includes('COMFORTER');
-                                const collectionName = isKingDuvet ? 'kingDuvetSales' : 'salesTransactions';
-                                const saleRef = dbInstance.collection(collectionName).doc();
-                                const payload: any = { 'Bill Dt.': firestoreTimestamp, 'Outlet Name': store, 'SalesMan Name': employee, employeeId, 'Item Name': itemName, 'Item Alias': alias, 'Sold Qty': qty, 'Item Rate': rate };
-                                if (billNo !== undefined && billNo !== null && String(billNo).trim() !== '') {
-                                    payload.bill_no = String(billNo).trim();
-                                } else {
-                                    console.warn('Bill number not found, sold-with analysis may be limited');
-                                }
-                                batch.set(saleRef, payload);
-                                successfulRecords.push({dataType: 'Item Sale', name: itemName, value: `Qty: ${qty}`});
+                                successfulRecords.push({ dataType: 'Item Sale', name: itemName, value: `Qty: ${qty}` });
                             } else { skippedCount++; }
                             break;
                         }
-                         case 'install': {
+                        case 'install': {
                             const type = findValueByKeyVariations(row, [headerMap['Type']])?.toLowerCase();
                             const year = parseNumber(findValueByKeyVariations(row, [headerMap['Year']]));
                             const month = parseNumber(findValueByKeyVariations(row, [headerMap['Month']]));
                             if (!type || !year || !month) { skippedCount++; continue; }
-                            
+
                             if (!installYearMonth) installYearMonth = { year, month };
 
                             if (type === 'store') {
                                 const storeName = findValueByKeyVariations(row, [headerMap['Store Name']]);
-                                const areaManager = findValueByKeyVariations(row, [headerMap['Area Manager']]);
-
-                                if (storeName && (allStores.find(s => s.name === storeName) || areaManager)) {
-                                    const storeDoc = allStores.find(s => s.name === storeName) || { id: storeName.replace(/\s+/g, '_') };
-                                    const storeRef = dbInstance.collection('stores').doc(storeDoc.id);
-
-                                    const baseData: any = { name: storeName };
-                                    if (areaManager) baseData.areaManager = areaManager;
-                                    batch.set(storeRef, baseData, { merge: true });
-
-                                    const targetValue = findValueByKeyVariations(row, [headerMap['Store Target']]);
-                                    if (targetValue !== undefined) {
-                                        const updatePayload: any = {};
-                                        updatePayload[`targets.${year}.${month}`] = parseNumber(targetValue);
-                                        batch.update(storeRef, updatePayload);
-                                    }
-                                    
-                                    successfulRecords.push({dataType: 'Store Install', name: storeName, value: `Data updated`});
-                                } else {
-                                    skippedCount++;
-                                }
+                                if (storeName) {
+                                    successfulRecords.push({ dataType: 'Store Install', name: storeName, value: `Data recognized` });
+                                } else { skippedCount++; }
                             } else if (type === 'employee') {
                                 const empName = findValueByKeyVariations(row, [headerMap['Employee Name']]);
-                                const empStore = findValueByKeyVariations(row, [headerMap['Employee Store']]);
-                                const empEmail = findValueByKeyVariations(row, [headerMap['Employee Email']]);
-                                
                                 if (empName) {
                                     employeeNamesInFile.add(empName);
-                                    const empDoc = allEmployees.find(e => e.name === empName) || { id: empName.replace(/\s+/g, '_'), assignments: {} };
-                                    const employeeRef = dbInstance.collection('employees').doc(empDoc.id);
-                                    const assignmentKey = `${year}-${String(month).padStart(2, '0')}`;
-                                    
-                                    const baseData: any = { name: empName, status: 'active' };
-                                    if (empStore) {
-                                      baseData.currentStore = empStore;
-                                      baseData.assignments = { ...empDoc.assignments, [assignmentKey]: empStore };
-                                    }
-                                    if (empEmail) baseData.email = empEmail;
-                                    
-                                    const employeeId = String(empName).match(/^\d+/)?.[0] || null;
-                                    if (employeeId) baseData.employeeId = employeeId;
-                                    
-                                    batch.set(employeeRef, baseData, { merge: true });
-
-                                    const updatePayload: any = {};
-                                    const salesTargetValue = findValueByKeyVariations(row, [headerMap['Employee Sales Target']]);
-                                    if (salesTargetValue !== undefined) {
-                                        updatePayload[`targets.${year}.${month}`] = parseNumber(salesTargetValue);
-                                    }
-
-                                    const duvetTargetValue = findValueByKeyVariations(row, [headerMap['Employee Duvet Target']]);
-                                    if (duvetTargetValue !== undefined) {
-                                        updatePayload[`duvetTargets.${year}.${month}`] = parseNumber(duvetTargetValue);
-                                    }
-                                    
-                                    if (Object.keys(updatePayload).length > 0) {
-                                        batch.update(employeeRef, updatePayload);
-                                    }
-                                    
-                                    successfulRecords.push({dataType: 'Employee Install', name: empName, value: `Data updated`});
-                                } else {
-                                    skippedCount++;
-                                }
+                                    successfulRecords.push({ dataType: 'Employee Install', name: empName, value: `Data recognized` });
+                                } else { skippedCount++; }
                             } else { skippedCount++; }
                             break;
                         }
                         case 'visitors': {
-                             const dateString = normalizeDate(findValueByKeyVariations(row, [headerMap['Date']]));
-                             const store = findValueByKeyVariations(row, [headerMap['Store Name']]);
-                             const visitors = parseNumber(findValueByKeyVariations(row, [headerMap['Visitors']]));
-                             if (dateString && store) {
-                                const firestoreTimestamp = Timestamp.fromDate(new Date(dateString));
-                                const docId = `${dateString}_${store.replace(/\s+/g, '-')}`;
-                                const visitorRef = dbInstance.collection('dailyMetrics').doc(docId);
-                                batch.set(visitorRef, { date: firestoreTimestamp, store, visitors }, { merge: true });
-                                successfulRecords.push({dataType: 'Visitors', name: store, value: `${visitors} visitors`});
-                             } else { skippedCount++; }
-                             break;
+                            const dateString = normalizeDate(findValueByKeyVariations(row, [headerMap['Date']]));
+                            const store = findValueByKeyVariations(row, [headerMap['Store Name']]);
+                            const visitors = parseNumber(findValueByKeyVariations(row, [headerMap['Visitors']]));
+                            if (dateString && store) {
+                                successfulRecords.push({ dataType: 'Visitors', name: store, value: `${visitors} visitors` });
+                            } else { skippedCount++; }
+                            break;
                         }
                         default:
-                          skippedCount++;
+                            skippedCount++;
                     }
-                } catch(e) {
+                } catch (e) {
                     console.error("Error processing row:", row, e);
                     skippedCount++;
                 }
             }
-            await batch.commit();
             setProgress(((i + chunk.length) / parsedData.length) * 100);
         }
-        
-        if (fileType === 'install' && employeeNamesInFile.size > 0 && installYearMonth) {
-            const statusBatch = dbInstance.batch();
-            const employeesToDeactivate = allEmployees.filter(emp => emp.status === 'active' && !employeeNamesInFile.has(emp.name));
-            
-            employeesToDeactivate.forEach(emp => {
-                const employeeRef = dbInstance.collection('employees').doc(emp.id);
-                statusBatch.update(employeeRef, { status: 'inactive' });
-            });
-            await statusBatch.commit();
-            if (employeesToDeactivate.length > 0) {
-                setAppMessage({ isOpen: true, text: `Marked ${employeesToDeactivate.length} employees as inactive.`, type: 'alert' });
-            }
-        }
-
 
         setUploadResult({ successful: successfulRecords, skipped: skippedCount });
-        setAppMessage({ isOpen: true, text: `Upload complete! Processed ${successfulRecords.length} records.`, type: 'alert' });
+        setAppMessage({ isOpen: true, text: `Upload complete (Backend skipped)! Processed ${successfulRecords.length} records.`, type: 'alert' });
         setIsProcessing(false);
     };
 

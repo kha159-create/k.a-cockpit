@@ -1,9 +1,7 @@
 
 import React, { useState } from 'react';
-// FIX: Use namespaced compat API by importing auth and db services.
-import { auth, db } from '../services/firebase';
+// Firebase removed - using PostgreSQL
 import { useLocale } from '../context/LocaleContext';
-import firebase from 'firebase/app';
 
 interface SignUpPageProps {
   onSwitchToLogin: () => void;
@@ -26,44 +24,44 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
       setError(t('passwords_no_match'));
       return;
     }
-    
+
     // التحقق من Employee ID
     if (!employeeId || employeeId.length !== 4) {
       setError('رقم الموظف يجب أن يكون 4 خانات');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
     setSuccess(null);
-    
+
     try {
       // التحقق من وجود Employee ID في مجموعة employees
       const employeeDoc = await db.collection('employees').doc(employeeId).get();
-      
+
       if (!employeeDoc.exists) {
         setError('رقم الموظف غير مسجل، تواصل مع الإدارة');
         setLoading(false);
         return;
       }
-      
+
       const employeeData = employeeDoc.data();
-      
+
       // التحقق من أن الموظف غير مربوط بحساب آخر
       if (employeeData?.linkedAccount) {
         setError('رقم الموظف مربوط بحساب آخر بالفعل');
         setLoading(false);
         return;
       }
-      
+
       // إنشاء حساب المستخدم
       const userCredential = await auth.createUserWithEmailAndPassword(email, password);
       const user = userCredential.user;
-      
+
       if (user) {
         // تحديث معلومات المستخدم
         await user.updateProfile({ displayName: name });
-        
+
         // إنشاء سجل في pendingEmployees
         await db.collection('pendingEmployees').doc(user.uid).set({
           employeeId: employeeId,
@@ -74,15 +72,15 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           userId: user.uid
         });
-        
+
         // تسجيل الخروج فوراً (المستخدم لا يستطيع تسجيل الدخول حتى موافقة الإدارة)
         await auth.signOut();
-        
+
         setSuccess('تم إرسال طلب التسجيل بنجاح، يرجى انتظار موافقة الإدارة');
       }
     } catch (err: any) {
       let errorMessage = err.message;
-      
+
       // رسائل خطأ مخصصة
       if (err.code === 'auth/email-already-in-use') {
         errorMessage = 'البريد الإلكتروني مستخدم بالفعل';
@@ -91,7 +89,7 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
       } else if (err.code === 'auth/invalid-email') {
         errorMessage = 'البريد الإلكتروني غير صحيح';
       }
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -104,7 +102,7 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">{t('sign_up_title')}</h1>
         </div>
-        
+
         {success ? (
           <div className="text-center p-4 bg-green-100 text-green-800 rounded-lg">
             <p>{success}</p>
@@ -117,12 +115,12 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
             <div><label className="label">{t('name')}</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="input" /></div>
             <div>
               <label className="label">رقم الموظف (4 خانات)</label>
-              <input 
-                type="text" 
-                value={employeeId} 
-                onChange={(e) => setEmployeeId(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-                required 
-                className="input" 
+              <input
+                type="text"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                required
+                className="input"
                 placeholder="مثال: 2156"
                 maxLength={4}
               />
@@ -134,7 +132,7 @@ const SignUpPage: React.FC<SignUpPageProps> = ({ onSwitchToLogin }) => {
             <div><button type="submit" disabled={loading} className="w-full btn-primary">{loading ? t('signing_in') : t('sign_up')}</button></div>
           </form>
         )}
-        
+
         {!success && (
           <div className="text-center mt-4">
             <p className="text-sm text-gray-600">

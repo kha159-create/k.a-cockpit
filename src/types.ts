@@ -1,27 +1,36 @@
 
-// FIX: Use firebase compat types to resolve module export errors.
-import firebase from 'firebase/app';
-import 'firebase/auth';
-import 'firebase/firestore';
+// Removed Firebase imports
+// import firebase from 'firebase/app';
+// import 'firebase/auth';
+// import 'firebase/firestore';
 
-export type User = firebase.User;
-export type Timestamp = firebase.firestore.Timestamp;
+export interface User {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+  // Add other fields if strictly needed by MainLayout
+}
+
+// Timestamp compatible with ISO strings or legacy uses
+export type Timestamp = string | { toDate: () => Date; seconds: number; nanoseconds: number; };
+
 
 
 export type UserRole = 'admin' | 'general_manager' | 'area_manager' | 'store_manager' | 'employee';
 
 export interface UserProfile {
-    id: string; // Will be the user's UID
-    name: string;
-    role: UserRole;
-    email: string;
-    employeeId?: string;
-    phone?: string;
-    areaManager?: string; // For area_manager role
-    store?: string; // For store_manager and employee roles
-    status?: 'pending' | 'approved' | 'active';
-    approvedAt?: Timestamp;
-    approvedBy?: string;
+  id: string; // Will be the user's UID
+  name: string;
+  role: UserRole;
+  email: string;
+  employeeId?: string;
+  phone?: string;
+  areaManager?: string; // For area_manager role
+  store?: string; // For store_manager and employee roles
+  status?: 'pending' | 'approved' | 'active';
+  approvedAt?: Timestamp;
+  approvedBy?: string;
 }
 
 
@@ -33,6 +42,8 @@ export interface Store extends BaseDocument {
   name: string;
   areaManager: string;
   city?: string; // City/Region filter (like orange-dashboard)
+  is_online?: boolean; // Distinguish Online vs Physical
+  store_type?: string;
   targets?: { [year: string]: { [month: string]: number } };
 }
 
@@ -45,11 +56,17 @@ export interface Employee extends BaseDocument {
   phone?: string;
   targets?: { [year: string]: { [month: string]: number } };
   duvetTargets?: { [year: string]: { [month: string]: number } };
+  userId?: string;
+  userEmail?: string;
+  salesGroup?: string; // GoFrugal sales group ID
+  originalId?: string;
+  displayName?: string;
 }
 
 export interface DailyMetric extends BaseDocument {
   date: string; // ✅ STRING (not firebase.firestore.Timestamp) - data comes from API
   store: string;
+  storeId?: string; // Added for robust matching (stores with same name or ID lookup)
   employee?: string;
   employeeId?: string;
   totalSales?: number;
@@ -67,6 +84,7 @@ export interface SalesTransaction extends BaseDocument {
   'Item Alias': string;
   'Sold Qty': number;
   'Item Rate': number;
+  'Net Amount'?: number;
 }
 
 export interface DateFilter {
@@ -100,7 +118,7 @@ export interface AppMessage {
 }
 
 export interface BusinessRule extends BaseDocument {
-    rule: string;
+  rule: string;
 }
 
 export interface Notification {
@@ -113,9 +131,9 @@ export interface Notification {
 }
 
 export interface PredictionResult {
-    predictedSales: number;
-    riskScore: number; // A score from 0 to 100
-    justification: string;
+  predictedSales: number;
+  riskScore: number; // A score from 0 to 100
+  justification: string;
 }
 
 export interface Task extends BaseDocument {
@@ -153,39 +171,39 @@ export interface StoreSummary extends Store {
 }
 
 export interface EmployeeSummary extends Employee {
-    store: string; // The store for the reporting period
-    totalSales: number;
-    totalTransactions: number;
-    atv: number;
-    effectiveTarget: number;
-    achievement: number;
+  store: string; // The store for the reporting period
+  totalSales: number;
+  totalTransactions: number;
+  atv: number;
+  effectiveTarget: number;
+  achievement: number;
 }
 
 export interface ProductSummary {
-    id: string;
-    name: string;
-    alias: string;
-    price: number;
-    soldQty: number;
-    totalValue: number;
+  id: string;
+  name: string;
+  alias: string;
+  price: number;
+  soldQty: number;
+  totalValue: number;
 }
 
 export interface DuvetSummary {
-    [storeName: string]: {
-        name: string;
-        [key: string]: number | string; // Dynamic keys for smart categories
-        total: number;
-    };
+  [storeName: string]: {
+    name: string;
+    [key: string]: number | string; // Dynamic keys for smart categories
+    total: number;
+  };
 }
 
 export interface CommissionStoreData {
-    name: string;
-    achievement: number;
-    commissionRate: number; // as percentage
-    employees: (EmployeeSummary & {
-        finalCommissionRate: number; // as percentage
-        commissionAmount: number;
-    })[];
+  name: string;
+  achievement: number;
+  commissionRate: number; // as percentage
+  employees: (EmployeeSummary & {
+    finalCommissionRate: number; // as percentage
+    commissionAmount: number;
+  })[];
 }
 
 export type FilterableData = DailyMetric | SalesTransaction;

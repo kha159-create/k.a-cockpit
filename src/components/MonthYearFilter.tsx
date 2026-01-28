@@ -15,7 +15,7 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
     // Always show 2024, 2025, 2026 regardless of loaded data
     // This ensures users can select these years even if data hasn't loaded yet
     const hardcodedYears = [2024, 2025, 2026];
-    
+
     // Also add any additional years found in data (for backward compatibility)
     const yearSet = new Set<number>(hardcodedYears);
     allData.forEach(d => {
@@ -34,7 +34,7 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
         yearSet.add(year);
       }
     });
-    
+
     const validYears = Array.from(yearSet).filter(y => !isNaN(y));
     const sorted = validYears.sort((a, b) => b - a);
     return forceRangeOnly ? sorted : ['all', ...sorted];
@@ -46,7 +46,7 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
     }
     return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   }, [locale]);
-  
+
   const days = ['all', ...Array.from({ length: 31 }, (_, i) => i + 1)];
   const rawMode = dateFilter.mode ?? 'single';
   const effectiveMode = forceRangeOnly ? 'range' : rawMode;
@@ -212,92 +212,92 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({ dateFilter, setDateFi
     setDateFilter(prev => ({ ...prev, customEndDate: value }));
   };
 
-    return (
-      <div className="flex flex-col gap-4 p-4 bg-white rounded-xl shadow-sm border border-neutral-200">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex items-center gap-2 flex-1 min-w-[150px]">
-            <span className="font-semibold text-zinc-600">{t('year')}:</span>
-            <select value={dateFilter.year} onChange={handleYearChange} className="input w-full" disabled={effectiveMode === 'custom'}>
-              {years.map(y => <option key={y} value={y}>{y === 'all' ? t('all_years') : y}</option>)}
-            </select>
-          </div>
-          <div className="flex items-center gap-2 flex-1 min-w-[150px]">
-            <span className="font-semibold text-zinc-600">{t('month')}:</span>
-            <select
-              value={dateFilter.month}
-              onChange={handleMonthChange}
-              className="input w-full"
-              disabled={effectiveMode === 'custom' || dateFilter.year === 'all'}>
-              {!forceRangeOnly && <option value="all">{t('all_months')}</option>}
-              {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
-            </select>
-          </div>
-          {!forceRangeOnly && (
-            <div className="flex items-center gap-2 flex-1 min-w-[150px]">
-              <span className="font-semibold text-zinc-600">{t('filter_mode')}:</span>
-              <select
-                value={effectiveMode}
-                onChange={handleModeChange}
-                className="input w-full"
-                disabled={effectiveMode !== 'custom' && (dateFilter.month === 'all' || dateFilter.year === 'all')}>
-                <option value="single">{t('single_day')}</option>
-                <option value="range">{t('day_range')}</option>
-                <option value="custom">{t('custom_range')}</option>
-              </select>
-            </div>
-          )}
+  return (
+    <div className="flex flex-col gap-4 p-4 bg-white rounded-xl shadow-sm border border-neutral-200">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-center gap-2 flex-1 min-w-[150px]">
+          <span className="font-semibold text-zinc-600">{t('year')}:</span>
+          <select value={dateFilter.year} onChange={handleYearChange} className="input w-full" disabled={effectiveMode === 'custom'}>
+            {years.map(y => <option key={y} value={y}>{y === 'all' ? t('all_years') : y}</option>)}
+          </select>
         </div>
-
-        {(!forceRangeOnly && effectiveMode === 'single') ? (
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-zinc-600">{t('day')}:</span>
-            <select value={dateFilter.day} onChange={handleDayChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
-              {days.map(d => <option key={d} value={d}>{d === 'all' ? t('all_days') : d}</option>)}
+        <div className="flex items-center gap-2 flex-1 min-w-[150px]">
+          <span className="font-semibold text-zinc-600">{t('month')}:</span>
+          <select
+            value={dateFilter.month}
+            onChange={handleMonthChange}
+            className="input w-full"
+            disabled={effectiveMode === 'custom' || dateFilter.year === 'all'}>
+            {!forceRangeOnly && <option value="all">{t('all_months')}</option>}
+            {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
+          </select>
+        </div>
+        {!forceRangeOnly && (
+          <div className="flex items-center gap-2 flex-1 min-w-[150px]">
+            <span className="font-semibold text-zinc-600">{t('filter_mode')}:</span>
+            <select
+              value={effectiveMode}
+              onChange={handleModeChange}
+              className="input w-full"
+              disabled={effectiveMode !== 'custom' && (dateFilter.month === 'all' || dateFilter.year === 'all')}>
+              <option value="single">{t('single_day')}</option>
+              <option value="range">{t('day_range')}</option>
+              <option value="custom">{t('custom_range')}</option>
             </select>
-          </div>
-        ) : effectiveMode === 'range' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-zinc-600">{t('day_from')}:</span>
-              <select value={dayFromValue} onChange={handleDayFromChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
-                {days.map(d => <option key={d} value={d}>{d === 'all' ? t('all_days') : d}</option>)}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-zinc-600">{t('day_to')}:</span>
-              <select value={dayToValue} onChange={handleDayToChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
-                {days.map(d => <option key={d} value={d}>{d === 'all' ? t('all_days') : d}</option>)}
-              </select>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <span className="font-semibold text-zinc-600">{t('custom_start_date')}:</span>
-              <input
-                type="date"
-                value={dateFilter.customStartDate ?? ''}
-                onChange={handleCustomStartChange}
-                className="input"
-                min={minDate ?? undefined}
-                max={dateFilter.customEndDate ?? undefined}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <span className="font-semibold text-zinc-600">{t('custom_end_date')}:</span>
-              <input
-                type="date"
-                value={dateFilter.customEndDate ?? ''}
-                onChange={handleCustomEndChange}
-                className="input"
-                min={dateFilter.customStartDate ?? undefined}
-                max={maxDate ?? undefined}
-              />
-            </div>
           </div>
         )}
       </div>
-    );
+
+      {(!forceRangeOnly && effectiveMode === 'single') ? (
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-zinc-600">{t('day')}:</span>
+          <select value={dateFilter.day} onChange={handleDayChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
+            {days.map(d => <option key={d} value={d}>{d === 'all' ? t('all_days') : d}</option>)}
+          </select>
+        </div>
+      ) : effectiveMode === 'range' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-zinc-600">{t('day_from')}:</span>
+            <select value={dayFromValue} onChange={handleDayFromChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
+              {days.map(d => <option key={d} value={d}>{d === 'all' ? t('all_days') : d}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-zinc-600">{t('day_to')}:</span>
+            <select value={dayToValue} onChange={handleDayToChange} className="input" disabled={dateFilter.month === 'all' || dateFilter.year === 'all'}>
+              {days.map(d => <option key={d} value={d}>{d === 'all' ? t('all_days') : d}</option>)}
+            </select>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-2">
+            <span className="font-semibold text-zinc-600">{t('custom_start_date')}:</span>
+            <input
+              type="date"
+              value={dateFilter.customStartDate ?? ''}
+              onChange={handleCustomStartChange}
+              className="input"
+              min={minDate ?? undefined}
+              max={dateFilter.customEndDate ?? undefined}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="font-semibold text-zinc-600">{t('custom_end_date')}:</span>
+            <input
+              type="date"
+              value={dateFilter.customEndDate ?? ''}
+              onChange={handleCustomEndChange}
+              className="input"
+              min={dateFilter.customStartDate ?? undefined}
+              max={maxDate ?? undefined}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default MonthYearFilter;

@@ -10,8 +10,15 @@ export const StoreName: React.FC<{ id?: string | number; fallback?: string }> = 
 
 export const EmployeeName: React.FC<{ id?: string | number; fallback?: string }> = ({ id, fallback }) => {
   const { employeeMap, loading } = useDirectory();
-  const key = id != null ? String(id) : '';
-  const name = (key && employeeMap[key]) || fallback;
+  const key = id != null ? String(id).trim() : '';
+
+  // Try direct string match
+  // Then try stripping leading zeros (e.g. "0046" -> "46")
+  // Then try fallback
+  const name = (key && employeeMap[key]) ||
+    (key && employeeMap[String(Number(key))]) ||
+    fallback;
+
   return <span>{name || (loading ? '…' : '—')}</span>;
 };
 

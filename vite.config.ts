@@ -5,7 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  
+
   // Use base path from environment variable
   // Default to "/" for Vercel (works out of the box)
   // Set VITE_BASE_PATH=/k.a-cockpit/ for GitHub Pages deployment
@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => {
     base,
     plugins: [react()],
     publicDir: 'public',
+    optimizeDeps: {
+      exclude: ['pg'], // Fix for 'Outdated Optimize Dep' with Node libraries
+    },
     build: {
       minify: 'terser',
       terserOptions: { compress: { drop_console: true, drop_debugger: true } },
@@ -45,5 +48,15 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve('./src'),
       },
     },
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+          secure: false,
+        }
+      }
+    },
   }
 })
+

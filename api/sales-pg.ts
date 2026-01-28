@@ -59,21 +59,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const year = parseInt(req.query.year as string);
-    const month = req.query.month ? parseInt(req.query.month as string) - 1 : undefined; // Convert 1-12 to 0-11
+    const month = req.query.month !== undefined ? parseInt(req.query.month as string) : undefined; // API expects 0-11
     const day = req.query.day ? parseInt(req.query.day as string) : undefined;
     const storeId = req.query.storeId as string | undefined;
 
-    if (!year || year < 2024 || year > 2025) {
-      return res.status(400).json({
-        success: false,
-        error: 'Year must be between 2024 and 2025 for PostgreSQL data',
-        range: { from: '', to: '', year },
-        byStore: [],
-        byEmployee: [],
-        totals: { salesAmount: 0, invoices: 0, visitors: 0, target: 0, kpis: { atv: 0, customerValue: 0, conversion: 0 } },
-        debug: { source: 'postgresql', notes: ['Invalid year'] },
-      });
+    if (!year || isNaN(year)) {
+      return res.status(400).json({ error: 'year parameter is required (YYYY format)' });
     }
+
+    // Allow any year (2024-2025 from gofrugal_sales, 2026+ can use this too if data exists)
+    // Remove year restriction to allow flexibility
 
     console.log(`📊 PostgreSQL Sales API: year=${year}, month=${month !== undefined ? month + 1 : 'all'}, day=${day || 'all'}, storeId=${storeId || 'all'}`);
 
@@ -131,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       FROM gofrugal_targets
       WHERE year = $1 AND (month = $2 OR $2 IS NULL)
     `;
-    const targetsParams = [year, month !== undefined ? month + 1 : null]; // month is 0-11, DB is 1-12
+    const targetsParams = [year, month !== undefined ? month + 1 : null]; // month is 0-11 from API, DB expects 1-12
     const targetsResult = await pool.query(targetsQuery, targetsParams);
     const targetsMap = new Map<string, Map<number, number>>(); // Key: outlet_name, Value: Map<month, target_amount>
     targetsResult.rows.forEach(row => {

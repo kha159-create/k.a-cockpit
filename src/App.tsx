@@ -13,6 +13,9 @@ const LoadingSpinner: React.FC = () => (
   </div>
 );
 
+import { AuthProvider } from '@/context/AuthContext';
+import { DataProvider } from '@/context/DataProvider';
+
 const App: React.FC = () => {
   const { user, profile, loading } = useAuth();
   const { locale } = useLocale();
@@ -29,7 +32,9 @@ const App: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen font-sans">
       {user && profile ? (
-        <MainLayout user={user} profile={profile} />
+        <DataProvider>
+          <MainLayout user={user} profile={profile} />
+        </DataProvider>
       ) : (
         <AuthPage />
       )}
@@ -37,4 +42,10 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+const AppWithProvider: React.FC = () => (
+  <AuthProvider>
+    <App />
+  </AuthProvider>
+);
+
+export default AppWithProvider;

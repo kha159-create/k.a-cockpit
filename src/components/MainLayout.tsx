@@ -1,14 +1,11 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { auth, db } from '@/services/firebase';
-// FIX: Import firebase to use Timestamp and FieldValue for Firestore operations.
-import firebase from 'firebase/app';
-
 import { useDataProcessing } from '@/hooks/useDataProcessing';
 import { useSmartUploader } from '@/hooks/useSmartUploader';
+import { useAuth } from '@/context/AuthContext';
 import { useLocale } from '@/context/LocaleContext';
 import { useData } from '@/context/DataProvider';
-import { getSalesData, getStores } from '@/data/dataProvider';
+import { getStores } from '../data/dataProvider';
 import { apiUrl } from '@/utils/apiBase';
 
 import Dashboard from '@/pages/Dashboard';
@@ -28,12 +25,12 @@ import PendingApprovalsPage from '@/pages/PendingApprovalsPage';
 import RolesManagementPage from '@/pages/RolesManagementPage';
 
 
-import { 
-    // FIX: Imported VisitorsModal to resolve missing component error.
-    VisitorsModal, EmployeeModal, StoreModal, DailyMetricModal, MonthlyStoreMetricModal, UserEditModal,
-    AiCoachingModal, SalesForecastModal, SalesPitchModal, AppMessageModal,
-    NaturalLanguageSearchModal, AiComparisonModal, AiPredictionModal, KPIBreakdownModal,
-    TaskModal, ProductDetailsModal
+import {
+  // FIX: Imported VisitorsModal to resolve missing component error.
+  VisitorsModal, EmployeeModal, StoreModal, DailyMetricModal, MonthlyStoreMetricModal, UserEditModal,
+  AiCoachingModal, SalesForecastModal, SalesPitchModal, AppMessageModal,
+  NaturalLanguageSearchModal, AiComparisonModal, AiPredictionModal, KPIBreakdownModal,
+  TaskModal, ProductDetailsModal
 } from '@/components/Modals';
 
 import type { User, UserProfile, Store, Employee, DailyMetric, SalesTransaction, ModalState, DateFilter, AreaStoreFilterState, AppMessage, StoreSummary, BusinessRule, UserRole, Notification, Task } from '@/types';
@@ -41,7 +38,7 @@ import type { User, UserProfile, Store, Employee, DailyMetric, SalesTransaction,
 import {
   HomeIcon, OfficeBuildingIcon, UserGroupIcon, CubeIcon,
   UploadIcon, ChartBarIcon, CalculatorIcon, CogIcon,
-  MenuIcon, LogoutIcon, SunIcon, MoonIcon, GlobeIcon, ChevronDownIcon, BellIcon
+  MenuIcon, LogoutIcon, SunIcon, MoonIcon, ChevronDownIcon, BellIcon
 } from '@/components/Icons';
 
 // Live icon component
@@ -51,8 +48,7 @@ const LiveIcon = () => (
   </svg>
 );
 
-// FIX: Initialized Timestamp for use in Firestore operations.
-const { Timestamp } = firebase.firestore;
+// Firebase removed - using PostgreSQL
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -78,7 +74,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, name, activeTab, setActi
         </div>
         <span className="ms-3 font-medium text-sm whitespace-nowrap">{label}</span>
       </div>
-      
+
       {/* مؤشر النشاط */}
       {isActive && (
         <div className="absolute right-3 w-2 h-2 bg-white rounded-full shadow-sm" />
@@ -88,90 +84,90 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, name, activeTab, setActi
 };
 
 const NotificationBell: React.FC<{
-    notifications: Notification[];
-    onNotificationClick: (id: string) => void;
+  notifications: Notification[];
+  onNotificationClick: (id: string) => void;
 }> = ({ notifications, onNotificationClick }) => {
-    const { t } = useLocale();
-    const [isOpen, setIsOpen] = useState(false);
-    const unreadCount = notifications.filter(n => !n.read).length;
+  const { t } = useLocale();
+  const [isOpen, setIsOpen] = useState(false);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
-    return (
-        <div className="relative">
-            <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 text-zinc-600 hover:bg-gray-100 rounded-full">
-                <BellIcon />
-                {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white"></span>
-                )}
-            </button>
-            {isOpen && (
-                <div className="absolute top-full mt-2 end-0 w-80 bg-white rounded-lg shadow-xl border z-10" onMouseLeave={() => setIsOpen(false)}>
-                    <div className="p-3 font-semibold text-sm border-b">{t('notifications')}</div>
-                    {notifications.length === 0 ? (
-                        <p className="p-4 text-sm text-gray-500">{t('no_notifications')}</p>
-                    ) : (
-                        <ul className="max-h-80 overflow-y-auto">
-                            {notifications.map(n => (
-                                <li key={n.id} onClick={() => onNotificationClick(n.id)} className={`p-3 text-sm border-b hover:bg-gray-50 cursor-pointer ${!n.read ? 'bg-blue-50' : ''}`}>
-                                    <p className="font-semibold">{t('new_user_registered')}</p>
-                                    <p className="text-gray-600">{t('user_awaits_approval', { name: n.userName })}</p>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            )}
+  return (
+    <div className="relative">
+      <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 text-zinc-600 hover:bg-gray-100 rounded-full">
+        <BellIcon />
+        {unreadCount > 0 && (
+          <span className="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white"></span>
+        )}
+      </button>
+      {isOpen && (
+        <div className="absolute top-full mt-2 end-0 w-80 bg-white rounded-lg shadow-xl border z-10" onMouseLeave={() => setIsOpen(false)}>
+          <div className="p-3 font-semibold text-sm border-b">{t('notifications')}</div>
+          {notifications.length === 0 ? (
+            <p className="p-4 text-sm text-gray-500">{t('no_notifications')}</p>
+          ) : (
+            <ul className="max-h-80 overflow-y-auto">
+              {notifications.map(n => (
+                <li key={n.id} onClick={() => onNotificationClick(n.id)} className={`p-3 text-sm border-b hover:bg-gray-50 cursor-pointer ${!n.read ? 'bg-blue-50' : ''}`}>
+                  <p className="font-semibold">{t('new_user_registered')}</p>
+                  <p className="text-gray-600">{t('user_awaits_approval', { name: n.userName })}</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 
 const UserMenu: React.FC<{ user: User; profile: UserProfile | null; onLogout: () => void; }> = ({ user, profile, onLogout }) => {
-    const { t } = useLocale();
-    const [isOpen, setIsOpen] = useState(false);
-    const [timeDetails, setTimeDetails] = useState({ greeting: '', Icon: SunIcon });
+  const { t } = useLocale();
+  const [isOpen, setIsOpen] = useState(false);
+  const [timeDetails, setTimeDetails] = useState({ greeting: '', Icon: SunIcon });
 
-    useEffect(() => {
-        const hour = new Date().getHours();
-        const greetingKey = (hour >= 4 && hour < 12) ? 'greeting_morning' : 'greeting_evening';
-        setTimeDetails({
-            greeting: t(greetingKey),
-            Icon: (hour >= 4 && hour < 12) ? SunIcon : MoonIcon
-        });
-    }, [t]);
+  useEffect(() => {
+    const hour = new Date().getHours();
+    const greetingKey = (hour >= 4 && hour < 12) ? 'greeting_morning' : 'greeting_evening';
+    setTimeDetails({
+      greeting: t(greetingKey),
+      Icon: (hour >= 4 && hour < 12) ? SunIcon : MoonIcon
+    });
+  }, [t]);
 
-    const userName = useMemo(() => {
-        if (profile?.name) return profile.name;
-        if (user.displayName) return user.displayName;
-        if (!user.email) return 'User';
-        const namePart = user.email.split('@')[0];
-        return namePart?.charAt(0)?.toUpperCase() + namePart?.slice(1) || 'User';
-    }, [user, profile]);
+  const userName = useMemo(() => {
+    if (profile?.name) return profile.name;
+    if (user.displayName) return user.displayName;
+    if (!user.email) return 'User';
+    const namePart = user.email.split('@')[0];
+    return namePart?.charAt(0)?.toUpperCase() + namePart?.slice(1) || 'User';
+  }, [user, profile]);
 
-    // Language toggle moved to header; removed from user menu
+  // Language toggle moved to header; removed from user menu
 
-    return (
-        <div className="relative">
-            <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 text-sm text-zinc-700 font-medium greeting-fade-in p-2 rounded-lg hover:bg-gray-100">
-                <timeDetails.Icon />
-                <span>{timeDetails.greeting}, {userName}</span>
-                <ChevronDownIcon />
-            </button>
-            {isOpen && (
-                <div
-                    className="absolute top-full mt-2 end-0 w-48 bg-white rounded-lg shadow-xl border z-10"
-                    onMouseLeave={() => setIsOpen(false)}
-                 >
-                    <ul className="p-2 text-sm text-gray-700">
-                         <li>
-                            <button onClick={onLogout} className="w-full text-start flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-red-600">
-                                <LogoutIcon /> {t('logout')}
-                            </button>
-                        </li>
-                    </ul>
-                </div>
-            )}
+  return (
+    <div className="relative">
+      <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 text-sm text-zinc-700 font-medium greeting-fade-in p-2 rounded-lg hover:bg-gray-100">
+        <timeDetails.Icon />
+        <span>{timeDetails.greeting}, {userName}</span>
+        <ChevronDownIcon />
+      </button>
+      {isOpen && (
+        <div
+          className="absolute top-full mt-2 end-0 w-48 bg-white rounded-lg shadow-xl border z-10"
+          onMouseLeave={() => setIsOpen(false)}
+        >
+          <ul className="p-2 text-sm text-gray-700">
+            <li>
+              <button onClick={onLogout} className="w-full text-start flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 text-red-600">
+                <LogoutIcon /> {t('logout')}
+              </button>
+            </li>
+          </ul>
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 
@@ -182,42 +178,38 @@ interface MainLayoutProps {
 
 const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   const { t, locale, setLocale } = useLocale();
-  const { allSalesData, loading: dataPreloading } = useData(); // Get preloaded data from DataProvider
+  const { logout } = useAuth();
+  const { allSalesData, loading: dataPreloading, storeMap, stores, unifiedEmployees: employees, products } = useData();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
+
   // Data states
-  const [stores, setStores] = useState<Store[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  // stores and employees now come from useData()
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
   const [kingDuvetSales, setKingDuvetSales] = useState<SalesTransaction[]>([]);
   const [salesTransactions, setSalesTransactions] = useState<SalesTransaction[]>([]);
   const [businessRules, setBusinessRules] = useState<BusinessRule[]>([]);
-  const [allUsers, setAllUsers] = useState<(UserProfile & { id: string })[]>([]);
+  const [/* allUsers */, setAllUsers] = useState<(UserProfile & { id: string })[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
-  // Filter States:
-  // - Date filters are independent per page (Dashboard, Stores, Products, Employees, Commissions)
-  // - Area/Store filters are independent per page
-
+  // ... (Filters section remains same)
   const defaultDateFilter: DateFilter = {
     year: new Date().getFullYear(),
     month: new Date().getMonth(),
     day: 'all',
   };
 
-  // Load saved filters from localStorage for Stores page (Area/Store filter + Date filter)
   const loadStoresAreaStoreFilter = (): AreaStoreFilterState => {
     try {
       const savedAreaStoreFilter = localStorage.getItem('storesAreaStoreFilter');
-      
+
       const defaultAreaStoreFilter: AreaStoreFilterState = {
         areaManager: profile?.role === 'area_manager' || profile?.role === 'store_manager' ? profile.areaManager || 'All' : 'All',
         store: profile?.role === 'store_manager' || profile?.role === 'employee' ? profile.store || 'All' : 'All',
         city: 'All',
       };
-      
+
       return savedAreaStoreFilter ? JSON.parse(savedAreaStoreFilter) : defaultAreaStoreFilter;
     } catch {
       return {
@@ -227,7 +219,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
       };
     }
   };
-  
+
   const savedStoresAreaStoreFilter = loadStoresAreaStoreFilter();
 
   const loadStoresDateFilter = (): DateFilter => {
@@ -247,13 +239,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   const [productsDateFilter, setProductsDateFilter] = useState<DateFilter>(defaultDateFilter);
   const [employeesDateFilter, setEmployeesDateFilter] = useState<DateFilter>(defaultDateFilter);
   const [commissionsDateFilter, setCommissionsDateFilter] = useState<DateFilter>(defaultDateFilter);
-  
+
   // Independent Area/Store filters per page
-  const [storesAreaStoreFilter, setStoresAreaStoreFilter] = useState<AreaStoreFilterState>(savedStoresAreaStoreFilter); // Stores page - independent area/store filter
+  const [storesAreaStoreFilter, setStoresAreaStoreFilter] = useState<AreaStoreFilterState>(savedStoresAreaStoreFilter);
   const [areaStoreFilter, setAreaStoreFilter] = useState<AreaStoreFilterState>({
-      areaManager: profile?.role === 'area_manager' || profile?.role === 'store_manager' ? profile.areaManager || 'All' : 'All',
-      store: profile?.role === 'store_manager' || profile?.role === 'employee' ? profile.store || 'All' : 'All',
-      city: 'All', // City filter (like orange-dashboard) - for other pages
+    areaManager: profile?.role === 'area_manager' || profile?.role === 'store_manager' ? profile.areaManager || 'All' : 'All',
+    store: profile?.role === 'store_manager' || profile?.role === 'employee' ? profile.store || 'All' : 'All',
+    city: 'All',
   });
   const [dashboardPieFilter, setDashboardPieFilter] = useState<string | null>(null);
 
@@ -286,232 +278,135 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   const [selectedArea, setSelectedArea] = useState<{ managerName: string; stores: StoreSummary[] } | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const activeYear = useMemo(() => {
-    const getYearValue = (value: DateFilter['year']) =>
-      typeof value === 'number' ? value : new Date().getFullYear();
-
-    switch (activeTab) {
-      case 'stores':
-        return getYearValue(storesDateFilter.year);
-      case 'employees':
-        return getYearValue(employeesDateFilter.year);
-      case 'products':
-        return getYearValue(productsDateFilter.year);
-      case 'commissions':
-        return getYearValue(commissionsDateFilter.year);
-      default:
-        return getYearValue(dashboardDateFilter.year);
-    }
-  }, [
-    activeTab,
-    dashboardDateFilter.year,
-    storesDateFilter.year,
-    employeesDateFilter.year,
-    productsDateFilter.year,
-    commissionsDateFilter.year,
-  ]);
+  // Removed activeYear logic as fetching is now handled by DataProvider globally
 
   useEffect(() => {
     if (!profile) return;
-    
-    // Load stores using hybrid provider (legacy for 2024/2025, API for 2026+)
-    const loadStoresHybrid = async () => {
-      try {
-        const year = activeYear;
-        const storesList = await getStores(year);
-        
-        if (storesList.length > 0) {
-          console.log(`✅ Loaded ${storesList.length} stores from ${year <= 2025 ? 'legacy' : 'API'}`);
-          setStores(storesList as Store[]);
-        } else {
-          console.warn('⚠️ No stores loaded - returning empty array');
-          setStores([]);
-        }
-      } catch (error: any) {
-        console.error('❌ Error loading stores:', error);
-        setStores([]);
-      }
-    };
-    
-    loadStoresHybrid();
-    
-    // Load employees from API (2026+ only, empty for legacy years)
-    const loadEmployeesFromAPI = async () => {
-      try {
-        const year = activeYear;
-        
-        // Legacy years (2024/2025) have no employee data
-        if (year <= 2025) {
-          console.log(`📊 Legacy year ${year} - no employee data available`);
-          setEmployees([]);
-          return;
-        }
-        
-        // For 2026+, load from API
-        const url = apiUrl('/api/get-employees');
-        const response = await fetch(url);
-        
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && Array.isArray(result.employees)) {
-            console.log(`✅ Loaded ${result.employees.length} employees from API`);
-            setEmployees(result.employees as Employee[]);
-          } else {
-            console.warn('⚠️ API returned no employees');
-            setEmployees([]);
-          }
-        } else {
-          console.warn('⚠️ API failed for employees');
-          setEmployees([]);
-        }
-      } catch (error: any) {
-        console.error('❌ Error loading employees from API:', error);
-        setEmployees([]);
-      }
-    };
-    
-    loadEmployeesFromAPI();
-    
-    // NO Firestore listeners - ALL data from PostgreSQL (SQL) and D365 API only
-    // Removed: all Firestore connections - using SQL and D365 only
-    console.log('📊 All Firestore listeners removed - using PostgreSQL (SQL) and D365 API only');
-    
-    // Set empty arrays for removed Firestore collections (no longer used)
+    // Data Loading is now handled by DataProvider
+    // Set legacy states to empty/defaults to avoid errors if any code uses them
     setKingDuvetSales([]);
     setSalesTransactions([]);
     setBusinessRules([]);
     setTasks([]);
-    setAllUsers([]); // Users will come from PostgreSQL in the future
-    
-    // Mark data as loaded (no Firestore data to wait for)
+    setAllUsers([]);
     setDataLoading(false);
 
-    return () => {
-        // No Firestore unsubscribers needed
-    };
-}, [profile, activeYear]); // Reload stores/employees when active year changes
+  }, [profile]);
 
   // Helper function to convert allSalesData to DailyMetric[] format (reusable for all pages)
   const convertAllSalesDataToDailyMetrics = useCallback((yearFilter: number | 'all', monthFilter: number | 'all') => {
     if (!profile || dataPreloading) {
       return [];
     }
-    
+
     // Check if allSalesData is available (it's an object, not null)
     if (!allSalesData || typeof allSalesData !== 'object') {
       console.warn('⚠️ allSalesData is not available yet');
       return [];
     }
-    
+
     const year = typeof yearFilter === 'number' ? yearFilter : new Date().getFullYear();
     const month = typeof monthFilter === 'number' ? monthFilter : (monthFilter === 'all' ? undefined : new Date().getMonth());
-    
+
     if (typeof year !== 'number' || year < 2024 || year > 2026) {
       return [];
     }
-    
+
     // Get preloaded data for this year (already loaded at startup)
     const result = allSalesData[year];
-    if (!result || !result.success) {
-      console.warn(`⚠️ No preloaded data for year ${year}`, { 
-        availableYears: Object.keys(allSalesData), 
-        yearData: result 
+    // GUARD CLAUSE: Data not ready yet
+    if (!result) {
+      // If loading, we return empty which might cause UI flicker if not handled in render.
+      // However, MainLayout rendering should check (loading && !data)
+      // For now, we return empty array safe.
+      return [];
+    }
+
+    if (!result.success) {
+      console.warn(`⚠️ No preloaded data for year ${year}`, {
+        availableYears: Object.keys(allSalesData),
+        yearData: result
       });
       return [];
     }
-    
-    // Build mapping: storeId -> storeName from current stores list (for proper matching)
-    const storeNameMap = new Map<string, string>();
-    stores.forEach(s => {
-      const storeId = (s as any).store_id || s.id || s.name;
-      storeNameMap.set(storeId, s.name);
-    });
-    
+
     const apiMetrics: DailyMetric[] = [];
-    
+
     // Use Set for O(1) lookup instead of O(n) array.some() (performance optimization)
     const employeeMetricsSet = new Set<string>(); // Key: "date_storeName"
-    
+
     // Filter byDay by month (client-side filtering - no API call)
     if (Array.isArray(result.byDay) && result.byDay.length > 0) {
       result.byDay.forEach((dayData: any) => {
         const dateStr = dayData.date; // "YYYY-MM-DD"
         const dateObj = new Date(dateStr + 'T00:00:00Z');
-        
+
         // Filter by month if specified
         if (month !== undefined && dateObj.getUTCMonth() !== month) {
           return; // Skip days outside the selected month
         }
-        
+
         // Add store-level metrics for this day
         if (Array.isArray(dayData.byStore)) {
           dayData.byStore.forEach((store: any) => {
-            const storeId = store.storeId || store.storeName;
-            const storeName = storeNameMap.get(storeId) || store.storeName || storeId;
-            
-            // Check if this store has employee metrics for this day (O(1) lookup)
-            const key = `${dateStr}_${storeName}`;
-            const hasEmployees = employeeMetricsSet.has(key);
-            
-            // Only add store-level if no employee-level exists for this day+store
-            if (!hasEmployees || year <= 2025) {
-              const id = `${dateStr}_${storeName}`;
-              apiMetrics.push({
-                id,
-                date: dateStr, // ✅ STRING (not Timestamp)
-                store: storeName,
-                totalSales: store.salesAmount || 0,
-                transactionCount: store.invoices || 0,
-                visitors: store.visitors,
-              });
-            }
-          });
-        }
-      });
-      
-      // Add employee-level metrics from monthly byEmployee (employees_data.json doesn't have daily breakdown)
-      // Use first day of month as date for employee metrics (they're monthly totals)
-      if (Array.isArray(result.byEmployee) && result.byEmployee.length > 0) {
-        const firstDayStr = result.range?.from || new Date().toISOString().split('T')[0];
-        const firstDayObj = new Date(firstDayStr + 'T00:00:00Z');
-        
-        // Filter by month if specified
-        if (month === undefined || firstDayObj.getUTCMonth() === month) {
-          result.byEmployee.forEach((emp: any) => {
-            const storeId = emp.storeId || emp.storeName;
-            const storeName = storeNameMap.get(storeId) || emp.storeName || storeId;
-            const id = `${firstDayStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
-            const key = `${firstDayStr}_${storeName}`;
-            employeeMetricsSet.add(key); // Track employee metrics for this day+store
+            const storeId = String(store.storeId || store.storeName || '').trim();
+            const storeName = storeMap[storeId] || store.storeName || storeId; // Use Global Map
+
+            // Use storeName as the primary key for the 'store' field in DailyMetric for consistent matching
+            const id = `${dateStr}_${storeName}`;
             apiMetrics.push({
               id,
-              date: firstDayStr, // ✅ STRING (not Timestamp)
+              date: dateStr,
               store: storeName,
-              employee: emp.employeeName,
-              employeeId: emp.employeeId,
-              totalSales: emp.salesAmount || 0,
-              transactionCount: emp.invoices || 0,
+              totalSales: store.salesAmount || 0,
+              transactionCount: store.invoices || 0,
+              visitors: store.visitors,
             });
           });
         }
+      });
+
+      // Add employee-level metrics from monthly byEmployee (Unified SQL source)
+      if (Array.isArray(result.byEmployee) && result.byEmployee.length > 0) {
+        const firstDayStr = result.range?.from || new Date().toISOString().split('T')[0];
+
+        result.byEmployee.forEach((emp: any) => {
+          const storeId = String(emp.storeId || emp.storeName || '').trim();
+          const storeName = storeMap[storeId] || emp.storeName || storeId; // Use Global Map
+          const id = `${firstDayStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
+          const key = `${firstDayStr}_${storeName}`;
+
+          employeeMetricsSet.add(key); // Track employee metrics for this day+store
+          apiMetrics.push({
+            id,
+            date: firstDayStr,
+            store: storeName,
+            storeId: storeId, // Added for robust matching
+            employee: emp.employeeName,
+            employeeId: emp.employeeId,
+            totalSales: emp.salesAmount || 0,
+            transactionCount: emp.invoices || 0,
+          });
+        });
       }
     } else {
       // Fallback: Monthly aggregation (legacy or when byDay not available)
       const dateStr = result.range?.from || new Date().toISOString().split('T')[0];
       const dateObj = new Date(dateStr + 'T00:00:00Z');
-      
+
       // Filter by month if specified
       if (month === undefined || dateObj.getUTCMonth() === month) {
         // Add employee-level metrics (byEmployee from API/D365, empty for legacy)
         if (Array.isArray(result.byEmployee)) {
           result.byEmployee.forEach((emp: any) => {
             const storeId = emp.storeId || emp.storeName;
-            const storeName = storeNameMap.get(storeId) || emp.storeName || storeId;
+            const storeName = storeMap[storeId] || emp.storeName || storeId; // Use Global Map
             const id = `${dateStr}_${storeName}_${emp.employeeName || emp.employeeId}`;
             apiMetrics.push({
               id,
               date: dateStr, // ✅ STRING (not Timestamp)
               store: storeName,
+              storeId: storeId, // Added for robust matching
               employee: emp.employeeName,
               employeeId: emp.employeeId,
               totalSales: emp.salesAmount || 0,
@@ -519,13 +414,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
             });
           });
         }
-        
+
         // Add store-level metrics (byStore from legacy or D365)
         if (Array.isArray(result.byStore)) {
           result.byStore.forEach((store: any) => {
             const storeId = store.storeId || store.storeName;
-            const storeName = storeNameMap.get(storeId) || store.storeName || storeId;
-            
+            const storeName = storeMap[storeId] || store.storeName || storeId; // Use Global Map
+
             // Check if this store has employee metrics (O(1) lookup)
             const key = `${dateStr}_${storeName}`;
             const hasEmployees = employeeMetricsSet.has(key);
@@ -535,6 +430,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
                 id,
                 date: dateStr, // ✅ STRING (not Timestamp)
                 store: storeName,
+                storeId: storeId, // Added for robust matching
                 totalSales: store.salesAmount || 0,
                 transactionCount: store.invoices || 0,
                 visitors: store.visitors,
@@ -544,7 +440,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
         }
       }
     }
-    
+
     // Reduced console.log frequency (performance optimization)
     // console.log(`📊 Converted ${apiMetrics.length} metrics from preloaded data for year ${year} (${month !== undefined ? `month ${month + 1}` : 'all months'})`);
     return apiMetrics;
@@ -577,7 +473,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     if (!profile || dataPreloading) {
       return;
     }
-    
+
     // Update dailyMetrics from preloaded data (client-side filtering only)
     setDailyMetrics(dashboardDailyMetrics);
   }, [profile, dataPreloading, dashboardDailyMetrics]);
@@ -767,7 +663,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   }, [profile, dateFilter.year, dateFilter.month, stores]); // Add stores dependency for proper store name mapping
   */
 
-useEffect(() => {
+  useEffect(() => {
+    // DISABLED: Firestore listeners are removed - pending approvals will be handled via PostgreSQL in the future
+    /*
     if (profile?.role !== 'admin' && profile?.role !== 'general_manager') {
       return;
     }
@@ -799,12 +697,13 @@ useEffect(() => {
       });
 
     return () => unsub();
-}, [profile, notifications]); 
+    */
+  }, [profile]);
 
-const handleNotificationClick = (notificationId: string) => {
+  const handleNotificationClick = (notificationId: string) => {
     setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
     setActiveTab('pendingApprovals');
-};
+  };
 
 
   const effectiveAreaStoreFilter = useMemo(() => {
@@ -835,7 +734,7 @@ const handleNotificationClick = (notificationId: string) => {
     // For Stores page, always use storesAreaStoreFilter (not dashboardPieFilter)
     return storesAreaStoreFilter;
   }, [storesAreaStoreFilter]);
-  
+
   const storesProcessedData = useDataProcessing({
     stores,
     employees,
@@ -894,388 +793,367 @@ const handleNotificationClick = (notificationId: string) => {
     () => [...storesDailyMetrics, ...salesTransactions, ...kingDuvetSales],
     [storesDailyMetrics, salesTransactions, kingDuvetSales]
   );
-  
-  const { handleSmartUpload, uploadResult, clearUploadResult } = useSmartUploader(db, setAppMessage, setIsProcessing, employees, stores);
 
-  const runWithRecalculation = useCallback((setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
-    setIsRecalculating(true);
-    setter(value);
-    setTimeout(() => setIsRecalculating(false), 50);
+  const { handleSmartUpload, uploadResult, clearUploadResult } = useSmartUploader(null, setAppMessage, setIsProcessing, employees, stores);
+
+  /**
+   * Wrapper for filter setters that triggers the recalculation overlay.
+   * Returns a function compatible with React.Dispatch<React.SetStateAction<T>>.
+   */
+  const runWithRecalculation = useCallback(function <T>(setter: React.Dispatch<React.SetStateAction<T>>) {
+    return (value: React.SetStateAction<T>) => {
+      setIsRecalculating(true);
+      setter(value);
+      setTimeout(() => setIsRecalculating(false), 50);
+    };
   }, []);
 
   // --- CRUD and Action Handlers ---
-    const handleSave = async (collectionName: 'stores' | 'employees', data: any) => {
-        const isNew = !data.id;
-        if (isNew && profile?.role !== 'admin') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to add new items.', type: 'alert' });
-            return;
-        }
+  const handleSave = async (collectionName: 'stores' | 'employees', data: any) => {
+    const isNew = !data.id;
+    if (isNew && profile?.role !== 'admin') {
+      setAppMessage({ isOpen: true, text: 'You do not have permission to add new items.', type: 'alert' });
+      return;
+    }
 
-        if (collectionName === 'employees' && profile?.role !== 'admin' && profile?.role !== 'area_manager') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to modify employees.', type: 'alert' });
-            return;
-        }
+    if (collectionName === 'employees' && profile?.role !== 'admin' && profile?.role !== 'area_manager') {
+      setAppMessage({ isOpen: true, text: 'You do not have permission to modify employees.', type: 'alert' });
+      return;
+    }
 
-        if (collectionName === 'stores' && profile?.role !== 'admin' && profile?.role !== 'general_manager') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to modify stores.', type: 'alert' });
-            return;
-        }
+    if (collectionName === 'stores' && profile?.role !== 'admin' && profile?.role !== 'general_manager') {
+      setAppMessage({ isOpen: true, text: 'You do not have permission to modify stores.', type: 'alert' });
+      return;
+    }
 
-        setIsProcessing(true);
-        setAppMessage({ 
-            isOpen: true, 
-            text: `Store/Employee management is not available via UI. Data now comes from PostgreSQL (SQL) and D365 API. Please update data directly in PostgreSQL or D365.`, 
-            type: 'alert' 
-        });
-        setIsProcessing(false);
-        setModalState({ type: null });
-    };
+    setIsProcessing(true);
+    setAppMessage({
+      isOpen: true,
+      text: `Store/Employee management is not available via UI. Data now comes from PostgreSQL (SQL) and D365 API. Please update data directly in PostgreSQL or D365.`,
+      type: 'alert'
+    });
+    setIsProcessing(false);
+    setModalState({ type: null });
+  };
 
-    // NO Firestore operations for stores/employees/businessRules - data now comes from PostgreSQL and D365
-    // Only users deletion is kept for authentication management
-    const handleDelete = (collectionName: 'stores' | 'employees' | 'businessRules', id: string, name: string) => {
-        if (profile?.role !== 'admin') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to delete items.', type: 'alert' });
-            return;
-        }
-        setAppMessage({
-            isOpen: true, 
-            text: `Deletion is not available via UI. ${collectionName} data now comes from PostgreSQL (SQL) and D365 API. Please delete data directly in PostgreSQL or D365.`, 
-            type: 'alert'
-        });
-    };
-    
-    const handleDailyMetricSave = async (metricData: any) => {
-        // NO Firestore writes - data now comes from API/local JSON only
-        // This function is disabled to prevent Firestore connections
-        setIsProcessing(true);
-        setAppMessage({ isOpen: true, text: t('daily_metric_success') || 'Daily metric saved (local only - no Firestore)', type: 'alert' });
-        setIsProcessing(false);
-        setModalState({ type: null });
-    };
+  // NO Firestore operations for stores/employees/businessRules - data now comes from PostgreSQL and D365
+  // Only users deletion is kept for authentication management
+  const handleDelete = (collectionName: 'stores' | 'employees' | 'businessRules', _id: string, _name: string) => {
+    if (profile?.role !== 'admin') {
+      setAppMessage({ isOpen: true, text: 'You do not have permission to delete items.', type: 'alert' });
+      return;
+    }
+    setAppMessage({
+      isOpen: true,
+      text: `Deletion is not available via UI. ${collectionName} data now comes from PostgreSQL (SQL) and D365 API. Please delete data directly in PostgreSQL or D365.`,
+      type: 'alert'
+    });
+  };
 
+  const handleDailyMetricSave = async (_metricData: any) => {
     // NO Firestore writes - data now comes from API/local JSON only
-    const handleVisitorsSave = async (data: { date: string; store: string; visitors: number }) => {
-        // This function is disabled to prevent Firestore connections
-        setIsProcessing(true);
-        setAppMessage({ isOpen: true, text: t('add_visitors_success') || 'Visitors saved (local only - no Firestore)', type: 'alert' });
-            setIsProcessing(false);
-            setModalState({ type: null });
-    };
+    // This function is disabled to prevent Firestore connections
+    setIsProcessing(true);
+    setAppMessage({ isOpen: true, text: t('daily_metric_success') || 'Daily metric saved (local only - no Firestore)', type: 'alert' });
+    setIsProcessing(false);
+    setModalState({ type: null });
+  };
 
-    const handleMonthlyMetricSave = async (metricData: any) => {
-        // NO Firestore writes - data now comes from API/local JSON only
-        // This function is disabled to prevent Firestore connections
-        setIsProcessing(true);
-        setAppMessage({ isOpen: true, text: t('monthly_metric_success') || 'Monthly metric saved (local only - no Firestore)', type: 'alert' });
-            setIsProcessing(false);
-            setModalState({ type: null });
-    };
-    
-    const handleDeleteAllData = () => {
-        // NO Firestore operations - data now comes from PostgreSQL and D365
-        // This function is disabled - data management should be done via PostgreSQL or D365
-        setAppMessage({
-            isOpen: true,
-            text: 'Data deletion is not available. Data now comes from PostgreSQL (SQL) and D365 API.',
-            type: 'alert'
-        });
-    };
+  // NO Firestore writes - data now comes from API/local JSON only
+  const handleVisitorsSave = async (_data: { date: string; store: string; visitors: number }) => {
+    // This function is disabled to prevent Firestore connections
+    setIsProcessing(true);
+    setAppMessage({ isOpen: true, text: t('add_visitors_success') || 'Visitors saved (local only - no Firestore)', type: 'alert' });
+    setIsProcessing(false);
+    setModalState({ type: null });
+  };
 
+  const handleMonthlyMetricSave = async (_metricData: any) => {
+    // NO Firestore writes - data now comes from API/local JSON only
+    // This function is disabled to prevent Firestore connections
+    setIsProcessing(true);
+    setAppMessage({ isOpen: true, text: t('monthly_metric_success') || 'Monthly metric saved (local only - no Firestore)', type: 'alert' });
+    setIsProcessing(false);
+    setModalState({ type: null });
+  };
+
+  const handleDeleteAllData = () => {
     // NO Firestore operations - data now comes from PostgreSQL and D365
-    // This function is disabled - data deletion should be done via PostgreSQL or D365
-    const handleSelectiveDelete = async (dataType: 'visitors' | 'sales' | 'products', year: number, month: number) => {
-        const monthName = new Date(year, month).toLocaleString(locale, { month: 'long' });
-        setAppMessage({
-            isOpen: true,
-            text: `Data deletion is not available. Data now comes from PostgreSQL (SQL) and D365 API. To delete ${dataType} for ${monthName} ${year}, use PostgreSQL directly.`,
-            type: 'alert'
-        });
-    };
+    // This function is disabled - data management should be done via PostgreSQL or D365
+    setAppMessage({
+      isOpen: true,
+      text: 'Data deletion is not available. Data now comes from PostgreSQL (SQL) and D365 API.',
+      type: 'alert'
+    });
+  };
 
-    const handleSaveBusinessRule = async (rule: string, existingRuleId?: string) => {
-        if (!rule.trim() && !existingRuleId) return;
-        setIsProcessing(true);
-        try {
-            if (existingRuleId && !rule.trim()) {
-                await db.collection('businessRules').doc(existingRuleId).delete();
-                setAppMessage({ isOpen: true, text: 'تم حذف القاعدة بنجاح', type: 'alert' });
-            } else if (existingRuleId) {
-                await db.collection('businessRules').doc(existingRuleId).set({ rule });
-                setAppMessage({ isOpen: true, text: t('rule_saved_success'), type: 'alert' });
-            } else {
-                await db.collection('businessRules').add({ rule });
-                setAppMessage({ isOpen: true, text: t('rule_saved_success'), type: 'alert' });
-            }
-        } catch (error: any) {
-             setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
-        } finally {
-            setIsProcessing(false);
-        }
-    };
+  // NO Firestore operations - data now comes from PostgreSQL and D365
+  // This function is disabled - data deletion should be done via PostgreSQL or D365
+  const handleSelectiveDelete = async (dataType: 'visitors' | 'sales' | 'products', year: number, month: number) => {
+    const monthName = new Date(year, month).toLocaleString(locale, { month: 'long' });
+    setAppMessage({
+      isOpen: true,
+      text: `Data deletion is not available. Data now comes from PostgreSQL (SQL) and D365 API. To delete ${dataType} for ${monthName} ${year}, use PostgreSQL directly.`,
+      type: 'alert'
+    });
+  };
 
-    const handleUpdateUser = async (userId: string, data: Partial<UserProfile>) => {
-        setIsProcessing(true);
-        try {
-            await db.collection('users').doc(userId).update(data);
-            setAppMessage({ isOpen: true, text: t('user_updated_success'), type: 'alert' });
-        } catch (error: any) {
-            setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
-        } finally {
-            setIsProcessing(false);
-            setModalState({ type: null });
-        }
-    };
+  const handleSaveBusinessRule = async (rule: string, existingRuleId?: string) => {
+    if (!rule.trim() && !existingRuleId) return;
+    setIsProcessing(true);
+    try {
+      if (existingRuleId && !rule.trim()) {
+        // await db.collection('businessRules').doc(existingRuleId).delete();
+        alert('Rule deletion disabled.');
+      } else if (existingRuleId) {
+        // await db.collection('businessRules').doc(existingRuleId).set({ rule });
+        alert('Rule update disabled.');
+      } else {
+        // await db.collection('businessRules').add({ rule });
+        alert('Rule creation disabled.');
+      }
+    } catch (error: any) {
+      setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-    const handleDeleteUser = (userId: string, userName: string) => {
-        if (profile?.role !== 'admin') {
-            setAppMessage({ isOpen: true, text: 'You do not have permission to delete users.', type: 'alert' });
-            return;
-        }
-        
-        setAppMessage({
-            isOpen: true,
-            text: `Are you sure you want to delete user "${userName}"? This action cannot be undone.`,
-            type: 'confirm',
-            onConfirm: async () => {
-                setIsProcessing(true);
-                try {
-                    await db.collection('users').doc(userId).delete();
-                    setAppMessage({ isOpen: true, text: t('user_deleted_success'), type: 'alert' });
-                } catch (error: any) {
-                    console.error('Error deleting user:', error);
-                    setAppMessage({ isOpen: true, text: t('error_deleting_user'), type: 'alert' });
-                } finally {
-                    setIsProcessing(false);
-                }
-            }
-        });
-    };
+  const handleUpdateUser = async (_userId: string, _data: Partial<UserProfile>) => {
+    setIsProcessing(true);
+    try {
+      // await db.collection('users').doc(_userId).update(_data);
+      alert('User updates are currently disabled.');
+    } catch (error: any) {
+      setAppMessage({ isOpen: true, text: `${t('error')}: ${error.message}`, type: 'alert' });
+    } finally {
+      setIsProcessing(false);
+      setModalState({ type: null });
+    }
+  };
 
-    const handleSaveTask = async (taskData: { recipientId: string, recipientName: string, title: string, message: string }) => {
-        // NO Firestore writes - tasks no longer stored in Firestore
-        // This function is disabled to prevent Firestore connections
-        if (!user || !profile) return;
-        setIsProcessing(true);
-        setAppMessage({ isOpen: true, text: `Task sent to ${taskData.recipientName} (local only - no Firestore).`, type: 'alert' });
-            setIsProcessing(false); 
-            setModalState({ type: null }); 
-    };
 
-    const handleUpdateTaskStatus = async (taskId: string, status: 'completed') => {
-        try {
-            const taskRef = db.collection('tasks').doc(taskId);
-            const updateData: any = { status };
-            if (status === 'completed') {
-                updateData.completedAt = Timestamp.now();
-            }
-            await taskRef.update(updateData);
-        } catch (error: any) {
-            setAppMessage({ isOpen: true, text: `Error updating task: ${error.message}`, type: 'alert' });
-        }
-    };
+
+  const handleSaveTask = async (taskData: { recipientId: string, recipientName: string, title: string, message: string }) => {
+    // NO Firestore writes - tasks no longer stored in Firestore
+    // This function is disabled to prevent Firestore connections
+    if (!user || !profile) return;
+    setIsProcessing(true);
+    setAppMessage({ isOpen: true, text: `Task sent to ${taskData.recipientName} (local only - no Firestore).`, type: 'alert' });
+    setIsProcessing(false);
+    setModalState({ type: null });
+  };
+
+  const handleUpdateTaskStatus = async (_taskId: string, _status: 'completed') => {
+    try {
+      // const taskRef = db.collection('tasks').doc(_taskId);
+      alert('Task status updates disabled.');
+    } catch (error: any) {
+      setAppMessage({ isOpen: true, text: `Error updating task: ${error.message}`, type: 'alert' });
+    }
+  };
 
   const handleLogout = async () => {
-    await auth.signOut();
+    logout();
   };
-  
+
   const navItemsConfig = useMemo(() => {
-      const role: UserRole = profile?.role || 'employee';
-      const allItems = [
-          { icon: <HomeIcon />, label: t('dashboard'), name: "dashboard", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
-          { icon: <LiveIcon />, label: t('live'), name: "live", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
-          { icon: <ChartBarIcon />, label: t('lfl_comparison'), name: "lfl", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
-          { icon: <OfficeBuildingIcon />, label: t('stores'), name: "stores", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
-          { icon: <UserGroupIcon />, label: t('employees'), name: "employees", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
-          { icon: <CalculatorIcon />, label: t('commissions'), name: "commissions", roles: ['admin', 'general_manager', 'area_manager', 'store_manager'] as UserRole[] },
-          { icon: <CubeIcon />, label: t('products'), name: "products", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
-          { icon: <UploadIcon />, label: t('smart_upload'), name: "uploads", roles: ['admin', 'general_manager', 'area_manager'] as UserRole[] },
-          { icon: <CogIcon />, label: t('settings'), name: "settings", roles: ['admin', 'general_manager'] as UserRole[] },
-          { icon: <span>⏳</span>, label: t('pending_approvals'), name: "pendingApprovals", roles: ['admin'] as UserRole[] },
-          { icon: <span>👥</span>, label: t('roles_management'), name: "rolesManagement", roles: ['admin'] as UserRole[] },
-      ];
-      return allItems.filter(item => item.roles.includes(role));
+    const role: UserRole = profile?.role || 'employee';
+    const allItems = [
+      { icon: <HomeIcon />, label: t('dashboard'), name: "dashboard", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
+      { icon: <LiveIcon />, label: t('live'), name: "live", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
+      { icon: <ChartBarIcon />, label: t('lfl_comparison'), name: "lfl", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
+      { icon: <OfficeBuildingIcon />, label: t('stores'), name: "stores", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
+      { icon: <UserGroupIcon />, label: t('employees'), name: "employees", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
+      { icon: <CalculatorIcon />, label: t('commissions'), name: "commissions", roles: ['admin', 'general_manager', 'area_manager', 'store_manager'] as UserRole[] },
+      { icon: <CubeIcon />, label: t('products'), name: "products", roles: ['admin', 'general_manager', 'area_manager', 'store_manager', 'employee'] as UserRole[] },
+      { icon: <UploadIcon />, label: t('smart_upload'), name: "uploads", roles: ['admin', 'general_manager', 'area_manager'] as UserRole[] },
+      { icon: <CogIcon />, label: t('settings'), name: "settings", roles: ['admin', 'general_manager'] as UserRole[] },
+      { icon: <span>⏳</span>, label: t('pending_approvals'), name: "pendingApprovals", roles: ['admin'] as UserRole[] },
+      { icon: <span>👥</span>, label: t('roles_management'), name: "rolesManagement", roles: ['admin'] as UserRole[] },
+    ];
+    return allItems.filter(item => item.roles.includes(role));
   }, [profile, t]);
-  
+
   useEffect(() => {
-      if (profile && !navItemsConfig.find(item => item.name === activeTab)) {
-          setActiveTab(navItemsConfig[0]?.name || 'dashboard');
-      }
+    if (profile && !navItemsConfig.find(item => item.name === activeTab)) {
+      setActiveTab(navItemsConfig[0]?.name || 'dashboard');
+    }
   }, [navItemsConfig, activeTab, profile]);
 
   if (profile?.status === 'pending') {
-      return <PendingApprovalPage onLogout={handleLogout} />;
+    return <PendingApprovalPage onLogout={handleLogout} />;
   }
 
- const renderContent = () => {
-  if (dataLoading) {
-    return (
-       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+  const renderContent = () => {
+    if (dataLoading) {
+      return (
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
-      </div>
-    );
-  }
+        </div>
+      );
+    }
 
-  if (activeTab === 'stores' && selectedArea) {
-      return <AreaDetailPage 
-          areaManager={selectedArea.managerName}
-          stores={selectedArea.stores}
-          allMetrics={dailyMetrics} 
-          onBack={() => setSelectedArea(null)}
-          allStores={processedData.storeSummary}
-          setModalState={setModalState}
-          allDateData={allDateData}
-          profile={profile}
-          onSelectStore={(store) => {
-            setSelectedArea(null);
-            setSelectedStore(store);
-          }}
+    if (activeTab === 'stores' && selectedArea) {
+      return <AreaDetailPage
+        areaManager={selectedArea.managerName}
+        stores={selectedArea.stores}
+        allMetrics={dailyMetrics}
+        onBack={() => setSelectedArea(null)}
+        allStores={processedData.storeSummary}
+        setModalState={setModalState}
+        allDateData={allDateData}
+        profile={profile}
+        onSelectStore={(store) => {
+          setSelectedArea(null);
+          setSelectedStore(store);
+        }}
       />;
-  }
+    }
 
-  if (activeTab === 'stores' && selectedStore) {
-      return <StoreDetailPage 
-          store={selectedStore} 
-          allMetrics={storesDailyMetrics} 
-          onBack={() => setSelectedStore(null)}
-          allStores={storesProcessedData.storeSummary}
-          storesDateFilter={storesDateFilter}
-          setStoresDateFilter={setStoresDateFilter}
-          setModalState={setModalState}
-          allDateData={storesAllDateData}
-          profile={profile}
-          businessRules={businessRules}
-          onSaveRule={handleSaveBusinessRule}
-          onDeleteRule={(id) => handleDelete('businessRules', id, 'this rule')}
-          isProcessing={isProcessing}
+    if (activeTab === 'stores' && selectedStore) {
+      return <StoreDetailPage
+        store={selectedStore}
+        allMetrics={storesDailyMetrics}
+        onBack={() => setSelectedStore(null)}
+        allStores={storesProcessedData.storeSummary}
+        storesDateFilter={storesDateFilter}
+        setStoresDateFilter={setStoresDateFilter}
+        setModalState={setModalState}
+        allDateData={storesAllDateData}
+        profile={profile}
+        businessRules={businessRules}
+        onSaveRule={handleSaveBusinessRule}
+        onDeleteRule={(id) => handleDelete('businessRules', id, 'this rule')}
+        isProcessing={isProcessing}
       />;
-  }
-  
-  const pageProps = {
+    }
+
+    const pageProps = {
       areaStoreFilter,
-      setAreaStoreFilter: (value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value),
+      setAreaStoreFilter: runWithRecalculation(setAreaStoreFilter),
       allStores: stores,
       allDateData: allDateData,
       setModalState,
       isRecalculating,
       profile,
-  };
+    };
 
-  switch (activeTab) {
-    case 'dashboard':
-      return (
-        <Dashboard
-          {...dashboardProcessedData}
-          {...pageProps}
-          dateFilter={dashboardDateFilter}
-          setDateFilter={(value: DateFilter) => runWithRecalculation(setDashboardDateFilter, value)}
-          dashboardPieFilter={dashboardPieFilter}
-          setDashboardPieFilter={setDashboardPieFilter}
-          tasks={tasks}
-          onUpdateTaskStatus={handleUpdateTaskStatus}
-          isProcessing={isProcessing}
-        />
-      );
-    case 'stores':
-      // Use independent dateFilter and processedData for Stores page
-      // Use storesAreaStoreFilter (independent) for Stores page
-      return (
-        <StoresPage
-          {...storesProcessedData}
-          dateFilter={storesDateFilter}
-          setDateFilter={(value: DateFilter) => runWithRecalculation(setStoresDateFilter, value)}
-          areaStoreFilter={storesAreaStoreFilter}
-          setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setStoresAreaStoreFilter, value)}
+    switch (activeTab) {
+      case 'dashboard':
+        return (
+          <Dashboard
+            {...dashboardProcessedData}
+            {...pageProps}
+            dateFilter={dashboardDateFilter}
+            setDateFilter={runWithRecalculation(setDashboardDateFilter)}
+            dashboardPieFilter={dashboardPieFilter}
+            setDashboardPieFilter={runWithRecalculation(setDashboardPieFilter)}
+            tasks={tasks}
+            onUpdateTaskStatus={handleUpdateTaskStatus}
+            isProcessing={isProcessing}
+          />
+        );
+      case 'stores':
+        // Use independent dateFilter and processedData for Stores page
+        // Use storesAreaStoreFilter (independent) for Stores page
+        return (
+          <StoresPage
+            {...storesProcessedData}
+            dateFilter={storesDateFilter}
+            setDateFilter={runWithRecalculation(setStoresDateFilter)}
+            areaStoreFilter={storesAreaStoreFilter}
+            setAreaStoreFilter={runWithRecalculation(setStoresAreaStoreFilter)}
+            allStores={stores}
+            allDateData={storesAllDateData}
+            setModalState={setModalState}
+            isRecalculating={isRecalculating}
+            profile={profile}
+            onEdit={d => setModalState({ type: 'store', data: d })}
+            onDelete={(id, name) => handleDelete('stores', id, name)}
+            onSelectStore={setSelectedStore}
+            onSelectArea={(managerName, stores) => setSelectedArea({ managerName, stores })}
+            allMetrics={storesDailyMetrics}
+          />
+        );
+      case 'employees':
+        // Use independent dateFilter and processedData for Employees page
+        return <EmployeesPage
+          {...employeesProcessedData}
+          dateFilter={employeesDateFilter}
+          setDateFilter={runWithRecalculation(setEmployeesDateFilter)}
+          areaStoreFilter={areaStoreFilter}
+          setAreaStoreFilter={runWithRecalculation(setAreaStoreFilter)}
           allStores={stores}
-          allDateData={storesAllDateData}
+          allDateData={allDateData}
           setModalState={setModalState}
           isRecalculating={isRecalculating}
           profile={profile}
-          onEdit={d => setModalState({ type: 'store', data: d })}
-          onDelete={(id, name) => handleDelete('stores', id, name)}
-          onSelectStore={setSelectedStore}
-          onSelectArea={(managerName, stores) => setSelectedArea({ managerName, stores })}
-          allMetrics={storesDailyMetrics}
-        />
-      );
-     case 'employees':
-      // Use independent dateFilter and processedData for Employees page
-      return <EmployeesPage 
-          {...employeesProcessedData}
-          dateFilter={employeesDateFilter}
-          setDateFilter={(value: DateFilter) => runWithRecalculation(setEmployeesDateFilter, value)}
-          areaStoreFilter={areaStoreFilter} 
-          setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} 
-          allStores={stores} 
-          allDateData={allDateData} 
-          setModalState={setModalState} 
-          isRecalculating={isRecalculating} 
-          profile={profile}
-          onEdit={d => setModalState({type: 'employee', data: d})} 
-          onDelete={(id, name) => handleDelete('employees', id, name)} 
-          dailyMetrics={employeesDailyMetrics} 
+          onEdit={d => setModalState({ type: 'employee', data: d })}
+          onDelete={(id, name) => handleDelete('employees', id, name)}
+          dailyMetrics={employeesDailyMetrics}
           salesTransactions={salesTransactions}
           kingDuvetSales={kingDuvetSales}
           allEmployees={employees}
           storeSummary={employeesProcessedData.storeSummary}
-          />;
-     case 'products':
-       // Use independent dateFilter and processedData for Products page
-      return <ProductsPage {...productsProcessedData} dateFilter={productsDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setProductsDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} />;
-     case 'commissions':
+        />;
+      case 'products':
+        // Use independent dateFilter and processedData for Products page
+        return <ProductsPage {...productsProcessedData} dateFilter={productsDateFilter} setDateFilter={runWithRecalculation(setProductsDateFilter)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={runWithRecalculation(setAreaStoreFilter)} allStores={stores} allProducts={products} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} />;
+      case 'commissions':
         // Use independent dateFilter and processedData for Commissions page
-        return <CommissionsPage {...commissionsProcessedData} dateFilter={commissionsDateFilter} setDateFilter={(value: DateFilter) => runWithRecalculation(setCommissionsDateFilter, value)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={(value: AreaStoreFilterState) => runWithRecalculation(setAreaStoreFilter, value)} allStores={stores} allDateData={allDateData} setModalState={setModalState} isRecalculating={isRecalculating} profile={profile} />;
-    case 'uploads':
-       return (
-         <SmartUploaderPage
-           onUpload={handleSmartUpload}
-           isProcessing={isProcessing}
-           uploadResult={uploadResult}
-           onClearResult={clearUploadResult}
-           employeeSummaries={Object.values(processedData.employeeSummary).flat()}
-           storeSummaries={processedData.storeSummary}
-           storePerformanceExtras={processedData.storePerformanceExtras}
-           duvetSummary={processedData.duvetSummary}
-          employeeDuvetSales={processedData.employeeDuvetSales}
-           employees={employees}
-           dateFilter={dashboardDateFilter}
-           setDateFilter={(value: DateFilter) => runWithRecalculation(setDashboardDateFilter, value)}
-           allData={allDateData}
-           allMetrics={dailyMetrics}
-           allStores={stores}
-         />
-       );
-     case 'live':
-        return <LivePage stores={stores} profile={profile} />;
-     case 'lfl':
-        return <LFLPage allStores={stores} allMetrics={dailyMetrics} profile={profile}/>;
-     case 'settings':
+        return <CommissionsPage {...commissionsProcessedData} dateFilter={commissionsDateFilter} setDateFilter={runWithRecalculation(setCommissionsDateFilter)} areaStoreFilter={areaStoreFilter} setAreaStoreFilter={runWithRecalculation(setAreaStoreFilter)} allStores={stores} allDateData={allDateData} isRecalculating={isRecalculating} profile={profile} />;
+      case 'uploads':
+        return (
+          <SmartUploaderPage
+            onUpload={handleSmartUpload}
+            isProcessing={isProcessing}
+            uploadResult={uploadResult}
+            onClearResult={clearUploadResult}
+            employeeSummaries={Object.values(processedData.employeeSummary).flat()}
+            storeSummaries={processedData.storeSummary}
+            storePerformanceExtras={processedData.storePerformanceExtras}
+            duvetSummary={processedData.duvetSummary}
+            employeeDuvetSales={processedData.employeeDuvetSales}
+            employees={employees}
+            dateFilter={dashboardDateFilter}
+            setDateFilter={runWithRecalculation(setDashboardDateFilter)}
+            allData={allDateData}
+            allMetrics={dailyMetrics}
+            allStores={stores}
+          />
+        );
+      case 'live':
+        return <LivePage profile={profile} />;
+      case 'lfl':
+        return <LFLPage allStores={stores} allMetrics={dailyMetrics} profile={profile} />;
+      case 'settings':
         return <SettingsPage
-                  storeSummary={processedData.storeSummary}
-                  onAddMonthlyData={() => setModalState({type: 'monthlyStoreMetric'})}
-                  onDeleteAllData={handleDeleteAllData}
-                  onSelectiveDelete={handleSelectiveDelete}
-                  isProcessing={isProcessing}
-                  profile={profile}
-               />;
-     case 'pendingApprovals':
+          storeSummary={processedData.storeSummary}
+          onAddMonthlyData={() => setModalState({ type: 'monthlyStoreMetric' })}
+          onDeleteAllData={handleDeleteAllData}
+          onSelectiveDelete={handleSelectiveDelete}
+          isProcessing={isProcessing}
+          profile={profile}
+        />;
+      case 'pendingApprovals':
         return <PendingApprovalsPage />;
-     case 'rolesManagement':
+      case 'rolesManagement':
         return <RolesManagementPage />;
-    default:
-      return (
-        <div className="text-center p-10 bg-white rounded-lg shadow">
-          <h2 className="text-2xl font-bold text-zinc-800">{t('page_not_found_title')}</h2>
-          <p className="text-zinc-500 mt-2">{t('page_not_found_message')}</p>
-        </div>
-      );
-  }
-};
+      default:
+        return (
+          <div className="text-center p-10 bg-white rounded-lg shadow">
+            <h2 className="text-2xl font-bold text-zinc-800">{t('page_not_found_title')}</h2>
+            <p className="text-zinc-500 mt-2">{t('page_not_found_message')}</p>
+          </div>
+        );
+    }
+  };
 
-  const fullProcessedData = { ...processedData, salesTransactions, kingDuvetSales };
+  // const fullProcessedData = { ...processedData, salesTransactions, kingDuvetSales };
 
   const sidebarOffscreenClass = locale === 'ar' ? 'translate-x-full' : '-translate-x-full';
-  
+
   const isAdmin = profile?.role === 'admin' || profile?.role === 'general_manager';
 
   return (
@@ -1296,16 +1174,16 @@ const handleNotificationClick = (notificationId: string) => {
             </div>
           </div>
         </div>
-        
+
         {/* القائمة */}
         <nav className="flex-grow overflow-y-auto p-3 sm:p-4">
           <ul className="space-y-2">
-             {navItemsConfig.map(item => (
-                <NavItem key={item.name} {...item} activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} />
+            {navItemsConfig.map(item => (
+              <NavItem key={item.name} {...item} activeTab={activeTab} setActiveTab={setActiveTab} setIsSidebarOpen={setIsSidebarOpen} />
             ))}
           </ul>
         </nav>
-        
+
         {/* معلومات المستخدم */}
         <div className="p-3 sm:p-4 border-t border-primary-100 bg-white">
           <div className="flex items-center space-x-3 mb-3">
@@ -1326,47 +1204,47 @@ const handleNotificationClick = (notificationId: string) => {
       </aside>
       <main className="flex-1 p-2 sm:p-4 md:p-6 md:ltr:ml-64 md:rtl:mr-64 lg:ltr:ml-72 lg:rtl:mr-72 bg-neutral-50 min-h-screen">
         <header className="bg-white rounded-2xl shadow-lg border border-neutral-200 p-4 sm:p-6 mb-4 sm:mb-6">
-            <div className="flex justify-between items-center flex-wrap gap-3">
-                <div className="flex items-center gap-4 min-w-0">
-                    <button className="md:hidden p-3 text-neutral-600 hover:bg-neutral-100 rounded-xl transition-all duration-200" onClick={() => setIsSidebarOpen(true)}>
-                        <MenuIcon />
-                    </button>
-                    <div className="min-w-0">
-                        <h2 className="text-2xl font-bold text-neutral-900 capitalize truncate max-w-[70vw] sm:max-w-none">{t(activeTab.replace(/([A-Z])/g, ' $1').replace('ai', 'AI'))}</h2>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                     {isAdmin && <NotificationBell notifications={notifications} onNotificationClick={handleNotificationClick} />}
-                     <button onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')} className="px-3 py-1.5 text-xs font-semibold rounded-full border border-zinc-300 hover:bg-gray-100 text-zinc-700" title={locale === 'en' ? 'العربية' : 'English'}>
-                        {locale === 'en' ? 'A' : 'ع'} - {locale === 'en' ? 'ع' : 'A'}
-                     </button>
-                     <UserMenu user={user} profile={profile} onLogout={handleLogout} />
-                </div>
+          <div className="flex justify-between items-center flex-wrap gap-3">
+            <div className="flex items-center gap-4 min-w-0">
+              <button className="md:hidden p-3 text-neutral-600 hover:bg-neutral-100 rounded-xl transition-all duration-200" onClick={() => setIsSidebarOpen(true)}>
+                <MenuIcon />
+              </button>
+              <div className="min-w-0">
+                <h2 className="text-2xl font-bold text-neutral-900 capitalize truncate max-w-[70vw] sm:max-w-none">{t(activeTab.replace(/([A-Z])/g, ' $1').replace('ai', 'AI'))}</h2>
+              </div>
             </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {isAdmin && <NotificationBell notifications={notifications} onNotificationClick={handleNotificationClick} />}
+              <button onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')} className="px-3 py-1.5 text-xs font-semibold rounded-full border border-zinc-300 hover:bg-gray-100 text-zinc-700" title={locale === 'en' ? 'العربية' : 'English'}>
+                {locale === 'en' ? 'A' : 'ع'} - {locale === 'en' ? 'ع' : 'A'}
+              </button>
+              <UserMenu user={user} profile={profile} onLogout={handleLogout} />
+            </div>
+          </div>
         </header>
         {renderContent()}
       </main>
 
-        {modalState.type &&
-            <div className="modal-backdrop">
-                {modalState.type === 'visitors' && <VisitorsModal onSave={handleVisitorsSave} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} stores={processedData.storeSummary} profile={profile} />}
-                {modalState.type === 'employee' && <EmployeeModal profile={profile} data={modalState.data} onSave={(data) => handleSave('employees', data)} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} stores={stores} />}
-                {modalState.type === 'store' && <StoreModal profile={profile} data={modalState.data} onSave={(data) => handleSave('stores', data)} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} />}
-                {modalState.type === 'dailyMetric' && <DailyMetricModal data={modalState.data} onSave={handleDailyMetricSave} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} stores={stores} />}
-                {modalState.type === 'monthlyStoreMetric' && <MonthlyStoreMetricModal onSave={handleMonthlyMetricSave} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} stores={stores} />}
-                {modalState.type === 'userEdit' && <UserEditModal data={modalState.data} onSave={handleUpdateUser} onClose={() => setModalState({type: null})} isProcessing={isProcessing} stores={stores} allEmployees={employees} />}
-                {modalState.type === 'aiCoaching' && <AiCoachingModal data={modalState.data} onClose={() => setModalState({ type: null })} />}
-                {modalState.type === 'salesForecast' && <SalesForecastModal salesData={modalState.data} onClose={() => setModalState({ type: null })} />}
-                {modalState.type === 'salesPitch' && <SalesPitchModal product={modalState.data} onClose={() => setModalState({ type: null })} />}
-                {modalState.type === 'naturalLanguageSearch' && <NaturalLanguageSearchModal query={modalState.data.query} fullData={processedData} onClose={() => setModalState({type: null})} />}
-                {modalState.type === 'aiComparison' && <AiComparisonModal data={modalState.data.item} allItems={modalState.data.allItems} type={modalState.data.type} onClose={() => setModalState({type: null})} />}
-                {modalState.type === 'aiPrediction' && <AiPredictionModal data={modalState.data} onClose={() => setModalState({type: null})} />}
-                {modalState.type === 'kpiBreakdown' && <KPIBreakdownModal data={modalState.data} onClose={() => setModalState({ type: null })} />}
-                {modalState.type === 'productDetails' && <ProductDetailsModal data={modalState.data} onClose={() => setModalState({ type: null })} />}
-                {modalState.type === 'task' && <TaskModal data={modalState.data} onSave={handleSaveTask} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} />}
-            </div>
-        }
-        {appMessage.isOpen && <AppMessageModal message={appMessage} onClose={() => setAppMessage({ isOpen: false, text: '', type: 'alert' })} />}
+      {modalState.type &&
+        <div className="modal-backdrop">
+          {modalState.type === 'visitors' && <VisitorsModal onSave={handleVisitorsSave} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} stores={processedData.storeSummary} profile={profile} />}
+          {modalState.type === 'employee' && <EmployeeModal profile={profile} data={modalState.data} onSave={(data) => handleSave('employees', data)} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} stores={stores} />}
+          {modalState.type === 'store' && <StoreModal profile={profile} data={modalState.data} onSave={(data) => handleSave('stores', data)} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} />}
+          {modalState.type === 'dailyMetric' && <DailyMetricModal data={modalState.data} onSave={handleDailyMetricSave} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} stores={stores} />}
+          {modalState.type === 'monthlyStoreMetric' && <MonthlyStoreMetricModal onSave={handleMonthlyMetricSave} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} stores={stores} />}
+          {modalState.type === 'userEdit' && <UserEditModal data={modalState.data} onSave={handleUpdateUser} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} stores={stores} allEmployees={employees} />}
+          {modalState.type === 'aiCoaching' && <AiCoachingModal data={modalState.data} onClose={() => setModalState({ type: null })} />}
+          {modalState.type === 'salesForecast' && <SalesForecastModal salesData={modalState.data} onClose={() => setModalState({ type: null })} />}
+          {modalState.type === 'salesPitch' && <SalesPitchModal product={modalState.data} onClose={() => setModalState({ type: null })} />}
+          {modalState.type === 'naturalLanguageSearch' && <NaturalLanguageSearchModal query={modalState.data.query} fullData={processedData} onClose={() => setModalState({ type: null })} />}
+          {modalState.type === 'aiComparison' && <AiComparisonModal data={modalState.data.item} allItems={modalState.data.allItems} type={modalState.data.type} onClose={() => setModalState({ type: null })} />}
+          {modalState.type === 'aiPrediction' && <AiPredictionModal data={modalState.data} onClose={() => setModalState({ type: null })} />}
+          {modalState.type === 'kpiBreakdown' && <KPIBreakdownModal data={modalState.data} onClose={() => setModalState({ type: null })} />}
+          {modalState.type === 'productDetails' && <ProductDetailsModal data={modalState.data} onClose={() => setModalState({ type: null })} />}
+          {modalState.type === 'task' && <TaskModal data={modalState.data} onSave={handleSaveTask} onClose={() => setModalState({ type: null })} isProcessing={isProcessing} />}
+        </div>
+      }
+      {appMessage.isOpen && <AppMessageModal message={appMessage} onClose={() => setAppMessage({ isOpen: false, text: '', type: 'alert' })} />}
     </div>
   );
 };

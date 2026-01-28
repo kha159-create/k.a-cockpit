@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { auth } from '@/services/firebase';
+import { useAuth } from '@/hooks/useAuth';
 import { getStores } from '@/data/dataProvider';
 import { apiUrl } from '@/utils/apiBase';
 
@@ -37,6 +37,7 @@ const pickEmployeeName = (d: any, id: string) =>
   );
 
 export const DirectoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [storeMap, setStoreMap] = useState<MapRec>({});
   const [employeeMap, setEmployeeMap] = useState<MapRec>({});
   const [loading, setLoading] = useState(true);
@@ -45,84 +46,65 @@ export const DirectoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     let cancelled = false;
 
-    const loadStores = async () => {
+    const loadData = async () => {
+      if (!user) {
+        setStoreMap({});
+        setEmployeeMap({});
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       try {
-        setLoading(true);
-        // Get current year for stores (or use 2026 as default for D365)
         const currentYear = new Date().getFullYear();
-        const storesList = await getStores(currentYear);
-        
+
+        // Parallel load
+        const [storesList] = await Promise.all([
+          getStores(currentYear)
+        ]);
+
         if (cancelled) return;
-        
+
         const sMap: MapRec = {};
         storesList.forEach((store) => {
           const key = String((store as any).store_id ?? store.id ?? store.name).trim();
           sMap[key] = pickStoreName(store, key);
         });
-        
         setStoreMap(sMap);
         console.log(`✅ DirectoryProvider: Loaded ${Object.keys(sMap).length} stores`);
+
+        // Load employees
+        if (currentYear > 2025) {
+          const url = apiUrl('/api/get-employees');
+          const response = await fetch(url);
+          if (response.ok) {
+            const result: any = await response.json();
+            if (!cancelled && result.success && Array.isArray(result.employees)) {
+              const eMap: MapRec = {};
+              result.employees.forEach((emp: any) => {
+                const key = String(emp.employeeId ?? emp.id ?? emp.name).trim();
+                eMap[key] = pickEmployeeName(emp, key);
+              });
+              setEmployeeMap(eMap);
+              console.log(`✅ DirectoryProvider: Loaded ${Object.keys(eMap).length} employees`);
+            }
+          }
+        }
+
       } catch (err: any) {
-        console.error('❌ DirectoryProvider stores load error:', err);
-        if (!cancelled) setError(err?.message || 'Failed to load stores');
+        console.error('❌ DirectoryProvider load error:', err);
+        if (!cancelled) setError(err?.message || 'Failed to load directory data');
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
 
-    const loadEmployees = async () => {
-      try {
-        // Load employees from API (2026+ only)
-        const currentYear = new Date().getFullYear();
-        if (currentYear <= 2025) {
-          // Legacy years have no employee data
-          if (!cancelled) setEmployeeMap({});
-          return;
-        }
-        
-        const url = apiUrl('/api/get-employees');
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          if (!cancelled) setEmployeeMap({});
-          return;
-        }
-        
-        const result: any = await response.json();
-        if (cancelled) return;
-        
-        const eMap: MapRec = {};
-        if (result.success && Array.isArray(result.employees)) {
-          result.employees.forEach((emp: any) => {
-            const key = String(emp.employeeId ?? emp.id ?? emp.name).trim();
-            eMap[key] = pickEmployeeName(emp, key);
-          });
-        }
-        
-        setEmployeeMap(eMap);
-        console.log(`✅ DirectoryProvider: Loaded ${Object.keys(eMap).length} employees`);
-      } catch (err: any) {
-        console.error('❌ DirectoryProvider employees load error:', err);
-        if (!cancelled) setEmployeeMap({});
-      }
-    };
-
-    const unsubAuth = auth.onAuthStateChanged((user) => {
-      if (cancelled) return;
-      if (user) {
-        loadStores();
-        loadEmployees();
-      } else {
-        setStoreMap({});
-        setEmployeeMap({});
-        setLoading(false);
-      }
-    });
+    loadData();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user]);
 
   const value = useMemo(() => ({ storeMap, employeeMap, loading, error }), [storeMap, employeeMap, loading, error]);
 

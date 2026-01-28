@@ -49,7 +49,7 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
 
     const filteredMetrics = useMemo(() => {
         return allMetrics.filter(m => {
-            if (m.store !== store.name) return false;
+            if (m.store !== store.name && (m as any).storeId !== store.id && (m as any).storeId !== (store as any).store_id) return false;
             const itemTimestamp = m.date;
             if (!itemTimestamp) return false;
             const itemDate =
@@ -122,20 +122,20 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
 
         const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
         const remainingDays = Math.max(0, totalDaysInMonth - todayDate + 1);
-        
+
         const salesThisMonth = allMetrics.filter(m => {
             if (m.store !== store.name || !m.date) return false;
             const metricDate = typeof m.date === 'string' ? new Date(m.date) : (m.date?.toDate ? m.date.toDate() : new Date(m.date));
             return metricDate.getFullYear() === year && metricDate.getMonth() === month;
         }).reduce((sum, m) => sum + (m.totalSales || 0), 0);
-            
-        const monthlyTarget = calculateEffectiveTarget(store.targets, {year, month, day: 'all'});
+
+        const monthlyTarget = calculateEffectiveTarget(store.targets, { year, month, day: 'all' });
         const remainingTarget = monthlyTarget - salesThisMonth;
 
         // 90% goal calculations
         const monthlyTarget90 = monthlyTarget * 0.9;
         const remainingTarget90 = monthlyTarget90 - salesThisMonth;
-        
+
         return {
             salesMTD: salesThisMonth,
             remainingTarget,
@@ -144,7 +144,7 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
             requiredDailyAverage90: remainingDays > 0 ? Math.max(0, remainingTarget90) / remainingDays : 0,
         };
     }, [store.name, store.targets, allMetrics]);
-    
+
     const handleGenerateAnalysis = async () => {
         setIsAnalyzing(true);
         setAiAnalysis('');
@@ -174,17 +174,17 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                 <button onClick={onBack} className="btn-secondary flex items-center gap-2">
+                <button onClick={onBack} className="btn-secondary flex items-center gap-2">
                     <ArrowLeftIcon /> {t('back_to_all_stores')}
                 </button>
                 <button onClick={handleCompare} className="btn-secondary flex items-center gap-2">
-                    <SparklesIcon/> {t('compare_with_ai')}
+                    <SparklesIcon /> {t('compare_with_ai')}
                 </button>
             </div>
-           
+
             <div className="p-6 bg-white rounded-xl shadow-sm border">
                 <h2 className="text-3xl font-bold text-zinc-800">{store.name}</h2>
-                <p className="text-zinc-500">{t('monthly_target')}: {calculateEffectiveTarget(store.targets, {year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all'}).toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
+                <p className="text-zinc-500">{t('monthly_target')}: {calculateEffectiveTarget(store.targets, { year: new Date().getFullYear(), month: new Date().getMonth(), day: 'all' }).toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</p>
             </div>
 
             <MonthYearFilter dateFilter={dateFilter} setDateFilter={setDateFilter} allData={allDateData} />
@@ -193,13 +193,13 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
                 <KPICard title={t('total_sales')} value={storeData.totalSales} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })} />
                 <KPICard title={t('visitors')} value={storeData.totalVisitors} />
                 <KPICard title={t('total_transactions')} value={storeData.totalTransactions} />
-                <KPICard title={t('avg_transaction_value')} value={storeData.atv} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}/>
+                <KPICard title={t('avg_transaction_value')} value={storeData.atv} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })} />
                 <KPICard title={t('conversion_rate')} value={storeData.visitorRate} format={v => `${Math.round(v)}%`} />
                 <KPICard title={t('sales_per_visitor')} value={storeData.salesPerVisitor} format={v => v.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div className="p-6 bg-white rounded-xl shadow-sm border">
+                <div className="p-6 bg-white rounded-xl shadow-sm border">
                     <h3 className="font-semibold text-lg text-zinc-700 mb-3">{t('ai_performance_review')}</h3>
                     <button onClick={handleGenerateAnalysis} disabled={isAnalyzing} className="btn-primary flex items-center gap-2">
                         <SparklesIcon /> {isAnalyzing ? t('analyzing') : t('generate_ai_analysis')}
@@ -207,16 +207,16 @@ const StoreDetailPage: React.FC<StoreDetailPageProps> = ({
                     {isAnalyzing && <div className="mt-4"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div></div>}
                     {aiAnalysis && <div className="mt-4 p-4 bg-gray-50 rounded-lg prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: aiAnalysis.replace(/\n/g, '<br />') }} />}
                 </div>
-                 <div className="p-6 bg-white rounded-xl shadow-sm border">
-                     <h3 className="font-semibold text-lg text-zinc-700 mb-3">{t('dynamic_daily_target')}</h3>
-                     <div className="space-y-3 text-sm">
-                         <div className="flex justify-between"><span>{t('sales_this_month')}</span><span className="font-semibold">{dynamicTargetData.salesMTD.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span></div>
-                         <div className="flex justify-between"><span>{t('remaining_target')}</span><span className="font-semibold text-red-600">{dynamicTargetData.remainingTarget > 0 ? dynamicTargetData.remainingTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) : t('achieved')}</span></div>
-                         <div className="flex justify-between"><span>{t('remaining_days')}</span><span className="font-semibold">{dynamicTargetData.remainingDays}</span></div>
+                <div className="p-6 bg-white rounded-xl shadow-sm border">
+                    <h3 className="font-semibold text-lg text-zinc-700 mb-3">{t('dynamic_daily_target')}</h3>
+                    <div className="space-y-3 text-sm">
+                        <div className="flex justify-between"><span>{t('sales_this_month')}</span><span className="font-semibold">{dynamicTargetData.salesMTD.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span></div>
+                        <div className="flex justify-between"><span>{t('remaining_target')}</span><span className="font-semibold text-red-600">{dynamicTargetData.remainingTarget > 0 ? dynamicTargetData.remainingTarget.toLocaleString('en-US', { style: 'currency', currency: 'SAR' }) : t('achieved')}</span></div>
+                        <div className="flex justify-between"><span>{t('remaining_days')}</span><span className="font-semibold">{dynamicTargetData.remainingDays}</span></div>
                         <div className="flex justify-between items-center bg-orange-50 p-2 rounded-lg mt-2"><span className="font-bold text-orange-700">{t('required_daily_avg')}</span><span className="font-bold text-orange-700 text-lg">{dynamicTargetData.requiredDailyAverage.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span></div>
                         <div className="flex justify-between items-center bg-amber-50 p-2 rounded-lg"><span className="font-bold text-amber-700">{t('required_daily_avg_90')}</span><span className="font-bold text-amber-700 text-lg">{dynamicTargetData.requiredDailyAverage90.toLocaleString('en-US', { style: 'currency', currency: 'SAR' })}</span></div>
-                     </div>
-                 </div>
+                    </div>
+                </div>
             </div>
 
             <CustomBusinessRules

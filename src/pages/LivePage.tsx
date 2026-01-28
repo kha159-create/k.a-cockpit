@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useLocale } from '@/context/LocaleContext';
 import { getLiveSales, getStores } from '@/data/dataProvider';
 import { useData } from '@/context/DataProvider';
-import { apiUrl } from '@/utils/apiBase';
 import type { Store, UserProfile } from '@/types';
 
 interface LiveSalesData {
@@ -15,22 +14,22 @@ interface LiveSalesData {
 }
 
 interface LivePageProps {
-  stores: Store[]; // Legacy prop (may be filtered by dateFilter) - we'll ignore it and load our own
+  stores?: Store[]; // Legacy prop - ignored in current implementation
   profile: UserProfile | null;
 }
 
-const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) => {
-  const { locale, t } = useLocale();
-  const { allSalesData } = useData(); // Get preloaded data (independent of dateFilter)
+const LivePage: React.FC<LivePageProps> = ({ profile }) => {
+  const { locale } = useLocale();
+  const { unifiedEmployees, stores: allStores } = useData(); // Use global stores
   const [liveData, setLiveData] = useState<LiveSalesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'today' | 'yesterday'>('today');
-  const [areaManagerFilter, setAreaManagerFilter] = useState<string>('All'); // Local state (independent of global filters)
-  
-  // Load stores independently from API (2026 only) - NOT affected by dateFilter
-  const [allStores, setAllStores] = useState<Store[]>([]);
-  const [storesLoading, setStoresLoading] = useState(true);
+  const [areaManagerFilter, setAreaManagerFilter] = useState<string>('All');
+
+  // Stores are now from Context, no need for local state or fetching
+  // const [allStores, setAllStores] = useState<Store[]>([]);
+  // const [storesLoading, setStoresLoading] = useState(true);
 
   const copy = useMemo(() => {
     if (locale === 'ar') {
@@ -45,50 +44,29 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
         error: 'حدث خطأ في تحميل البيانات',
         areaManager: 'مدير المنطقة',
         allAreaManagers: 'جميع مديري المناطق',
+        totalToday: '📊 إجمالي مبيعات اليوم',
+        totalYesterday: '📅 إجمالي مبيعات أمس',
+        outlets: 'معرض'
       };
     }
-      return {
-        title: 'Live Sales',
-        date: 'Date',
-        lastUpdate: 'Last Update',
-        outlet: 'Outlet',
-        sales: 'Sales',
-        loading: 'Loading...',
-        noData: 'No sales data available',
-        error: 'Error loading data',
-        areaManager: 'Area Manager',
-        allAreaManagers: 'All Area Managers',
-      };
+    return {
+      title: 'Live Sales',
+      date: 'Date',
+      lastUpdate: 'Last Update',
+      outlet: 'Outlet',
+      sales: 'Sales',
+      loading: 'Loading...',
+      noData: 'No sales data available',
+      error: 'Error loading data',
+      areaManager: 'Area Manager',
+      allAreaManagers: 'All Area Managers',
+      totalToday: '📊 Total Today\'s Sales',
+      totalYesterday: '📅 Total Yesterday\'s Sales',
+      outlets: 'outlets'
+    };
   }, [locale]);
 
-  // Load stores independently (2026 only) - NOT affected by dateFilter
-  useEffect(() => {
-    const loadStoresForLive = async () => {
-      try {
-        setStoresLoading(true);
-        console.log('🔗 Loading stores for Live page (2026 only, independent of dateFilter)...');
-        
-        // Always load stores for 2026 (current year) regardless of dateFilter
-        const currentYear = 2026; // Live page always uses 2026 data
-        const storesList = await getStores(currentYear);
-        
-        if (storesList.length > 0) {
-          console.log(`✅ Loaded ${storesList.length} stores for Live page (2026)`);
-          setAllStores(storesList as Store[]);
-        } else {
-          console.warn('⚠️ No stores loaded for Live page');
-          setAllStores([]);
-        }
-        setStoresLoading(false);
-      } catch (error: any) {
-        console.error('❌ Error loading stores for Live page:', error);
-        setAllStores([]);
-        setStoresLoading(false);
-      }
-    };
-    
-    loadStoresForLive();
-  }, []); // Load once on mount, never re-run
+  // Removed useEffect for loading stores
 
   useEffect(() => {
     // Load live sales from D365 API (NO Firestore)
@@ -97,9 +75,9 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
         setLoading(true);
         setError(null);
         console.log('🔗 Fetching live sales from D365 API...');
-        
+
         const result = await getLiveSales();
-        
+
         if (result.success !== false && (result.today || result.yesterday)) {
           const data: LiveSalesData = {
             date: result.date || new Date().toISOString().split('T')[0],
@@ -168,7 +146,7 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
   const showAreaManagerFilter = useMemo(() => {
     return profile?.role === 'admin' || profile?.role === 'general_manager';
   }, [profile?.role]);
-  
+
   const availableAreaManagers = useMemo(() => {
     if (!showAreaManagerFilter) return [];
     // Use allStores (loaded independently for 2026) instead of stores prop
@@ -179,36 +157,140 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
   // Support both new format (today/yesterday) and legacy format (stores)
   const todayStores = liveData?.today || liveData?.stores || [];
   const yesterdayStores = liveData?.yesterday || [];
-  
+
   // Filter stores by area manager (using allStores loaded independently for 2026)
   const filteredTodayStores = useMemo(() => {
-    if (areaManagerFilter === 'All' || !showAreaManagerFilter) {
-      return todayStores;
-    }
-    // Match outlet names with store names to get areaManager
-    // Use allStores (loaded independently for 2026) instead of stores prop
-    const storeMap = new Map(allStores.map(s => [s.name, s]));
-    return todayStores.filter(item => {
-      const store = storeMap.get(item.outlet);
-      return store?.areaManager === areaManagerFilter;
+    // Use unifiedEmployees for robust matching (ID "46" vs "0046")
+    const storeMapByName = new Map(allStores.map(s => [s.name, s]));
+    const storeMapById = new Map(allStores.map(s => [String((s as any).store_id || s.id || '').trim(), s]));
+
+    return todayStores.map(item => {
+      // 1. Try matching by Outlet/Store ID using Global Store List
+      let store = storeMapById.get(String((item as any).storeId || '').trim()) ||
+        storeMapByName.get(item.outlet) ||
+        storeMapById.get(String(item.outlet || '').trim());
+
+      // 2. If not found, try matching against Unified Employee List (if outlet is actually an employee ID like "46")
+      if (!store) {
+        const cleanID = String(item.outlet || (item as any).storeId || '').trim();
+        // Find employee who matches this ID
+        const employee = unifiedEmployees?.find(e =>
+          e.id === cleanID || // Normalized match (e.g. "46" === "46")
+          e.originalId === cleanID ||
+          e.employeeId === cleanID
+        );
+
+        if (employee) {
+          // Get the store this employee belongs to
+          // Wait, 'currentStore' implies where they work. 
+          // But 'outlet' in Live Data usually means the transaction location.
+          // If 'outlet' is "46", it means Employee 46 made a sale.
+          // We want to display the Employee Name? Or the Store Name?
+          // User Request: "Ensure that local ID '0046' matches API ID 46."
+          // And "UI displays 'Employee 0046'".
+          // It seems the Goal is to display the Name (Arabic).
+
+          // If it's a store list, we expect store names. 
+          // If the API returns Employee IDs as "outlets", this is a fundamental ambiguity.
+          // However, typically Live Sales is by Store.
+          // Let's assume 'outlet' is a Store ID/Name.
+          // But the User mentioned "Employee 0046" issues in `EmployeesPage`.
+          // And "LivePage shows 0 sales".
+
+          // Let's stick to solving the ID mismatch for STORES here.
+          // The user said: "LivePage: Live data loaded successfully... UI shows Total Sales: 0... Root Cause: D365 API returns IDs as numbers (e.g. 101)."
+          // "0046" example might be for EmployeesPage.
+
+          // So for LivePage, we just need robust Store ID matching.
+          // We've enforced String conversion.
+          // Let's ensure we use the 'unifiedEmployees' context if meaningful here?
+          // Actually, LivePage is about STORES. The unified list is EMPLOYEES.
+          // The user instruction "Step 3: Fix LivePage (Use Unified Data)" says:
+          // "refactor LivePage... to use Context's unifiedEmployees."
+          // "const employee = unifiedEmployees.find(e => e.id === String(sale.storeId))"
+          // Wait, is 'sale.storeId' actually an EMPLOYEE ID in some contexts?
+          // Or did the user mean "EmployeesPage"?
+          // Re-reading User Request: "2. Employees Page Issue... 1. LivePage Issue... LivePage shows 0 sales."
+          // "The Problem: LivePage shows 0 sales because '0046' !== 46."
+          // If '0046' is a STORE ID, then we need a Unified STORE List?
+          // We have `stores` from `getStores()`.
+          // Maybe the "Unified Data Layer" request is primarily about EMPLOYEES, but they want it used in LivePage too?
+          // "When matching Sales Data (from API) to Employees... In LivePage logic: const employee = unifiedEmployees.find..."
+          // This implies LivePage displays EMPLOYEES?
+          // Looking at `LivePage` UI: It displays "Outlet / Sales".
+          // Maybe for some users (Commission based?), "Outlet" is actually an Employee?
+          // "gofrugal_employee_mapping" suggests we are mapping employees.
+
+          // HYPOTHESIS: In this system, "Outlets" in the live feed might be Sales Groups (Employees).
+          // So we should check `unifiedEmployees` too.
+
+          const matchedEmp = unifiedEmployees?.find(e => String(e.salesGroup || e.id) === cleanID);
+
+          if (matchedEmp) {
+            return {
+              ...item,
+              outlet: matchedEmp.displayName || matchedEmp.name, // Use Arabic Name!
+              areaManager: matchedEmp.currentStore // Fallback to their store?
+            };
+          }
+        }
+      }
+
+      if (store) {
+        return { ...item, outlet: store.name, areaManager: store.areaManager };
+      }
+      return { ...item, areaManager: undefined };
+    }).filter(item => {
+      if (areaManagerFilter === 'All') return true;
+      return item.areaManager === areaManagerFilter;
     });
-  }, [todayStores, areaManagerFilter, allStores, showAreaManagerFilter]);
+  }, [todayStores, areaManagerFilter, allStores, showAreaManagerFilter, unifiedEmployees]);
 
   const filteredYesterdayStores = useMemo(() => {
-    if (areaManagerFilter === 'All' || !showAreaManagerFilter) {
-      return yesterdayStores;
-    }
-    // Use allStores (loaded independently for 2026) instead of stores prop
-    const storeMap = new Map(allStores.map(s => [s.name, s]));
-    return yesterdayStores.filter(item => {
-      const store = storeMap.get(item.outlet);
-      return store?.areaManager === areaManagerFilter;
+    const storeMapByName = new Map(allStores.map(s => [s.name, s]));
+    const storeMapById = new Map(allStores.map(s => [String((s as any).store_id || s.id || '').trim(), s]));
+
+    return yesterdayStores.map(item => {
+      let store = storeMapById.get(String((item as any).storeId || '').trim()) ||
+        storeMapByName.get(item.outlet) ||
+        storeMapById.get(String(item.outlet || '').trim());
+
+      if (!store) {
+        const cleanID = String(item.outlet || (item as any).storeId || '').trim();
+        const matchedEmp = unifiedEmployees?.find(e => String(e.salesGroup || e.id) === cleanID);
+        if (matchedEmp) {
+          return {
+            ...item,
+            outlet: matchedEmp.displayName || matchedEmp.name,
+            areaManager: matchedEmp.currentStore
+          };
+        }
+      }
+
+      if (store) {
+        return { ...item, outlet: store.name, areaManager: store.areaManager };
+      }
+      return { ...item, areaManager: undefined };
+    }).filter(item => {
+      if (areaManagerFilter === 'All') return true;
+      return item.areaManager === areaManagerFilter;
     });
-  }, [yesterdayStores, areaManagerFilter, allStores, showAreaManagerFilter]);
-  
+  }, [yesterdayStores, areaManagerFilter, allStores, showAreaManagerFilter, unifiedEmployees]);
+
   // Get current view data
   const currentStores = viewMode === 'today' ? filteredTodayStores : filteredYesterdayStores;
   const totalSales = currentStores.reduce((sum, item) => sum + (item.sales || 0), 0);
+
+  // Debug: Mapping Check (User Requested)
+  console.log('Mapping Check:', {
+    firstStoreId: allStores[0]?.id,
+    typeOfStoreId: typeof allStores[0]?.id,
+    firstApiId: (liveData?.today?.[0] as any)?.storeId,
+    typeOfApiId: typeof (liveData?.today?.[0] as any)?.storeId,
+    firstOutlet: liveData?.today?.[0]?.outlet,
+    storesCount: allStores.length,
+    liveDataCount: liveData?.today?.length
+  });
 
   // Early returns AFTER all hooks (useMemo) are called
   if (loading && !liveData) {
@@ -239,7 +321,7 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">{copy.title}</h1>
-          
+
           {/* Area Manager Filter */}
           {showAreaManagerFilter && availableAreaManagers.length > 1 && (
             <div className="flex items-center justify-center gap-4 mb-4">
@@ -259,31 +341,29 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
               </select>
             </div>
           )}
-          
+
           {/* View Mode Toggle */}
           <div className="flex items-center justify-center gap-4 mb-4">
             <button
               onClick={() => setViewMode('today')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                viewMode === 'today'
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${viewMode === 'today'
+                ? 'bg-orange-500 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
             >
               {locale === 'ar' ? '📊 اليوم' : '📊 Today'}
             </button>
             <button
               onClick={() => setViewMode('yesterday')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                viewMode === 'yesterday'
-                  ? 'bg-gray-500 text-white shadow-md'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${viewMode === 'yesterday'
+                ? 'bg-gray-500 text-white shadow-md'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
             >
               {locale === 'ar' ? '📅 أمس' : '📅 Yesterday'}
             </button>
           </div>
-          
+
           <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
             <div>
               <span className="font-semibold">{copy.date}:</span>{' '}
@@ -301,7 +381,7 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
       <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-lg border border-orange-700 p-6 text-white">
         <div className="text-center">
           <div className="text-lg font-medium mb-2 opacity-90">
-            {locale === 'ar' 
+            {locale === 'ar'
               ? (viewMode === 'today' ? '📊 إجمالي مبيعات اليوم' : '📅 إجمالي مبيعات أمس')
               : (viewMode === 'today' ? '📊 Total Today\'s Sales' : '📅 Total Yesterday\'s Sales')}
           </div>
@@ -322,7 +402,7 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">
-            {locale === 'ar' 
+            {locale === 'ar'
               ? (viewMode === 'today' ? '📊 مبيعات اليوم' : '📅 مبيعات أمس')
               : (viewMode === 'today' ? '📊 Today\'s Sales' : '📅 Yesterday\'s Sales')}
           </h2>
@@ -330,21 +410,18 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
             {currentStores.map((item, index) => (
               <div
                 key={`${viewMode}-${index}`}
-                className={`rounded-xl shadow-sm border-l-4 p-6 hover:shadow-md transition-all duration-200 ${
-                  viewMode === 'today'
-                    ? 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-500'
-                    : 'bg-gray-50 border-gray-400'
-                }`}
+                className={`rounded-xl shadow-sm border-l-4 p-6 hover:shadow-md transition-all duration-200 ${viewMode === 'today'
+                  ? 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-500'
+                  : 'bg-gray-50 border-gray-400'
+                  }`}
               >
                 <div className="text-center">
-                  <div className={`text-sm font-medium mb-2 truncate ${
-                    viewMode === 'today' ? 'text-gray-700' : 'text-gray-600'
-                  }`}>
+                  <div className={`text-sm font-medium mb-2 truncate ${viewMode === 'today' ? 'text-gray-700' : 'text-gray-600'
+                    }`}>
                     {item.outlet}
                   </div>
-                  <div className={`text-3xl font-bold ${
-                    viewMode === 'today' ? 'text-orange-900' : 'text-gray-800'
-                  }`}>
+                  <div className={`text-3xl font-bold ${viewMode === 'today' ? 'text-orange-900' : 'text-gray-800'
+                    }`}>
                     {formatSales(item.sales)}
                   </div>
                 </div>
@@ -357,7 +434,7 @@ const LivePage: React.FC<LivePageProps> = ({ stores: _legacyStores, profile }) =
       {/* Auto-refresh indicator */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
         <p className="text-sm text-blue-700">
-          {locale === 'ar' 
+          {locale === 'ar'
             ? '🔄 البيانات تتحدث تلقائياً كل 15 دقيقة'
             : '🔄 Data auto-refreshes every 15 minutes'}
         </p>

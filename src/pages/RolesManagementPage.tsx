@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../services/firebase';
 import { useLocale } from '../context/LocaleContext';
-import { Table } from '../components/Table';
+import { Table, Column } from '../components/Table';
 import RoleBadge from '../components/RoleBadge';
-import { Role, ROLE_DISPLAY_NAMES, ROLE_COLORS } from '../config/roles';
+import { Role, ROLE_DISPLAY_NAMES } from '../config/roles';
 
 interface User {
   id: string;
@@ -19,7 +18,6 @@ const RolesManagementPage: React.FC = () => {
   const { t } = useLocale();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -27,31 +25,8 @@ const RolesManagementPage: React.FC = () => {
 
   const loadUsers = async () => {
     try {
-      // جلب جميع المستخدمين المعتمدين (approved أو admin بدون status)
-      const snapshot = await db.collection('users')
-        .get();
-      
-      const allUsers = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          name: d.name ?? '',
-          email: d.email ?? '',
-          employeeId: d.employeeId ?? '',
-          role: d.role ?? 'employee',
-          status: d.status ?? 'pending',
-          ...d
-        };
-      }) as User[];
-      
-      // تصفية المستخدمين المعتمدين
-      const approvedUsers = allUsers.filter(user => 
-        user.status === 'approved' || 
-        user.status === 'active' ||
-        (user.role === 'admin' && !user.status)
-      );
-      
-      setUsers(approvedUsers);
+      // Firebase removed - Placeholder logic
+      setUsers([]);
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {
@@ -59,41 +34,11 @@ const RolesManagementPage: React.FC = () => {
     }
   };
 
-  const handleRoleChange = async (userId: string, newRole: Role) => {
-    setUpdating(userId);
-    
-    try {
-      // تحديث دور المستخدم في users
-      await db.collection('users').doc(userId).update({
-        role: newRole,
-        updatedAt: new Date(),
-        updatedBy: 'admin' // يمكن تحسين هذا لاحقاً
-      });
-
-      // تحديث دور الموظف في employees إذا كان موجوداً
-      const user = users.find(u => u.id === userId);
-      if (user?.employeeId) {
-        await db.collection('employees').doc(user.employeeId).update({
-          role: newRole,
-          updatedAt: new Date()
-        });
-      }
-
-      // تحديث القائمة المحلية
-      setUsers(prev => prev.map(u => 
-        u.id === userId ? { ...u, role: newRole } : u
-      ));
-      
-      alert(t('role_updated'));
-    } catch (error) {
-      console.error('Error updating role:', error);
-      alert(t('role_failed'));
-    } finally {
-      setUpdating(null);
-    }
+  const handleRoleChange = async (_userId: string, _newRole: Role) => {
+    alert('Role changes are currently disabled. Please contact the administrator.');
   };
 
-  const columns = [
+  const columns: Column<User>[] = [
     {
       key: 'name',
       label: t('user_name'),
@@ -131,24 +76,22 @@ const RolesManagementPage: React.FC = () => {
       key: 'status',
       label: t('status'),
       render: (value: string) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          value === 'approved' || value === 'active'
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-yellow-100 text-yellow-800'
-        }`}>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${value === 'approved' || value === 'active'
+          ? 'bg-green-100 text-green-800'
+          : 'bg-yellow-100 text-yellow-800'
+          }`}>
           {value === 'approved' || value === 'active' ? t('approved') : t('pending')}
         </span>
       )
     },
     {
-      key: 'actions',
+      key: 'actions' as any,
       label: t('change_role'),
       render: (_: any, record: User) => (
         <div className="flex gap-2">
           <select
             value={record.role}
             onChange={(e) => handleRoleChange(record.id, e.target.value as Role)}
-            disabled={updating === record.id}
             className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
           >
             <option value="employee">👤 {t('employee')}</option>
@@ -157,9 +100,6 @@ const RolesManagementPage: React.FC = () => {
             <option value="general_manager">🎯 {t('general_manager')}</option>
             <option value="admin">👑 {t('admin')}</option>
           </select>
-          {updating === record.id && (
-            <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-          )}
         </div>
       )
     }
@@ -201,7 +141,7 @@ const RolesManagementPage: React.FC = () => {
       </div>
 
       {/* جدول المستخدمين */}
-        <div className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6">
+      <div className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{t('roles_management')}</h2>
@@ -228,15 +168,15 @@ const RolesManagementPage: React.FC = () => {
               <span className="text-gray-400 text-2xl">👥</span>
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">{t('no_users_found')}</h3>
-            <p className="text-gray-600">{t('check_firebase_or_signup')}</p>
+            <p className="text-gray-600">Please contact the administrator to create users.</p>
           </div>
         ) : (
           <div className="overflow-hidden">
             <Table
               data={users}
               columns={columns}
-              getRowClassName={(record, index) => 
-                index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+              rowClassName={(_item: User) =>
+                'bg-white hover:bg-neutral-50'
               }
             />
           </div>
