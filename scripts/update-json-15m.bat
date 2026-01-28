@@ -13,6 +13,9 @@ node scripts/generate-json-from-sql.js >> update_15m_log.txt 2>&1
 :: =========================================
 :: 2. Commit and Push to GitHub
 :: =========================================
+echo  - Pulling latest changes from GitHub... >> update_15m_log.txt
+git pull origin main --no-edit >> update_15m_log.txt 2>&1
+
 echo  - Committing and pushing to GitHub... >> update_15m_log.txt
 git add public/data/*.json >> update_15m_log.txt 2>&1
 git commit -m "Auto Update 15m: %date% %time%" >> update_15m_log.txt 2>&1
