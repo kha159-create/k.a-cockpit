@@ -9,7 +9,7 @@ $WorkingDir = "C:\Users\Orange1\.cursor\worktrees\cockpit\vmb"
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 if (-not $isAdmin) {
-    Write-Host "❌ This script must be run as Administrator!" -ForegroundColor Red
+    Write-Host "[ERROR] This script must be run as Administrator!" -ForegroundColor Red
     Write-Host "Right-click and select 'Run with PowerShell (as Administrator)'" -ForegroundColor Yellow
     pause
     exit 1
@@ -17,7 +17,7 @@ if (-not $isAdmin) {
 
 # Check if script exists
 if (-not (Test-Path $ScriptPath)) {
-    Write-Host "❌ Script not found: $ScriptPath" -ForegroundColor Red
+    Write-Host "[ERROR] Script not found: $ScriptPath" -ForegroundColor Red
     pause
     exit 1
 }
@@ -25,7 +25,7 @@ if (-not (Test-Path $ScriptPath)) {
 # Remove existing task if it exists
 $existingTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 if ($existingTask) {
-    Write-Host "⚠️  Removing existing task..." -ForegroundColor Yellow
+    Write-Host "[WARNING] Removing existing task..." -ForegroundColor Yellow
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
 }
 
@@ -58,21 +58,21 @@ try {
         -Description "Updates JSON data from PostgreSQL every 15 minutes and pushes to GitHub (like reference project)" `
         -Force
 
-    Write-Host "✅ Task '$TaskName' registered successfully!" -ForegroundColor Green
+    Write-Host "[SUCCESS] Task '$TaskName' registered successfully!" -ForegroundColor Green
     Write-Host "   - Runs every 15 minutes" -ForegroundColor Cyan
     Write-Host "   - Script: $ScriptPath" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "📋 To verify:" -ForegroundColor Yellow
+    Write-Host "To verify:" -ForegroundColor Yellow
     Write-Host "   - Open Task Scheduler" -ForegroundColor White
     Write-Host "   - Look for task: '$TaskName'" -ForegroundColor White
     Write-Host ""
-    Write-Host "📝 To test manually:" -ForegroundColor Yellow
+    Write-Host "To test manually:" -ForegroundColor Yellow
     Write-Host "   - Run: $ScriptPath" -ForegroundColor White
     Write-Host ""
-    Write-Host "📊 Logs:" -ForegroundColor Yellow
+    Write-Host "Logs:" -ForegroundColor Yellow
     Write-Host "   - Check: $WorkingDir\update_15m_log.txt" -ForegroundColor White
 } catch {
-    Write-Host "❌ Error creating task: $_" -ForegroundColor Red
+    Write-Host "[ERROR] Error creating task: $_" -ForegroundColor Red
     pause
     exit 1
 }
