@@ -1,9 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import gatewayHandler from './[...route]';
+import { authSqlHandler } from '../lib/apiHandler';
 
-// Thin wrapper so Vercel exposes /api/auth-sql
-// while all logic (CORS + DB + fallback pins) lives in the gateway.
+// Dedicated entry for /api/auth-sql using shared handler logic.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  return gatewayHandler(req, res);
+  return authSqlHandler(req, res);
 }
 
