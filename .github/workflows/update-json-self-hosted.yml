@@ -1,0 +1,65 @@
+name: Auto Update JSON Data (Self-Hosted Runner - Every 15 Minutes)
+
+# This workflow uses a self-hosted runner to access local PostgreSQL database
+# Setup: https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners
+
+on:
+  schedule:
+    # Run every 15 minutes: */15 * * * *
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write # Required to push commits
+
+jobs:
+  update-json:
+    runs-on: self-hosted # Requires self-hosted runner on machine with local DB access
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate JSON data from local PostgreSQL
+        env:
+          # Use local database (localhost)
+          PG_HOST: localhost
+          PG_DATABASE: showroom_sales
+          PG_USER: postgres
+          PG_PASSWORD: ${{ secrets.LOCAL_PG_PASSWORD || 'KhaKha11@' }}
+          PG_PORT: 5432
+          PG_SSL: 'false'
+        run: |
+          echo "🔍 Connecting to local database: localhost:5432/showroom_sales"
+          node scripts/generate-json-from-sql.js
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "Dashboard Bot"
+          git config user.email "dashboard-bot@users.noreply.github.com"
+          
+          # Get current date/time in Saudi Arabia timezone (UTC+3)
+          DATE=$(TZ='Asia/Riyadh' date '+%a %m/%d/%Y %H:%M:%S.%2N')
+          
+          # Check if there are changes
+          git add public/data/*.json || exit 0
+          
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes to commit"
+          else
+            git commit -m "Auto Update 15m: $DATE"
+            git push origin main
+            echo "✅ Changes pushed successfully"
+          fi

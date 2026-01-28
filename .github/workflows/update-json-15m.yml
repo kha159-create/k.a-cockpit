@@ -1,0 +1,64 @@
+name: Auto Update JSON Data (Every 15 Minutes)
+
+on:
+  schedule:
+    # Run every 15 minutes: */15 * * * *
+    # Format: minute hour day month day-of-week
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write # Required to push commits
+
+jobs:
+  update-json:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0 # Fetch all history for git operations
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate JSON data from PostgreSQL
+        env:
+          # Use remote database connection (set these in GitHub Secrets)
+          PG_HOST: ${{ secrets.PG_HOST }}
+          PG_DATABASE: ${{ secrets.PG_DATABASE || 'showroom_sales' }}
+          PG_USER: ${{ secrets.PG_USER }}
+          PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
+          PG_PORT: ${{ secrets.PG_PORT || '5432' }}
+          PG_SSL: ${{ secrets.PG_SSL || 'true' }}
+        run: |
+          echo "🔍 Connecting to database: $PG_HOST:$PG_PORT/$PG_DATABASE"
+          node scripts/generate-json-from-sql.js
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "Dashboard Bot"
+          git config user.email "dashboard-bot@users.noreply.github.com"
+          
+          # Get current date/time in Saudi Arabia timezone (UTC+3)
+          DATE=$(TZ='Asia/Riyadh' date '+%a %m/%d/%Y %H:%M:%S.%2N')
+          
+          # Check if there are changes
+          git add public/data/*.json || exit 0
+          
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes to commit"
+          else
+            git commit -m "Auto Update 15m: $DATE"
+            git push origin main
+            echo "✅ Changes pushed successfully"
+          fi
+
