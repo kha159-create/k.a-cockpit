@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Pool } from 'pg';
 
 import salesPgHandler from './sales-pg';
 import salesD365SqlHandler from './sales-d365-sql';
@@ -10,15 +11,18 @@ import getProductsHandler from './get-products';
 
 type ApiHandler = (req: VercelRequest, res: VercelResponse) => any | Promise<any>;
 
-// Lightweight SQL-less auth handler to keep authentication working
-// while respecting Vercel function limits.
-const authSqlHandler: ApiHandler = async (req, res) => {
-  const allowedOrigin = process.env.CORS_ALLOW_ORIGIN || '*';
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+// Shared PostgreSQL pool (same DB as reporting)
+const authPool = new Pool({
+  host: process.env.PG_HOST || 'localhost',
+  database: process.env.PG_DATABASE || 'showroom_sales',
+  user: process.env.PG_USER || 'postgres',
+  password: process.env.PG_PASSWORD || '',
+  port: parseInt(process.env.PG_PORT || '5432'),
+  ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
+});
 
+// Auth handler using public.users table (id, username, password, role, display_name)
+const authSqlHandler: ApiHandler = async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -35,24 +39,48 @@ const authSqlHandler: ApiHandler = async (req, res) => {
     return;
   }
 
-  const name = String(username).trim();
+  try {
+    const client = await authPool.connect();
+    try {
+      const result = await client.query(
+        'SELECT id, username, password, role, display_name FROM public.users WHERE username = $1 LIMIT 1',
+        [username]
+      );
 
-  // Simple role inference based on display name
-  let role: 'employee' | 'store_manager' | 'area_manager' | 'general_manager' | 'admin' = 'employee';
-  if (name === 'Sales Manager') {
-    role = 'general_manager';
-  } else if (name.includes('المنطقة')) {
-    role = 'area_manager';
+      if (result.rowCount === 0) {
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
+
+      const row = result.rows[0];
+      const storedPassword = String(row.password || '');
+
+      // Plain-text comparison for now (matches reference DB screenshot)
+      if (storedPassword !== String(pin)) {
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
+
+      const name = row.display_name || row.username;
+      const rawRole = (row.role || 'employee') as string;
+      const normalizedRole =
+        rawRole.toLowerCase() as 'employee' | 'store_manager' | 'area_manager' | 'general_manager' | 'admin';
+
+      const user = {
+        id: String(row.id),
+        name,
+        displayName: name,
+        role: normalizedRole,
+      };
+
+      res.status(200).json({ success: true, user });
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    console.error('❌ auth-sql error:', error);
+    res.status(500).json({ error: error?.message || 'Auth failed' });
   }
-
-  const user = {
-    id: name.replace(/\s+/g, '_'),
-    name,
-    displayName: name,
-    role,
-  };
-
-  res.status(200).json({ success: true, user });
 };
 
 const routes: Record<string, ApiHandler> = {
