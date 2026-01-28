@@ -47,8 +47,40 @@ const authSqlHandler: ApiHandler = async (req, res) => {
         [username]
       );
 
+      // If not found in DB, fall back to hardcoded USERS from reference project
       if (result.rowCount === 0) {
-        res.status(401).json({ error: 'Invalid credentials' });
+        const fallbackPins: Record<string, { pin: string; role: string }> = {
+          'Sales Manager': { pin: '6587', role: 'admin' },
+          'المنطقة الغربية': { pin: '1478', role: 'general_manager' },
+          'اماني عسيري': { pin: '3698', role: 'area_manager' },
+          'جهاد ايوبي': { pin: '2587', role: 'area_manager' },
+          'خليل الصانع': { pin: '2131', role: 'area_manager' },
+          'رضوان عطيوي': { pin: '7643', role: 'area_manager' },
+          'شريفة العمري': { pin: '8491', role: 'area_manager' },
+          'عبد الجليل الحبال': { pin: '1637', role: 'area_manager' },
+          'عبدالله السرداح': { pin: '4618', role: 'area_manager' },
+          'عبيدة السباعي': { pin: '1647', role: 'area_manager' },
+          'محمدكلو': { pin: '4891', role: 'area_manager' },
+          'منطقة الطائف': { pin: '6342', role: 'area_manager' },
+        };
+
+        const fb = fallbackPins[username];
+        if (!fb || fb.pin !== String(pin)) {
+          res.status(401).json({ error: 'Invalid credentials' });
+          return;
+        }
+
+        const normalizedRole =
+          fb.role.toLowerCase() as 'employee' | 'store_manager' | 'area_manager' | 'general_manager' | 'admin';
+
+        const user = {
+          id: username.replace(/\s+/g, '_'),
+          name: username,
+          displayName: username,
+          role: normalizedRole,
+        };
+
+        res.status(200).json({ success: true, user });
         return;
       }
 
