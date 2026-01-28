@@ -32,13 +32,12 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // Map /api/foo to api/foo.ts
-    const apiName = pathname.replace('/api/', '');
-    const entryPath = join(process.cwd(), 'api', `${apiName}.ts`);
+    // Always route through the single API gateway: api/[...route].ts
+    const entryPath = join(process.cwd(), 'api', '[...route].ts');
 
     if (!existsSync(entryPath)) {
         res.statusCode = 404;
-        res.end(`API function not found: ${entryPath}`);
+        res.end(`API gateway function not found: ${entryPath}`);
         return;
     }
 
@@ -90,7 +89,7 @@ const server = http.createServer(async (req, res) => {
             }
         };
 
-        // Dynamically import the handler
+        // Dynamically import the gateway handler
         // We use a timestamp to avoid ESM caching if we edit the file
         const moduleUrl = `${pathToFileURL(entryPath).href}?t=${Date.now()}`;
         const module = await import(moduleUrl);
