@@ -7,47 +7,71 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Pool } from 'pg';
 import * as XLSX from 'xlsx';
 
-// Validate required environment variables (fail fast in production)
-const requiredEnvVars = {
-  PG_HOST: process.env.PG_HOST,
-  PG_DATABASE: process.env.PG_DATABASE,
-  PG_USER: process.env.PG_USER,
-  PG_PASSWORD: process.env.PG_PASSWORD,
-  PG_PORT: process.env.PG_PORT,
-};
+// Check if running on Vercel
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
 
-// Debug logging (safe - does not expose passwords)
-console.log('🔍 DB Config Check (sales-d365-sql):', {
-  host: requiredEnvVars.PG_HOST ? 'Defined' : '❌ MISSING',
-  database: requiredEnvVars.PG_DATABASE ? 'Defined' : '❌ MISSING',
-  user: requiredEnvVars.PG_USER ? 'Defined' : '❌ MISSING',
-  password: requiredEnvVars.PG_PASSWORD ? 'Defined' : '❌ MISSING',
-  port: requiredEnvVars.PG_PORT ? 'Defined' : '❌ MISSING',
-  ssl: process.env.PG_SSL === 'true' ? 'Enabled' : 'Disabled',
-});
+// Only create DB pool if NOT on Vercel (local development)
+// On Vercel, this API should only work if there's a remote database
+let pool: Pool | null = null;
 
-// Fail fast if critical env vars are missing (no weak fallbacks)
-if (!requiredEnvVars.PG_HOST) {
-  throw new Error('❌ PG_HOST environment variable is required but not set');
-}
-if (!requiredEnvVars.PG_DATABASE) {
-  throw new Error('❌ PG_DATABASE environment variable is required but not set');
-}
-if (!requiredEnvVars.PG_USER) {
-  throw new Error('❌ PG_USER environment variable is required but not set');
-}
-if (!requiredEnvVars.PG_PASSWORD) {
-  throw new Error('❌ PG_PASSWORD environment variable is required but not set');
-}
+if (!isVercel) {
+  // Local development: try to connect to DB
+  const requiredEnvVars = {
+    PG_HOST: process.env.PG_HOST || 'localhost',
+    PG_DATABASE: process.env.PG_DATABASE || 'showroom_sales',
+    PG_USER: process.env.PG_USER || 'postgres',
+    PG_PASSWORD: process.env.PG_PASSWORD || 'KhaKha11@',
+    PG_PORT: process.env.PG_PORT || '5432',
+  };
 
-const pool = new Pool({
-  host: requiredEnvVars.PG_HOST,
-  database: requiredEnvVars.PG_DATABASE,
-  user: requiredEnvVars.PG_USER,
-  password: requiredEnvVars.PG_PASSWORD,
-  port: parseInt(requiredEnvVars.PG_PORT || '5432'),
-  ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
-});
+  try {
+    pool = new Pool({
+      host: requiredEnvVars.PG_HOST,
+      database: requiredEnvVars.PG_DATABASE,
+      user: requiredEnvVars.PG_USER,
+      password: requiredEnvVars.PG_PASSWORD,
+      port: parseInt(requiredEnvVars.PG_PORT),
+      ssl: false, // Local DB
+    });
+    console.log('✅ Local DB pool created for sales-d365-sql');
+  } catch (error) {
+    console.warn('⚠️ Could not create DB pool:', error);
+    pool = null;
+  }
+} else {
+  // On Vercel: only create pool if remote DB credentials are provided
+  const requiredEnvVars = {
+    PG_HOST: process.env.PG_HOST,
+    PG_DATABASE: process.env.PG_DATABASE,
+    PG_USER: process.env.PG_USER,
+    PG_PASSWORD: process.env.PG_PASSWORD,
+    PG_PORT: process.env.PG_PORT,
+  };
+
+  // Only create pool if all vars are set (remote DB)
+  if (requiredEnvVars.PG_HOST && 
+      requiredEnvVars.PG_DATABASE && 
+      requiredEnvVars.PG_USER && 
+      requiredEnvVars.PG_PASSWORD &&
+      requiredEnvVars.PG_HOST !== 'localhost') {
+    try {
+      pool = new Pool({
+        host: requiredEnvVars.PG_HOST,
+        database: requiredEnvVars.PG_DATABASE,
+        user: requiredEnvVars.PG_USER,
+        password: requiredEnvVars.PG_PASSWORD,
+        port: parseInt(requiredEnvVars.PG_PORT || '5432'),
+        ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      });
+      console.log('✅ Remote DB pool created for sales-d365-sql on Vercel');
+    } catch (error) {
+      console.warn('⚠️ Could not create remote DB pool:', error);
+      pool = null;
+    }
+  } else {
+    console.log('🌐 Running on Vercel - sales-d365-sql will return empty data (no remote DB configured)');
+  }
+}
 
 // Load store mapping from mapping.xlsx (from dailysales repository)
 async function loadStoreMapping(): Promise<Map<string, string>> {
@@ -190,6 +214,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // On Vercel without DB: return empty data
+  if (!pool) {
+    const year = parseInt(getQueryParam(req, 'year') || '') || new Date().getFullYear();
+    console.log('⚠️ sales-d365-sql: No DB connection, returning empty data');
+    
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year, 11, 31);
+    
+    return res.status(200).json({
+      success: true,
+      range: {
+        from: startDate.toISOString().split('T')[0],
+        to: endDate.toISOString().split('T')[0],
+        year,
+      },
+      byStore: [],
+      byDay: [],
+      byEmployee: [],
+      totals: { salesAmount: 0, invoices: 0, kpis: { atv: 0, customerValue: 0 } },
+      debug: {
+        source: 'vercel-empty',
+        notes: ['D365 SQL API requires database connection. Data for 2024-2025 available via /api/read-json-data'],
+      },
+    });
+  }
+
   try {
     const year = parseInt(getQueryParam(req, 'year') || '') || new Date().getFullYear();
     const monthParam = getQueryParam(req, 'month');
@@ -220,7 +270,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`📊 D365 SQL Sales API: year=${year}, month=${month !== undefined ? month + 1 : 'all'}, day=${day || 'all'}, storeId=${storeId || 'all'}`);
 
-    // Only support 2026+ (2024-2025 handled by sales-pg.ts)
+    // Only support 2026+ (2024-2025 handled by sales-pg.ts / read-json-data)
     if (year < 2026) {
       return res.status(200).json({
         success: true,

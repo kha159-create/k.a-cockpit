@@ -85,7 +85,15 @@ const AuthPage: React.FC = () => {
                     </div>
                     <div className="auth-input-container">
                         <span className="auth-input-icon"><PasswordIcon /></span>
-                        <input className="auth-input" type="password" placeholder={t('password')} value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
+                        <input 
+                            className="auth-input" 
+                            type="password" 
+                            placeholder={t('password')} 
+                            value={loginPassword} 
+                            onChange={e => setLoginPassword(e.target.value)} 
+                            autoComplete="current-password"
+                            required 
+                        />
                     </div>
                     {error && <p className="text-sm text-red-500">{error}</p>}
                     <button className="auth-button w-full" type="submit" disabled={loading}>{loading ? t('signing_in') : t('sign_in')}</button>
@@ -116,11 +124,27 @@ const AuthPage: React.FC = () => {
                     </div>
                     <div className="auth-input-container">
                         <span className="auth-input-icon"><PasswordIcon /></span>
-                        <input className="auth-input" type="password" placeholder={t('password')} value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} required />
+                        <input 
+                            className="auth-input" 
+                            type="password" 
+                            placeholder={t('password')} 
+                            value={signUpPassword} 
+                            onChange={e => setSignUpPassword(e.target.value)} 
+                            autoComplete="new-password"
+                            required 
+                        />
                     </div>
                     <div className="auth-input-container">
                         <span className="auth-input-icon"><PasswordIcon /></span>
-                        <input className="auth-input" type="password" placeholder={t('confirm_password')} value={signUpPasswordConfirm} onChange={e => setSignUpPasswordConfirm(e.target.value)} required />
+                        <input 
+                            className="auth-input" 
+                            type="password" 
+                            placeholder={t('confirm_password')} 
+                            value={signUpPasswordConfirm} 
+                            onChange={e => setSignUpPasswordConfirm(e.target.value)} 
+                            autoComplete="new-password"
+                            required 
+                        />
                     </div>
                     {error && <p className="text-sm text-red-500">{error}</p>}
                     {success && <p className="text-sm text-green-600">{success}</p>}
