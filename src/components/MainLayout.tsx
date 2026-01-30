@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDataProcessing } from '@/hooks/useDataProcessing';
 import { useSmartUploader } from '@/hooks/useSmartUploader';
 import { useAuth } from '@/context/AuthContext';
@@ -7,6 +7,7 @@ import { useLocale } from '@/context/LocaleContext';
 import { useData } from '@/context/DataProvider';
 import { getStores } from '../data/dataProvider';
 import { apiUrl } from '@/utils/apiBase';
+import type { NormalizedSalesResponse } from '@/data/dataProvider';
 
 import Dashboard from '@/pages/Dashboard';
 import StoresPage from '@/pages/StoresPage';
@@ -47,6 +48,14 @@ const LiveIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
   </svg>
 );
+
+const hasMeaningfulSalesData = (data?: NormalizedSalesResponse | null) => {
+  if (!data || !data.success) return false;
+  const byStoreCount = Array.isArray(data.byStore) ? data.byStore.length : 0;
+  const byDayCount = Array.isArray(data.byDay) ? data.byDay.length : 0;
+  const totalSales = data.totals?.salesAmount || 0;
+  return byStoreCount > 0 || byDayCount > 0 || totalSales > 0;
+};
 
 // Firebase removed - using PostgreSQL
 
@@ -182,6 +191,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
   const { allSalesData, loading: dataPreloading, storeMap, stores, unifiedEmployees: employees, products } = useData();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const autoAdjustedYearRef = useRef(false);
 
   // Data states
   // stores and employees now come from useData()
@@ -292,6 +302,52 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, profile }) => {
     setDataLoading(false);
 
   }, [profile]);
+
+  useEffect(() => {
+    if (dataPreloading || autoAdjustedYearRef.current) return;
+
+    const preferredYear = [2026, 2025, 2024].find(year => hasMeaningfulSalesData(allSalesData[year]));
+    if (!preferredYear) return;
+
+    const currentYear = new Date().getFullYear();
+    const shouldAdjust = (filter: DateFilter) =>
+      typeof filter.year === 'number' &&
+      filter.year === currentYear &&
+      !hasMeaningfulSalesData(allSalesData[filter.year]);
+
+    const needsAdjustment =
+      shouldAdjust(dashboardDateFilter) ||
+      shouldAdjust(storesDateFilter) ||
+      shouldAdjust(productsDateFilter) ||
+      shouldAdjust(employeesDateFilter) ||
+      shouldAdjust(commissionsDateFilter);
+
+    if (!needsAdjustment || preferredYear === currentYear) return;
+
+    autoAdjustedYearRef.current = true;
+
+    const updateFilter = (
+      setter: React.Dispatch<React.SetStateAction<DateFilter>>,
+      filter: DateFilter
+    ) => {
+      if (!shouldAdjust(filter)) return;
+      setter(prev => ({ ...prev, year: preferredYear }));
+    };
+
+    updateFilter(setDashboardDateFilter, dashboardDateFilter);
+    updateFilter(setStoresDateFilter, storesDateFilter);
+    updateFilter(setProductsDateFilter, productsDateFilter);
+    updateFilter(setEmployeesDateFilter, employeesDateFilter);
+    updateFilter(setCommissionsDateFilter, commissionsDateFilter);
+  }, [
+    allSalesData,
+    dataPreloading,
+    dashboardDateFilter,
+    storesDateFilter,
+    productsDateFilter,
+    employeesDateFilter,
+    commissionsDateFilter,
+  ]);
 
   // Helper function to convert allSalesData to DailyMetric[] format (reusable for all pages)
   const convertAllSalesDataToDailyMetrics = useCallback((yearFilter: number | 'all', monthFilter: number | 'all') => {
