@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useLocale } from '@/context/LocaleContext';
 import { getLiveSales, getStores } from '@/data/dataProvider';
 import { useData } from '@/context/DataProvider';
@@ -23,6 +23,7 @@ const LivePage: React.FC<LivePageProps> = ({ profile }) => {
   const { unifiedEmployees, stores: allStores } = useData(); // Use global stores
   const [liveData, setLiveData] = useState<LiveSalesData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'today' | 'yesterday'>('today');
   const [areaManagerFilter, setAreaManagerFilter] = useState<string>('All');
@@ -42,6 +43,8 @@ const LivePage: React.FC<LivePageProps> = ({ profile }) => {
         loading: 'جاري التحميل...',
         noData: 'لا توجد بيانات متاحة',
         error: 'حدث خطأ في تحميل البيانات',
+        refresh: 'تحديث الآن',
+        refreshing: 'جاري التحديث...',
         areaManager: 'مدير المنطقة',
         allAreaManagers: 'جميع مديري المناطق',
         totalToday: '📊 إجمالي مبيعات اليوم',
@@ -58,6 +61,8 @@ const LivePage: React.FC<LivePageProps> = ({ profile }) => {
       loading: 'Loading...',
       noData: 'No sales data available',
       error: 'Error loading data',
+      refresh: 'Refresh',
+      refreshing: 'Refreshing...',
       areaManager: 'Area Manager',
       allAreaManagers: 'All Area Managers',
       totalToday: '📊 Total Today\'s Sales',
@@ -68,44 +73,47 @@ const LivePage: React.FC<LivePageProps> = ({ profile }) => {
 
   // Removed useEffect for loading stores
 
-  useEffect(() => {
-    // Load live sales from D365 API (NO Firestore)
-    const loadLiveData = async () => {
-      try {
-        setLoading(true);
+  const loadLiveData = useCallback(async (options?: { showSpinner?: boolean }) => {
+    const showSpinner = options?.showSpinner ?? false;
+
+    try {
+      if (showSpinner) setRefreshing(true);
+      setLoading(true);
+      setError(null);
+      console.log('🔗 Fetching live sales from D365 API...');
+
+      const result = await getLiveSales();
+
+      if (result.success !== false && (result.today || result.yesterday)) {
+        const data: LiveSalesData = {
+          date: result.date || new Date().toISOString().split('T')[0],
+          lastUpdate: result.lastUpdate || new Date().toTimeString().slice(0, 5),
+          today: result.today || [],
+          yesterday: result.yesterday || [],
+        };
+        setLiveData(data);
         setError(null);
-        console.log('🔗 Fetching live sales from D365 API...');
-
-        const result = await getLiveSales();
-
-        if (result.success !== false && (result.today || result.yesterday)) {
-          const data: LiveSalesData = {
-            date: result.date || new Date().toISOString().split('T')[0],
-            lastUpdate: result.lastUpdate || new Date().toTimeString().slice(0, 5),
-            today: result.today || [],
-            yesterday: result.yesterday || [],
-          };
-          setLiveData(data);
-          setLoading(false);
-          setError(null);
-          console.log('✅ Live data loaded successfully from API');
-        } else {
-          throw new Error(result.error || 'No data in API response');
-        }
-      } catch (err: any) {
-        console.error('❌ Error loading live sales:', err);
-        setError(locale === 'ar' ? 'فشل تحميل بيانات المبيعات المباشرة' : 'Failed to load live sales data');
-        setLoading(false);
-        // Set empty data on error (don't crash)
-        setLiveData({
-          date: new Date().toISOString().split('T')[0],
-          lastUpdate: new Date().toTimeString().slice(0, 5),
-          today: [],
-          yesterday: [],
-        });
+        console.log('✅ Live data loaded successfully from API');
+      } else {
+        throw new Error(result.error || 'No data in API response');
       }
-    };
+    } catch (err: any) {
+      console.error('❌ Error loading live sales:', err);
+      setError(locale === 'ar' ? 'فشل تحميل بيانات المبيعات المباشرة' : 'Failed to load live sales data');
+      // Set empty data on error (don't crash)
+      setLiveData({
+        date: new Date().toISOString().split('T')[0],
+        lastUpdate: new Date().toTimeString().slice(0, 5),
+        today: [],
+        yesterday: [],
+      });
+    } finally {
+      setLoading(false);
+      if (showSpinner) setRefreshing(false);
+    }
+  }, [locale]);
 
+  useEffect(() => {
     // Load immediately from D365 API
     loadLiveData();
 
@@ -117,7 +125,7 @@ const LivePage: React.FC<LivePageProps> = ({ profile }) => {
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [copy]);
+  }, [loadLiveData]);
 
   const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return '-';
@@ -364,7 +372,7 @@ const LivePage: React.FC<LivePageProps> = ({ profile }) => {
             </button>
           </div>
 
-          <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
+          <div className="flex items-center justify-center gap-4 text-sm text-gray-600 flex-wrap">
             <div>
               <span className="font-semibold">{copy.date}:</span>{' '}
               {formatDate(liveData?.date)}
@@ -373,6 +381,17 @@ const LivePage: React.FC<LivePageProps> = ({ profile }) => {
               <span className="font-semibold">{copy.lastUpdate}:</span>{' '}
               {formatTime(liveData?.lastUpdate)}
             </div>
+            <button
+              onClick={() => loadLiveData({ showSpinner: true })}
+              disabled={refreshing}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                refreshing
+                  ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                  : 'border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100'
+              }`}
+            >
+              {refreshing ? copy.refreshing : copy.refresh}
+            </button>
           </div>
         </div>
       </div>

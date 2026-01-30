@@ -5,11 +5,40 @@ import { Pool } from 'pg';
 // Check if running on Vercel
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
 
-// Only create DB pool if NOT on Vercel (local development)
 let pool: Pool | null = null;
 
-if (!isVercel) {
-  // Local development: try to connect to DB
+if (isVercel) {
+  const requiredEnvVars = {
+    PG_HOST: process.env.PG_HOST,
+    PG_DATABASE: process.env.PG_DATABASE,
+    PG_USER: process.env.PG_USER,
+    PG_PASSWORD: process.env.PG_PASSWORD,
+    PG_PORT: process.env.PG_PORT,
+  };
+
+  if (requiredEnvVars.PG_HOST &&
+      requiredEnvVars.PG_DATABASE &&
+      requiredEnvVars.PG_USER &&
+      requiredEnvVars.PG_PASSWORD &&
+      requiredEnvVars.PG_HOST !== 'localhost') {
+    try {
+      pool = new Pool({
+        host: requiredEnvVars.PG_HOST,
+        database: requiredEnvVars.PG_DATABASE,
+        user: requiredEnvVars.PG_USER,
+        password: requiredEnvVars.PG_PASSWORD,
+        port: parseInt(requiredEnvVars.PG_PORT || '5432'),
+        ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      });
+      console.log('✅ Remote DB pool created for live-sales on Vercel');
+    } catch (error) {
+      console.warn('⚠️ Could not create remote DB pool:', error);
+      pool = null;
+    }
+  } else {
+    console.log('🌐 Running on Vercel - live-sales will return empty data (no remote DB configured)');
+  }
+} else {
   const requiredEnvVars = {
     PG_HOST: process.env.PG_HOST || 'localhost',
     PG_DATABASE: process.env.PG_DATABASE || 'showroom_sales',
@@ -32,8 +61,6 @@ if (!isVercel) {
     console.warn('⚠️ Could not create DB pool, will return empty data:', error);
     pool = null;
   }
-} else {
-  console.log('🌐 Running on Vercel - live-sales will return empty data (no DB connection)');
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

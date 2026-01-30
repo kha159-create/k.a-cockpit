@@ -5,7 +5,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Pool } from 'pg';
-import * as XLSX from 'xlsx';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 // Check if running on Vercel
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
@@ -73,49 +74,56 @@ if (!isVercel) {
   }
 }
 
-// Load store mapping from mapping.xlsx (from dailysales repository)
+const LOCAL_DATA_DIRS = [
+  path.join(process.cwd(), 'public', 'data'),
+  path.join(process.cwd(), 'data'),
+  path.join(process.cwd(), 'k.a-cockpit', 'data'),
+  process.cwd(),
+];
+
+async function readLocalJson(fileName: string): Promise<any | null> {
+  const candidatePaths = LOCAL_DATA_DIRS.map(dir => path.join(dir, fileName));
+
+  for (const filePath of candidatePaths) {
+    try {
+      const contents = await fs.readFile(filePath, 'utf-8');
+      return JSON.parse(contents);
+    } catch (error: any) {
+      if (error?.code !== 'ENOENT') {
+        console.warn(`⚠️ Failed reading ${filePath}:`, error?.message || error);
+      }
+    }
+  }
+
+  return null;
+}
+
+// Load store mapping from SQL (no external hosts)
 async function loadStoreMapping(): Promise<Map<string, string>> {
   const mapping = new Map<string, string>();
   
   try {
-    console.log('📥 Loading store mapping from dailysales...');
-    const response = await fetch('https://raw.githubusercontent.com/ALAAWF2/dailysales/main/backend/mapping.xlsx');
-    
-    if (!response.ok) {
-      console.warn('⚠️ Could not fetch mapping.xlsx, using store IDs as names');
+    if (!pool) {
+      console.warn('⚠️ No DB pool available for store mapping');
       return mapping;
     }
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet) as any[];
-    
-    const firstRow = data[0] || {};
-    const keys = Object.keys(firstRow);
-    
-    const storeIdCol = keys.find(k => {
-      const kLower = k.toLowerCase();
-      return kLower.includes('store') && (kLower.includes('number') || kLower.includes('id'));
-    }) || keys[0];
-    
-    const storeNameCol = keys.find(k => {
-      const kLower = k.toLowerCase();
-      return kLower.includes('outlet') || (kLower.includes('name') && !kLower.includes('store'));
-    }) || keys[1];
-    
-    data.forEach((row: any) => {
-      const storeId = String(row[storeIdCol] || '').trim();
-      const storeName = String(row[storeNameCol] || '').trim();
-      if (storeId && storeName && storeId !== 'NaN' && storeName !== 'NaN') {
+
+    console.log('📥 Loading store mapping from PostgreSQL...');
+    const result = await pool.query(`
+      SELECT store_id, name
+      FROM stores
+      WHERE is_active = TRUE
+    `);
+
+    result.rows.forEach((row: any) => {
+      const storeId = String(row.store_id || '').trim();
+      const storeName = String(row.name || '').trim();
+      if (storeId && storeName) {
         mapping.set(storeId, storeName);
       }
     });
-    
-    console.log(`✅ Loaded ${mapping.size} store mappings`);
+
+    console.log(`✅ Loaded ${mapping.size} store mappings from SQL`);
   } catch (error: any) {
     console.error('❌ Error loading store mapping:', error.message);
   }
@@ -123,27 +131,24 @@ async function loadStoreMapping(): Promise<Map<string, string>> {
   return mapping;
 }
 
-// Load employees_data.json from orange-dashboard
+// Load employees_data.json from local JSON (no external hosts)
 async function loadEmployeesData(): Promise<{ [storeId: string]: any[][] }> {
   try {
-    console.log('📥 Loading employees_data.json from orange-dashboard...');
-    const response: Response = await fetch('https://raw.githubusercontent.com/ALAAWF2/orange-dashboard/main/employees_data.json');
-    
-    if (!response.ok) {
-      console.warn('⚠️ Could not fetch employees_data.json from orange-dashboard');
+    console.log('📥 Loading employees_data.json from local disk...');
+    const data = await readLocalJson('employees_data.json');
+    if (!data) {
+      console.warn('⚠️ employees_data.json not found locally');
       return {};
     }
-    
-    const data = await response.json();
     console.log(`✅ Loaded employees data for ${Object.keys(data).length} stores`);
-    return data;
+    return data as { [storeId: string]: any[][] };
   } catch (error: any) {
     console.error('❌ Error loading employees_data.json:', error.message);
     return {};
   }
 }
 
-// Load targets and visitors from orange-dashboard
+// Load targets and visitors from local JSON (no external hosts)
 interface ManagementData {
   targets?: {
     [year: string]: {
@@ -166,19 +171,17 @@ async function loadTargetsAndVisitors(): Promise<{ targets: ManagementData['targ
   }
 
   try {
-    console.log('📥 Loading targets and visitors from orange-dashboard...');
-    const response: Response = await fetch('https://raw.githubusercontent.com/ALAAWF2/orange-dashboard/main/management_data.json');
-    
-    if (!response.ok) {
-      console.warn('⚠️ Could not fetch management_data.json from orange-dashboard');
+    console.log('📥 Loading targets and visitors from local management_data.json...');
+    const data = await readLocalJson('management_data.json');
+    if (!data) {
+      console.warn('⚠️ management_data.json not found locally');
       return { targets: {}, visitors: [] };
     }
-    
-    const data: ManagementData = await response.json();
-    cachedManagementData = data;
+
+    cachedManagementData = data as ManagementData;
     return {
-      targets: data.targets || {},
-      visitors: data.visitors || [],
+      targets: cachedManagementData.targets || {},
+      visitors: cachedManagementData.visitors || [],
     };
   } catch (error: any) {
     console.error('❌ Error loading management_data.json:', error.message);

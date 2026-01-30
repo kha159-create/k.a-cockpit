@@ -74,8 +74,8 @@ let cachedData: ManagementData | null = null;
 let loadingPromise: Promise<ManagementData> | null = null;
 let cachedStoreMapping: Map<string, string> | null = null;
 
-// Load targets and visitors from orange-dashboard's management_data.json (for 2024/2025)
-// This ensures consistency across all years (2024, 2025, 2026)
+// Load targets and visitors from local management_data.json (for 2024/2025)
+// This ensures consistency across all years (2024, 2025, 2026) without external hosts
 interface OrangeDashboardManagementData {
   targets?: {
     [year: string]: {
@@ -98,23 +98,19 @@ async function loadTargetsAndVisitorsFromOrangeDashboard(): Promise<{ targets: O
   }
 
   try {
-    console.log('📥 Loading targets and visitors from orange-dashboard management_data.json (for 2024/2025)...');
-    const response: Response = await fetch('https://raw.githubusercontent.com/ALAAWF2/orange-dashboard/main/management_data.json');
-    
-    if (!response.ok) {
-      console.warn('⚠️ Could not fetch management_data.json from orange-dashboard');
-      return { targets: {}, visitors: [] };
-    }
-    
-    const data: OrangeDashboardManagementData = await response.json();
-    cachedOrangeDashboardData = data;
-    console.log(`✅ Loaded targets for ${Object.keys(data.targets || {}).length} years, ${(data.visitors || []).length} visitor entries from orange-dashboard`);
-    return {
+    console.log('📥 Loading targets and visitors from local management_data.json (for 2024/2025)...');
+    const data = await loadManagementData();
+    cachedOrangeDashboardData = {
       targets: data.targets || {},
       visitors: data.visitors || [],
     };
+    console.log(`✅ Loaded targets for ${Object.keys(cachedOrangeDashboardData.targets || {}).length} years, ${(cachedOrangeDashboardData.visitors || []).length} visitor entries`);
+    return {
+      targets: cachedOrangeDashboardData.targets || {},
+      visitors: cachedOrangeDashboardData.visitors || [],
+    };
   } catch (error: any) {
-    console.error('❌ Error loading targets/visitors from orange-dashboard:', error.message);
+    console.error('❌ Error loading targets/visitors from local JSON:', error.message);
     return { targets: {}, visitors: [] };
   }
 }
